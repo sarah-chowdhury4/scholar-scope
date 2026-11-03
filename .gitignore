@@ -1,0 +1,34 @@
+# Secrets — never commit
+.env
+.env.secrets
+*.pem
+*-key.json
+service-account*.json
+
+# Dependencies and builds
+node_modules/
+dist/
+.angular/
+
+# Terraform
+**/.terraform/
+*.tfstate
+*.tfstate.*
+*.tfplan
+.terraform.lock.hcl.bak
+
+# Emulator and tool output
+firebase-debug.log
+firestore-debug.log
+ui-debug.log
+.infracost/
+
+# Local scratch
+.tmp_media/
+.DS_Store
+Thumbs.db
+
+# Seed data: keep only the example file in git
+api/seed/*.csv
+!api/seed/dataset.example.csv
+coverage/

@@ -1,0 +1,15 @@
+{
+  "indexes": [
+    { "collectionGroup": "scholarships", "queryScope": "COLLECTION", "fields": [ { "fieldPath": "status", "order": "ASCENDING" }, { "fieldPath": "deadline.utc", "order": "ASCENDING" } ] },
+    { "collectionGroup": "scholarships", "queryScope": "COLLECTION_GROUP", "fields": [ { "fieldPath": "recheck.enabled", "order": "ASCENDING" }, { "fieldPath": "recheck.nextCheckAt", "order": "ASCENDING" } ] },
+    { "collectionGroup": "scholarships", "queryScope": "COLLECTION_GROUP", "fields": [ { "fieldPath": "deadline.utc", "order": "ASCENDING" } ] },
+    { "collectionGroup": "requirements", "queryScope": "COLLECTION", "fields": [ { "fieldPath": "matchKey", "order": "ASCENDING" }, { "fieldPath": "removedAt", "order": "ASCENDING" } ] },
+    { "collectionGroup": "changes", "queryScope": "COLLECTION_GROUP", "fields": [ { "fieldPath": "status", "order": "ASCENDING" }, { "fieldPath": "detectedAt", "order": "DESCENDING" } ] },
+    { "collectionGroup": "alerts", "queryScope": "COLLECTION", "fields": [ { "fieldPath": "inApp.readAt", "order": "ASCENDING" }, { "fieldPath": "createdAt", "order": "DESCENDING" } ] },
+    { "collectionGroup": "auditLogs", "queryScope": "COLLECTION", "fields": [ { "fieldPath": "subjectUid", "order": "ASCENDING" }, { "fieldPath": "at", "order": "DESCENDING" } ] },
+    { "collectionGroup": "sources", "queryScope": "COLLECTION", "fields": [ { "fieldPath": "kind", "order": "ASCENDING" }, { "fieldPath": "url", "order": "ASCENDING" } ] }
+  ],
+  "fieldOverrides": [
+    { "collectionGroup": "auditLogs", "fieldPath": "expireAt", "ttl": true, "indexes": [] }
+  ]
+}

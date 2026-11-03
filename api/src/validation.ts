@@ -1,0 +1,61 @@
+import { z } from 'zod';
+import { SCHOLARSHIP_STATUSES } from '@scholarscope/shared';
+
+const httpsOrHttpUrl = z
+  .string()
+  .trim()
+  .max(2000)
+  .refine((v) => /^https?:\/\//i.test(v), 'Must start with http:// or https://');
+
+export const createScholarshipSchema = z.object({
+  name: z.string().trim().min(1).max(200),
+  provider: z.string().trim().min(1).max(200),
+  url: httpsOrHttpUrl.nullable().optional(),
+  awardAmount: z
+    .object({ amount: z.number().nonnegative().max(10_000_000), currency: z.string().length(3).toUpperCase() })
+    .nullable()
+    .optional(),
+  /** A deadline typed by the student is stored as "unverified" until a source confirms it. */
+  deadline: z
+    .object({
+      date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Use YYYY-MM-DD'),
+      timezone: z.string().min(1).max(64).default('UTC'),
+    })
+    .nullable()
+    .optional(),
+  catalogId: z.string().regex(/^SCH-\d{3}$/).nullable().optional(),
+});
+
+export const updateScholarshipSchema = createScholarshipSchema.partial().extend({
+  status: z.enum(SCHOLARSHIP_STATUSES).exclude(['archived']).optional(),
+});
+
+export const ALLOWED_UPLOAD_TYPES = [
+  'application/pdf',
+  'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+  'text/plain',
+  'image/png',
+  'image/jpeg',
+] as const;
+
+export const createUploadSchema = z.object({
+  fileName: z.string().trim().min(1).max(200),
+  contentType: z.enum(ALLOWED_UPLOAD_TYPES),
+  size: z.number().int().positive(),
+  /** Scholarship guidelines (a source) or a library item (a material). */
+  purpose: z.enum(['source', 'material']),
+  scholarshipId: z.string().min(1).max(128).optional(),
+});
+
+export const addUrlSourceSchema = z.object({
+  scholarshipId: z.string().min(1).max(128),
+  url: httpsOrHttpUrl,
+});
+
+export const consentSchema = z.object({ version: z.string().min(1).max(32) });
+
+/** Keep only safe characters in object keys. */
+export function safeFileName(name: string): string {
+  const cleaned = name.normalize('NFKD').replace(/[^\w.-]+/g, '_').replace(/_+/g, '_');
+  return cleaned.slice(-120) || 'file';
+}

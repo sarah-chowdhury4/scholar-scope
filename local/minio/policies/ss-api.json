@@ -1,0 +1,17 @@
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "UploadToQuarantineOnly",
+      "Effect": "Allow",
+      "Action": ["s3:PutObject"],
+      "Resource": ["arn:aws:s3:::uploads/*"]
+    },
+    {
+      "Sid": "ReadCleanFilesAndExports",
+      "Effect": "Allow",
+      "Action": ["s3:GetObject", "s3:GetObjectVersion"],
+      "Resource": ["arn:aws:s3:::originals/*", "arn:aws:s3:::exports/*"]
+    }
+  ]
+}

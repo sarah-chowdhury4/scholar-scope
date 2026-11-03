@@ -1,0 +1,26 @@
+{
+  "name": "@scholarscope/worker",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "nodemon --legacy-watch --watch src --watch ../shared/src --ext ts --exec tsx src/index.ts",
+    "start": "tsx src/index.ts",
+    "cron:recheck": "tsx src/runOnce.ts recheck",
+    "cron:deadline-alerts": "tsx src/runOnce.ts deadline-alerts",
+    "delete-user": "tsx src/jobs/deleteUser.ts",
+    "typecheck": "tsc -p tsconfig.json"
+  },
+  "dependencies": {
+    "@scholarscope/shared": "*",
+    "firebase-admin": "^14.5.0",
+    "html-to-text": "^9.0.5",
+    "mammoth": "^1.10.0",
+    "node-cron": "^4.0.0",
+    "pdfjs-dist": "^5.4.0",
+    "robots-parser": "^3.0.1"
+  },
+  "devDependencies": {
+    "@types/html-to-text": "^9.0.4"
+  }
+}

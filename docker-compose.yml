@@ -1,0 +1,258 @@
+# ScholarScope — local stack (no cloud account needed)
+# See README.md. Start with:  docker compose up -d --build
+#
+# Stand-ins for the Google Cloud services in the production design:
+#   Firestore, Identity Platform  -> Firebase emulators (firebase)
+#   Cloud Storage                 -> MinIO (minio)
+#   Cloud Tasks, Secret Manager   -> LocalStack SQS + Secrets Manager (localstack)
+#   Brevo                         -> Mailpit (mailpit)
+#   ClamAV on the worker          -> ClamAV container (clamav)
+#
+# Every published port is bound to 127.0.0.1 so nothing is reachable from your network.
+# Each service gets only the variables it needs; nothing uses env_file except LocalStack,
+# which loads the real API keys from .env.secrets into its Secrets Manager.
+
+name: scholarscope
+
+services:
+
+  # ---------- Firestore + Auth emulators ----------
+  firebase:
+    build: ./local/firebase
+    init: true
+    stop_grace_period: 30s          # time to write the export on shutdown
+    volumes:
+      - firebase-data:/data
+    ports:
+      - "127.0.0.1:4000:4000"       # Emulator UI
+      - "127.0.0.1:4400:4400"       # emulator hub (used by the UI)
+      - "127.0.0.1:8080:8080"       # Firestore
+      - "127.0.0.1:9099:9099"       # Auth (the Angular app talks to this)
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://localhost:4400/emulators').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 10s
+      timeout: 5s
+      retries: 30
+      start_period: 30s
+
+  # ---------- Object storage (stands in for Cloud Storage) ----------
+  minio:
+    image: ${MINIO_IMAGE:?set MINIO_IMAGE in .env (pin a tag or digest)}
+    # Chainguard's MinIO build runs as uid 65532; root keeps the named volume writable (local only).
+    user: "0:0"
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:?set in .env}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:?set in .env}
+      MINIO_API_CORS_ALLOW_ORIGIN: http://localhost:4200
+    volumes:
+      - minio-data:/data
+    ports:
+      - "127.0.0.1:9000:9000"       # S3 API (browser uploads go here via presigned URLs)
+      - "127.0.0.1:9001:9001"       # MinIO console
+    healthcheck:
+      # works with both the official image (mc) and Chainguard's -dev image (wget)
+      test: ["CMD-SHELL", "mc ready local >/dev/null 2>&1 || wget -q --spider http://localhost:9000/minio/health/live"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  # One-shot: buckets, versioning, lifecycle rules, one user + policy per service
+  minio-init:
+    image: ${MC_IMAGE:?set MC_IMAGE in .env (pin a tag or digest)}
+    depends_on:
+      minio:
+        condition: service_healthy
+    entrypoint: ["/bin/sh", "/init/init.sh"]
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}
+      MINIO_API_ACCESS_KEY: ${MINIO_API_ACCESS_KEY:?set in .env}
+      MINIO_API_SECRET_KEY: ${MINIO_API_SECRET_KEY:?set in .env}
+      MINIO_WORKER_ACCESS_KEY: ${MINIO_WORKER_ACCESS_KEY:?set in .env}
+      MINIO_WORKER_SECRET_KEY: ${MINIO_WORKER_SECRET_KEY:?set in .env}
+      MINIO_DELETER_ACCESS_KEY: ${MINIO_DELETER_ACCESS_KEY:?set in .env}
+      MINIO_DELETER_SECRET_KEY: ${MINIO_DELETER_SECRET_KEY:?set in .env}
+    volumes:
+      - ./local/minio:/init:ro
+    restart: "no"
+
+  # ---------- Queues + secrets (stands in for Cloud Tasks + Secret Manager) ----------
+  localstack:
+    image: ${LOCALSTACK_IMAGE:?set LOCALSTACK_IMAGE in .env (pin a tag)}
+    environment:
+      LOCALSTACK_AUTH_TOKEN: ${LOCALSTACK_AUTH_TOKEN:?set LOCALSTACK_AUTH_TOKEN in .env}
+      SERVICES: sqs,secretsmanager
+      AWS_DEFAULT_REGION: us-east-1
+    env_file:
+      - .env.secrets                 # GEMINI_API_KEY, NVIDIA_API_KEY, BREVO_API_KEY -> Secrets Manager
+    volumes:
+      - ./local/localstack/init-ready.sh:/etc/localstack/init/ready.d/10-init.sh:ro
+    ports:
+      - "127.0.0.1:4566:4566"
+    healthcheck:
+      test: ["CMD", "bash", "-c", "awslocal sqs get-queue-url --queue-name default-queue >/dev/null"]
+      interval: 10s
+      timeout: 5s
+      retries: 30
+      start_period: 20s
+
+  # ---------- Malware scanning (NFR-1.4) ----------
+  clamav:
+    image: ${CLAMAV_IMAGE:-clamav/clamav:stable}
+    volumes:
+      - clamav-db:/var/lib/clamav    # keeps signatures between restarts
+    healthcheck:
+      test: ["CMD", "clamdcheck.sh"]
+      interval: 30s
+      timeout: 10s
+      retries: 10
+      start_period: 180s             # first start downloads signatures
+
+  # ---------- Email catcher (stands in for Brevo) ----------
+  mailpit:
+    image: ${MAILPIT_IMAGE:-axllent/mailpit:latest}
+    ports:
+      - "127.0.0.1:8025:8025"       # web inbox for alert emails
+
+  # ---------- ScholarScope API (Express) ----------
+  api:
+    build:
+      context: .
+      dockerfile: local/docker/node-dev.Dockerfile
+    command: npm run dev
+    volumes:
+      - ./shared:/repo/shared
+      - ./api:/repo/api
+      # keep the container's Linux node_modules; never use ones installed on Windows
+      - /repo/shared/node_modules
+      - /repo/api/node_modules
+    environment:
+      APP_ENV: local
+      PORT: "3000"
+      GCLOUD_PROJECT: demo-scholarscope
+      FIRESTORE_EMULATOR_HOST: firebase:8080
+      FIREBASE_AUTH_EMULATOR_HOST: firebase:9099
+      STORAGE_BACKEND: s3
+      S3_ENDPOINT: http://minio:9000
+      S3_PUBLIC_ENDPOINT: http://localhost:9000     # host the browser uses for presigned URLs
+      S3_ACCESS_KEY: ${MINIO_API_ACCESS_KEY}
+      S3_SECRET_KEY: ${MINIO_API_SECRET_KEY}
+      BUCKET_UPLOADS: uploads
+      BUCKET_ORIGINALS: originals
+      BUCKET_EXPORTS: exports
+      QUEUE_BACKEND: sqs
+      AWS_ENDPOINT_URL: http://localstack:4566
+      AWS_REGION: us-east-1
+      AWS_ACCESS_KEY_ID: test
+      AWS_SECRET_ACCESS_KEY: test
+      CORS_ORIGIN: http://localhost:4200
+    ports:
+      - "127.0.0.1:3000:3000"
+    depends_on:
+      firebase: { condition: service_healthy }
+      minio-init: { condition: service_completed_successfully }
+      localstack: { condition: service_healthy }
+
+  # ---------- Worker: scan, OCR, extract, diff, draft, alerts ----------
+  worker:
+    build:
+      context: .
+      dockerfile: local/docker/worker-dev.Dockerfile
+    command: npm run dev
+    volumes:
+      - ./shared:/repo/shared
+      - ./worker:/repo/worker
+      # keep the container's Linux node_modules; never use ones installed on Windows
+      - /repo/shared/node_modules
+      - /repo/worker/node_modules
+    environment:
+      APP_ENV: local
+      GCLOUD_PROJECT: demo-scholarscope
+      FIRESTORE_EMULATOR_HOST: firebase:8080
+      STORAGE_BACKEND: s3
+      S3_ENDPOINT: http://minio:9000
+      S3_ACCESS_KEY: ${MINIO_WORKER_ACCESS_KEY}
+      S3_SECRET_KEY: ${MINIO_WORKER_SECRET_KEY}
+      BUCKET_UPLOADS: uploads
+      BUCKET_ORIGINALS: originals
+      BUCKET_EXPORTS: exports
+      QUEUE_BACKEND: sqs
+      SECRETS_BACKEND: aws
+      AWS_ENDPOINT_URL: http://localstack:4566
+      AWS_REGION: us-east-1
+      AWS_ACCESS_KEY_ID: test
+      AWS_SECRET_ACCESS_KEY: test
+      CLAMAV_HOST: clamav
+      CLAMAV_PORT: "3310"
+      OCR_BACKEND: tesseract
+      GEMINI_BACKEND: aistudio                       # "vertex" on Google Cloud
+      GEMINI_MODEL: ${GEMINI_MODEL:?set GEMINI_MODEL in .env}
+      NIM_BASE_URL: https://integrate.api.nvidia.com/v1
+      AI_REAL_STUDENT_DATA_ALLOWED: "false"          # synthetic documents only (NFR-1.5)
+      MAIL_BACKEND: smtp                             # "brevo" to send real emails
+      SMTP_HOST: mailpit
+      SMTP_PORT: "1025"
+      SCHEDULER: cron                                # Cloud Scheduler on Google Cloud
+      CRON_RECHECK: "0 2 * * *"
+      CRON_DEADLINE_ALERTS: "0 13 * * *"
+      GEMINI_RATE_PER_SEC: "1"                       # same limits as the Cloud Tasks queues
+      NIM_RATE_PER_MIN: "30"
+    depends_on:
+      firebase: { condition: service_healthy }
+      minio-init: { condition: service_completed_successfully }
+      localstack: { condition: service_healthy }
+      clamav: { condition: service_healthy }
+      mailpit: { condition: service_started }
+
+  # ---------- One-off: delete all data for one student (FR-8.4) ----------
+  #   docker compose run --rm deleter          (all pending deletion requests)
+  #   docker compose run --rm deleter <uid>    (one student now)
+  deleter:
+    profiles: ["tools"]
+    build:
+      context: .
+      dockerfile: local/docker/worker-dev.Dockerfile
+    entrypoint: ["npx", "tsx", "src/jobs/deleteUser.ts"]
+    volumes:
+      - ./shared:/repo/shared
+      - ./worker:/repo/worker
+      # keep the container's Linux node_modules; never use ones installed on Windows
+      - /repo/shared/node_modules
+      - /repo/worker/node_modules
+    environment:
+      APP_ENV: local
+      GCLOUD_PROJECT: demo-scholarscope
+      FIRESTORE_EMULATOR_HOST: firebase:8080
+      FIREBASE_AUTH_EMULATOR_HOST: firebase:9099
+      STORAGE_BACKEND: s3
+      S3_ENDPOINT: http://minio:9000
+      S3_ACCESS_KEY: ${MINIO_DELETER_ACCESS_KEY}
+      S3_SECRET_KEY: ${MINIO_DELETER_SECRET_KEY}
+      BUCKET_UPLOADS: uploads
+      BUCKET_ORIGINALS: originals
+      BUCKET_EXPORTS: exports
+    depends_on:
+      firebase: { condition: service_healthy }
+      minio-init: { condition: service_completed_successfully }
+
+  # ---------- Optional: Angular dev server in Docker ----------
+  # Running `npm start` in ./web on your own machine is faster on Windows.
+  #   docker compose --profile web up -d web
+  web:
+    profiles: ["web"]
+    image: node:22-bookworm-slim
+    working_dir: /app
+    command: sh -c "npm ci && npx ng serve --host 0.0.0.0 --poll 2000 --proxy-config proxy.docker.json"
+    volumes:
+      - ./web:/app
+      - /app/node_modules
+    ports:
+      - "127.0.0.1:4200:4200"
+    depends_on:
+      - api
+
+volumes:
+  firebase-data:
+  minio-data:
+  clamav-db:

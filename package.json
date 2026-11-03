@@ -1,0 +1,26 @@
+{
+  "name": "scholarscope",
+  "private": true,
+  "description": "ScholarScope: track scholarship requirements with a source for every claim.",
+  "type": "module",
+  "workspaces": [
+    "shared",
+    "api",
+    "worker"
+  ],
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "typecheck": "npm run typecheck --workspaces --if-present",
+    "test": "vitest run",
+    "check": "npm run typecheck && npm test"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.0",
+    "nodemon": "^3.1.14",
+    "tsx": "^4.23.15",
+    "typescript": "^5.9.0",
+    "vitest": "^3.2.0"
+  }
+}

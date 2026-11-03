@@ -1,0 +1,29 @@
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "ReadQuarantine",
+      "Effect": "Allow",
+      "Action": ["s3:GetObject"],
+      "Resource": ["arn:aws:s3:::uploads/*"]
+    },
+    {
+      "Sid": "AddAndReadOriginalsAndExports",
+      "Effect": "Allow",
+      "Action": ["s3:PutObject", "s3:GetObject", "s3:GetObjectVersion"],
+      "Resource": ["arn:aws:s3:::originals/*", "arn:aws:s3:::exports/*"]
+    },
+    {
+      "Sid": "ListBuckets",
+      "Effect": "Allow",
+      "Action": ["s3:ListBucket", "s3:GetBucketLocation"],
+      "Resource": ["arn:aws:s3:::uploads", "arn:aws:s3:::originals", "arn:aws:s3:::exports"]
+    },
+    {
+      "Sid": "NeverDelete",
+      "Effect": "Deny",
+      "Action": ["s3:DeleteObject", "s3:DeleteObjectVersion", "s3:PutLifecycleConfiguration", "s3:PutBucketVersioning", "s3:PutBucketPolicy"],
+      "Resource": ["arn:aws:s3:::uploads", "arn:aws:s3:::uploads/*", "arn:aws:s3:::originals", "arn:aws:s3:::originals/*", "arn:aws:s3:::exports", "arn:aws:s3:::exports/*"]
+    }
+  ]
+}
