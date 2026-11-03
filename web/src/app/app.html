@@ -1,0 +1,10 @@
+<header class="topbar">
+  <a routerLink="/" class="brand">ScholarScope</a>
+  <span class="tagline">No source, no claim.</span>
+  @if (auth.signedIn()) {
+    <button type="button" class="link" (click)="auth.signOut()">Sign out</button>
+  }
+</header>
+<main>
+  <router-outlet />
+</main>

@@ -1,0 +1,28 @@
+.topbar {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  padding: 0.75rem 1rem;
+  border-bottom: 1px solid var(--line);
+  background: var(--surface);
+}
+.brand {
+  font-weight: 700;
+  font-size: 1.15rem;
+  color: var(--ink);
+  text-decoration: none;
+}
+.tagline {
+  color: var(--muted);
+  flex: 1;
+}
+main {
+  max-width: 960px;
+  margin: 0 auto;
+  padding: 1rem;
+}
+@media (max-width: 480px) {
+  .tagline {
+    display: none;
+  }
+}
