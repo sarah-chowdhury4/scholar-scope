@@ -27,13 +27,30 @@ Everything runs on your own computer with Docker. **You don't need a cloud accou
 
 ## Before you start
 
-| Tool | Version | Check with |
-|---|---|---|
-| Docker Desktop (Windows: **WSL 2** engine) | recent; give Docker **≥ 6 GB RAM** | `docker info` prints a *Server* section · `wsl -l -v` shows `docker-desktop` version 2 |
-| Node.js | **22.22.3 or newer** (Angular 22 refuses older 22.x) | `node -v` |
-| Git | any recent | `git --version` |
+You need Docker (with Compose v2), Node.js **22.22.3 or newer** (Angular 22 refuses older 22.x) and Git. Docker needs **at least 6 GB RAM**; ClamAV alone uses about 1.5 GB.
 
-**Windows users:** use **PowerShell** (not Command Prompt) for every command below. Run each code block's commands as written; a long command is **one line**, even if your screen wraps it.
+| | Windows 10/11 | macOS (Intel or Apple Silicon) | Linux (Ubuntu, Debian, Fedora…) |
+|---|---|---|---|
+| Docker | Docker Desktop with the **WSL 2** engine | Docker Desktop (OrbStack or Colima also work) | Docker Engine + the `docker compose` plugin |
+| Docker memory | Settings → Resources (or WSL default: half your RAM) | Settings → Resources → Memory ≥ 6 GB | uses system RAM directly |
+| Node.js 22 | Installer from nodejs.org | `nvm install 22` ([nvm](https://github.com/nvm-sh/nvm)) or `brew install node@22` | `nvm install 22` ([nvm](https://github.com/nvm-sh/nvm)) |
+| Git | git-scm.com | `xcode-select --install` or `brew install git` | `sudo apt install git` / `sudo dnf install git` |
+| Terminal | **PowerShell** (not Command Prompt) | Terminal (zsh) | any shell (bash) |
+
+**Linux only:** let your user run Docker without `sudo`: `sudo usermod -aG docker $USER`, then log out and back in.
+
+Check the installs (same on every system):
+
+```bash
+docker info              # prints a "Server" section with no errors
+docker compose version   # v2.x or newer
+node -v                  # v22.22.3 or newer
+git --version
+```
+
+Windows only: `wsl -l -v` should list `docker-desktop` with VERSION 2.
+
+Code blocks below are labelled **PowerShell** (Windows) or **bash** (macOS/Linux). Unlabelled `docker …` commands are the same everywhere. Run each command as **one line**, even if your screen wraps it.
 
 ---
 
@@ -43,10 +60,12 @@ All commands run from the repository root unless a step says otherwise.
 
 ### 1. Clone
 
-```powershell
+```bash
 git clone https://github.com/<org>/scholar-scope.git
 cd scholar-scope
 ```
+
+(Same command in PowerShell.)
 
 ### 2. Get the free keys (no card needed)
 
@@ -63,14 +82,24 @@ Keep keys in a password manager, never in chat, screenshots or recordings.
 
 ### 3. Create your settings files
 
+**PowerShell**
+
 ```powershell
 Copy-Item .env.example .env
 Copy-Item local\localstack\secrets.env.example .env.secrets
 ```
 
-(macOS/Linux: `cp .env.example .env` and `cp local/localstack/secrets.env.example .env.secrets`.)
+**bash**
 
-Fill the four MinIO secrets with random **hex** values. Hex matters: a value starting with `-` breaks the MinIO setup. This fills only those four lines:
+```bash
+cp .env.example .env
+cp local/localstack/secrets.env.example .env.secrets
+chmod 600 .env .env.secrets
+```
+
+Fill the four MinIO secrets with random **hex** values. Hex matters: a value starting with `-` breaks the MinIO setup. These commands fill only those four lines:
+
+**PowerShell**
 
 ```powershell
 $keys = 'MINIO_ROOT_PASSWORD','MINIO_API_SECRET_KEY','MINIO_WORKER_SECRET_KEY','MINIO_DELETER_SECRET_KEY'
@@ -82,9 +111,17 @@ foreach ($k in $keys) {
 Set-Content .env $c -Encoding ascii
 ```
 
-(macOS/Linux: for each of the four keys, `sed -i "s/^KEY=.*/KEY=$(openssl rand -hex 24)/" .env`.)
+**bash** (works with both macOS and GNU `sed`)
 
-Then open `.env` and set `LOCALSTACK_AUTH_TOKEN` and `GEMINI_MODEL`; open `.env.secrets` and set `GEMINI_API_KEY`.
+```bash
+for k in MINIO_ROOT_PASSWORD MINIO_API_SECRET_KEY MINIO_WORKER_SECRET_KEY MINIO_DELETER_SECRET_KEY; do
+  v=$(node -e "console.log(require('crypto').randomBytes(24).toString('hex'))")
+  sed -i.bak "s/^$k=.*/$k=$v/" .env
+done
+rm .env.bak
+```
+
+Then open `.env` and set `LOCALSTACK_AUTH_TOKEN` and `GEMINI_MODEL`; open `.env.secrets` and set `GEMINI_API_KEY`. Use any text editor: `notepad .env` (Windows), `open -e .env` (macOS) or `nano .env` (Linux).
 
 Both files are git-ignored. If this is a fresh copy rather than a clone, run `git init -b main` first, then confirm with `git status` that neither file is listed.
 
@@ -97,13 +134,13 @@ Both files are git-ignored. If this is a fresh copy rather than a clone, run `gi
 
 Check that everything is filled in. This prints nothing when the config is valid:
 
-```powershell
+```bash
 docker compose config -q
 ```
 
 To move to newer images later, pull them, then copy the printed `name@sha256:…` into `.env.example` for everyone:
 
-```powershell
+```bash
 docker pull cgr.dev/chainguard/minio:latest-dev
 docker image inspect cgr.dev/chainguard/minio:latest-dev --format "{{index .RepoDigests 0}}"
 docker pull localstack/localstack:latest
@@ -112,7 +149,7 @@ docker image inspect localstack/localstack:latest --format "{{index .RepoDigests
 
 ### 5. Start the infrastructure
 
-```powershell
+```bash
 docker compose up -d --build firebase minio minio-init localstack clamav mailpit
 docker compose ps
 ```
@@ -121,7 +158,7 @@ The first start takes several minutes: the Firebase image downloads the emulator
 
 **Done when:** `docker compose ps` shows `firebase`, `minio`, `localstack`, `clamav` and `mailpit` as **healthy** (`minio-init` runs once and exits), and
 
-```powershell
+```bash
 docker compose logs --tail 20 minio-init localstack
 ```
 
@@ -141,7 +178,7 @@ The `awslocal is deprecated` banner is harmless.
 
 ### 7. Run the storage permission tests
 
-```powershell
+```bash
 docker compose run --rm --entrypoint /bin/sh minio-init /init/test-permissions.sh
 ```
 
@@ -149,7 +186,7 @@ docker compose run --rm --entrypoint /bin/sh minio-init /init/test-permissions.s
 
 ### 8. Start the API and worker
 
-```powershell
+```bash
 docker compose up -d --build api worker
 docker compose logs --tail 20 api worker
 ```
@@ -158,13 +195,15 @@ docker compose logs --tail 20 api worker
 
 ### 9. Start the web app
 
-In a second PowerShell window:
+In a second terminal window, from the repository root:
 
-```powershell
+```bash
 cd web
 npm ci
 npm start
 ```
+
+(Same commands in PowerShell.)
 
 Open http://localhost:4200. You should see the sign-in page. Choose **Create an account** (any email, 12+ character password).
 
@@ -188,7 +227,7 @@ Open http://localhost:4200. You should see the sign-in page. Choose **Create an 
 
 Export a scholarship list to `api/seed/dataset.csv` (same columns as `api/seed/dataset.example.csv`, dates as `YYYY-MM-DD`), then:
 
-```powershell
+```bash
 docker compose exec api npm run seed -- seed/dataset.csv demo@student.test "a-long-demo-password"
 ```
 
@@ -227,11 +266,13 @@ All ports listen on `127.0.0.1` only.
 
 ## Tests
 
-```powershell
-npm ci; npm run check                       # typecheck + unit tests (shared, api, worker)
-cd web; npx ng test --watch=false           # Angular tests
+```bash
+npm ci && npm run check                     # typecheck + unit tests (shared, api, worker)
+cd web && npx ng test --watch=false && cd ..   # Angular tests
 docker compose run --rm --entrypoint /bin/sh minio-init /init/test-permissions.sh
 ```
+
+In Windows PowerShell 5, use `;` instead of `&&`.
 
 ---
 
@@ -239,16 +280,20 @@ docker compose run --rm --entrypoint /bin/sh minio-init /init/test-permissions.s
 
 | Symptom | Fix |
 |---|---|
-| `'clamav' is not recognized as an internal or external command` | A long command was split over two lines. Run it as one line, in PowerShell. |
+| `'clamav' is not recognized…` (Windows) or `clamav: command not found` (macOS/Linux) | A long command was split over two lines. Run it as one line. |
 | `required variable … is missing a value` | That value in `.env` is empty (step 3). |
 | `pull access denied for minio/mc` or `401 Unauthorized` from quay.io | Old MinIO image names. Use the Chainguard digest from `.env.example` (step 4). |
 | `No such image: localstack/…` | The pull didn't finish. Run `docker pull localstack/localstack:latest` again. |
 | `minio-init`: `flag provided but not defined` | A MinIO secret starts with `-`. Refill the four with hex (step 3), then `docker compose rm -sf minio minio-init`, `docker volume rm scholarscope_minio-data`, `docker compose up -d minio minio-init`. |
 | `localstack` exits or shows a licence error | `LOCALSTACK_AUTH_TOKEN` is missing or wrong. |
 | Worker: `queue_receive_failed … ECONNREFUSED 127.0.0.1:4566` | You have an old copy of `shared/src/platform/queue/sqs.ts`. Pull the latest code, then `docker compose restart worker`. |
-| `npm warn EBADENGINE` and Angular won't start | Node.js is older than 22.22.3. Install the latest Node 22 LTS, reopen PowerShell, run `npm ci` again. |
+| `npm warn EBADENGINE` and Angular won't start | Node.js is older than 22.22.3. Install the latest Node 22 LTS (Windows: nodejs.org installer; macOS/Linux: `nvm install 22 && nvm alias default 22`), open a new terminal, run `npm ci` again. |
+| Linux: `permission denied while trying to connect to the Docker daemon socket` | Add yourself to the `docker` group (see *Before you start*), then log out and back in. |
+| Linux: `docker: 'compose' is not a docker command` | Install the Compose v2 plugin (`sudo apt install docker-compose-plugin` on Docker's apt repo). The old `docker-compose` v1 tool isn't supported. |
+| Apple Silicon: `no matching manifest for linux/arm64` for one image | Create `docker-compose.override.yml` with `services: { <service>: { platform: linux/amd64 } }` (Docker Desktop runs it under emulation), or pin a newer multi-arch digest. |
+| Containers slow or killed on a Mac | Docker Desktop → Settings → Resources → Memory ≥ 6 GB. |
 | Web app shows only the header | Pull the latest code (the sign-in guard fix), then reload. Otherwise press F12 → Console and check the red errors. |
-| `/bin/sh^M: bad interpreter` | A `.sh` file got Windows line endings. `.gitattributes` prevents this for new clones; to fix now, open it in VS Code → *CRLF* → *LF* → save. |
+| `/bin/sh^M: bad interpreter` | A `.sh` file got Windows line endings. `.gitattributes` prevents this for new clones; to fix now, open it in VS Code → *CRLF* → *LF* → save (macOS/Linux: `sed -i.bak 's/\r$//' file.sh`). |
 | ClamAV unhealthy for several minutes | First signature download. Wait, or give Docker more RAM. |
 | Upload fails with a signature or CORS error | `S3_PUBLIC_ENDPOINT` must be `http://localhost:9000` and the web app must run on `http://localhost:4200`. |
 | Upload stuck on "Reading the requirements…" | `docker compose logs --tail 30 worker`. Usually a wrong Gemini key or model id. Fix it, then `docker compose restart localstack worker`. |
