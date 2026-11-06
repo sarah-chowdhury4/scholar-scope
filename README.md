@@ -193,7 +193,19 @@ docker compose logs --tail 20 api worker
 
 **Done when:** the logs show `api_started`, `worker_started` and three `queue_consumer_started` lines, and http://localhost:3000/api/health returns `{"status":"ok"}`.
 
-### 9. Start the web app
+### 9. Load the scholarship catalog
+
+The **Discover** page lists the scholarships in the catalog. Export the dataset to `api/seed/dataset.csv` (columns as in `api/seed/dataset.example.csv`, dates as `YYYY-MM-DD`; the file is git-ignored), then:
+
+```bash
+docker compose exec api npm run seed:catalog -- seed/dataset.csv
+```
+
+No dataset at hand? Use the two fictional examples: `… seed:catalog -- seed/dataset.example.csv`.
+
+**Done when:** it prints `Catalog: N scholarships saved.`
+
+### 10. Start the web app
 
 In a second terminal window, from the repository root:
 
@@ -205,13 +217,14 @@ npm start
 
 (Same commands in PowerShell.)
 
-Open http://localhost:4200. You should see the sign-in page. Choose **Create an account** (any email, 12+ character password).
+Open http://localhost:4200. You should see the sign-in page. Choose **Create an account** (any email, 12+ character password). A new account starts with an **empty dashboard** with two buttons: **Discover scholarships** and **Add one that isn't listed**.
 
-### 10. Try the full flow
+### 11. Try the full flow
 
-1. Add a scholarship with a deadline **7 days from today**. It shows an **Unverified** badge, because you typed it and there's no source yet.
-2. Trigger the deadline alert now: `docker compose exec worker npm run cron:deadline-alerts`. The email appears at http://localhost:8025.
-3. Save this as `example-guidelines.txt` and upload it on the scholarship's page:
+1. Open **Discover** (top menu). Search (e.g. `leadership`), filter by deadline, your GPA, provider or what the application asks for (essay, video, recommendation…), then **Add to my scholarships**. The button changes to **Added · open**.
+2. Back on **My scholarships**, choose **Add your own** and add a scholarship that isn't listed, with a deadline **7 days from today**. It shows an **Unverified** badge, because you typed it and there's no source yet.
+3. Trigger the deadline alert now: `docker compose exec worker npm run cron:deadline-alerts`. The email appears at http://localhost:8025.
+4. Save this as `example-guidelines.txt` and upload it on the scholarship's page:
 
    ```text
    Example Award 2027 — Application Guidelines
@@ -221,17 +234,15 @@ Open http://localhost:4200. You should see the sign-in page. Choose **Create an 
    Submit one recommendation letter from a teacher.
    ```
 
-4. Each requirement now shows its quoted sentence and a **From source** / **Needs review** badge. **Open source** opens the stored file.
+5. Each requirement now shows its quoted sentence and a **From source** / **Needs review** badge. **Open source** opens the stored file.
 
-### Optional: seed demo records
-
-Export a scholarship list to `api/seed/dataset.csv` (same columns as `api/seed/dataset.example.csv`, dates as `YYYY-MM-DD`), then:
+### Optional: a demo student with scholarships already added
 
 ```bash
 docker compose exec api npm run seed -- seed/dataset.csv demo@student.test "a-long-demo-password"
 ```
 
-Seeded values have no citation, so they show as **Unverified** until real guidelines are uploaded. `api/seed/*.csv` is git-ignored except the example.
+This loads the catalog and adds catalog scholarships (up to 15) to a demo account. Catalog values have no citation, so they show as **Unverified** until real guidelines are uploaded.
 
 ---
 
@@ -360,12 +371,18 @@ The local setup does **not** provide encryption at rest, IAM enforcement in Loca
 | Area | Status |
 |---|---|
 | Sign-up / sign-in, consent, idle timeout | Done (TOTP MFA screens to do) |
-| Scholarship records (up to 15), dashboard sorted by deadline | Done |
+| Scholarship records (up to 15), dashboard sorted by deadline, empty state for new students | Done |
+| Discover page: catalog search, filters (deadline, GPA, provider, what's required), add to my list | Done |
+| Add a scholarship that isn't in the catalog (name, provider, page, award, deadline) | Done |
+| Landing page before sign-in | To do |
 | Upload → scan → store original → extract with citations | Done |
+| Paste a scholarship page URL as a source (UI) | To do (API ready) |
+| Confirm / correct / reject an extracted item | To do |
 | OCR for images and scanned PDFs | Done (Tesseract locally) |
 | Requirement versions + change flag on re-extraction | Done (basic pairing by requirement name) |
 | Daily page re-check (robots.txt, change detection) | Done |
-| Deadline alerts (in-app + email, de-duplicated) | Done |
+| Deadline alerts (email, de-duplicated; stored for in-app) | Done |
+| In-app alerts list, change alerts | To do |
 | Delete my data | Done |
 | Side-by-side diff view, acknowledging changes | To do |
 | Material library, matching (NIM embeddings) | To do |

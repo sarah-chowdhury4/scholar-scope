@@ -8,6 +8,8 @@ export * from './audit';
 export * from './citations';
 export * from './deadlines';
 export * from './jobs';
+export * from './catalog';
+export * from './catalogStore';
 export { storage, buckets, type Storage } from './platform/storage/index';
 export { queue, QUEUE_FOR_JOB, type Queue } from './platform/queue/index';
 export { consume } from './platform/queue/sqs';

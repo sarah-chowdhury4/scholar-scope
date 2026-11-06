@@ -1,21 +1,42 @@
 import { Component, OnInit, inject, signal } from '@angular/core';
 import { DatePipe } from '@angular/common';
-import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { RouterLink } from '@angular/router';
-import { HttpErrorResponse } from '@angular/common/http';
 import { ApiService, type Scholarship } from '../../core/api.service';
 
 @Component({
   selector: 'app-dashboard',
-  imports: [ReactiveFormsModule, RouterLink, DatePipe],
+  imports: [RouterLink, DatePipe],
   template: `
-    <h1>Your scholarships</h1>
-    <p class="hint">Sorted by nearest deadline. Anything marked <span class="badge unverified">Unverified</span> has no source yet.</p>
+    <div class="page-head">
+      <div>
+        <h1>My scholarships</h1>
+        @if (!loading() && items().length > 0) {
+          <p class="hint">
+            {{ items().length }} of {{ limit }} · sorted by nearest deadline · <span class="badge unverified">Unverified</span> means no source yet
+          </p>
+        }
+      </div>
+      @if (items().length > 0) {
+        <div class="actions">
+          <a class="button" routerLink="/discover">Discover scholarships</a>
+          <a class="button secondary" routerLink="/scholarships/new">Add your own</a>
+        </div>
+      }
+    </div>
 
     @if (loading()) {
       <p>Loading…</p>
+    } @else if (error()) {
+      <p class="error" role="alert">{{ error() }}</p>
     } @else if (items().length === 0) {
-      <p class="card">No scholarships yet. Add your first one below.</p>
+      <section class="card empty">
+        <h2>Your dashboard is empty</h2>
+        <p>Start by finding scholarships to track. You can follow up to {{ limit }}.</p>
+        <div class="actions">
+          <a class="button" routerLink="/discover">Discover scholarships</a>
+          <a class="button secondary" routerLink="/scholarships/new">Add one that isn't listed</a>
+        </div>
+      </section>
     } @else {
       <ul class="cards">
         @for (s of items(); track s.id) {
@@ -44,24 +65,6 @@ import { ApiService, type Scholarship } from '../../core/api.service';
         }
       </ul>
     }
-
-    <section class="card">
-      <h2>Add a scholarship</h2>
-      <form [formGroup]="form" (ngSubmit)="add()">
-        <label for="name">Name</label>
-        <input id="name" formControlName="name" required />
-        <label for="provider">Provider</label>
-        <input id="provider" formControlName="provider" required />
-        <label for="url">Official page (optional)</label>
-        <input id="url" type="url" formControlName="url" placeholder="https://" />
-        <label for="deadline">Deadline (optional)</label>
-        <input id="deadline" type="date" formControlName="deadline" />
-        @if (error()) {
-          <p class="error" role="alert">{{ error() }}</p>
-        }
-        <button type="submit" [disabled]="form.invalid">Add</button>
-      </form>
-    </section>
   `,
 })
 export class Dashboard implements OnInit {
@@ -69,12 +72,7 @@ export class Dashboard implements OnInit {
   protected readonly items = signal<Scholarship[]>([]);
   protected readonly loading = signal(true);
   protected readonly error = signal('');
-  protected readonly form = inject(FormBuilder).nonNullable.group({
-    name: ['', Validators.required],
-    provider: ['', Validators.required],
-    url: [''],
-    deadline: [''],
-  });
+  protected readonly limit = 15;
 
   async ngOnInit() {
     await this.load();
@@ -86,27 +84,13 @@ export class Dashboard implements OnInit {
 
   async load() {
     this.loading.set(true);
-    try {
-      this.items.set((await this.api.scholarships()).items);
-    } finally {
-      this.loading.set(false);
-    }
-  }
-
-  async add() {
-    const v = this.form.getRawValue();
     this.error.set('');
     try {
-      await this.api.createScholarship({
-        name: v.name,
-        provider: v.provider,
-        url: v.url || null,
-        deadline: v.deadline ? { date: v.deadline, timezone: Intl.DateTimeFormat().resolvedOptions().timeZone } : null,
-      });
-      this.form.reset();
-      await this.load();
-    } catch (err) {
-      this.error.set(err instanceof HttpErrorResponse && err.error?.error ? err.error.error : 'Could not add the scholarship.');
+      this.items.set((await this.api.scholarships()).items);
+    } catch {
+      this.error.set('Could not load your scholarships. Is the API running?');
+    } finally {
+      this.loading.set(false);
     }
   }
 

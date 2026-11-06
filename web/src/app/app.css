@@ -16,13 +16,30 @@
   color: var(--muted);
   flex: 1;
 }
+nav {
+  display: flex;
+  gap: 1rem;
+}
+nav a {
+  color: var(--ink);
+  text-decoration: none;
+  padding: 0.25rem 0;
+  border-bottom: 3px solid transparent;
+}
+nav a.active {
+  border-bottom-color: var(--accent);
+  font-weight: 600;
+}
 main {
   max-width: 960px;
   margin: 0 auto;
   padding: 1rem;
 }
-@media (max-width: 480px) {
+@media (max-width: 640px) {
   .tagline {
     display: none;
+  }
+  .topbar {
+    flex-wrap: wrap;
   }
 }
