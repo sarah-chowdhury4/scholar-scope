@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>My profile</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Newsreader:ital,wght@1,400&display=swap">
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<main class="page">
+
+  <!-- Header card -->
+  <section class="card hero">
+    <div class="avatar-wrap">
+      <div class="avatar" id="avatar" aria-label="Profile photo"><span id="avatarInitial">S</span></div>
+      <button class="btn btn-light" id="photoBtn" type="button">Add photo</button>
+      <button class="link" id="photoRemove" type="button" hidden>Remove</button>
+      <input type="file" id="photoInput" accept="image/png,image/jpeg" hidden>
+    </div>
+    <div class="hero-main">
+      <h1 id="userName">Student name</h1>
+      <p class="muted" id="userEmail">student@example.com</p>
+      <p class="hint" id="photoHint">JPG or PNG, up to 2 MB.</p>
+      <div class="progress-track" id="photoProgress" hidden><div class="progress-bar" id="photoProgressBar"></div></div>
+      <p class="error" id="photoError" role="alert"></p>
+    </div>
+    <div class="complete">
+      <div class="complete-top"><span>Profile complete</span><strong id="pctText">0%</strong></div>
+      <div class="progress-track"><div class="progress-bar" id="pctBar"></div></div>
+      <p class="hint" id="pctHint"></p>
+    </div>
+  </section>
+
+  <div class="grid">
+    <div class="col">
+
+      <!-- Email -->
+      <section class="card">
+        <h2>Email address</h2>
+        <p class="muted">We'll send a verification link to the new address.</p>
+        <form id="emailForm" novalidate>
+          <label for="newEmail">New email</label>
+          <input id="newEmail" type="email" placeholder="you@example.com" autocomplete="email">
+          <p class="error" id="newEmailErr"></p>
+          <label for="emailPwd">Current password</label>
+          <div class="pwd"><input id="emailPwd" type="password" autocomplete="current-password"><button type="button" class="toggle" data-target="emailPwd">Show</button></div>
+          <p class="error" id="emailPwdErr"></p>
+          <button class="btn" type="submit">Change email</button>
+        </form>
+      </section>
+
+      <!-- Password -->
+      <section class="card">
+        <h2>Password</h2>
+        <p class="muted">Use at least 8 characters with a mix of letters, numbers and symbols.</p>
+        <form id="pwdForm" novalidate>
+          <label for="curPwd">Current password</label>
+          <div class="pwd"><input id="curPwd" type="password" autocomplete="current-password"><button type="button" class="toggle" data-target="curPwd">Show</button></div>
+          <p class="error" id="curPwdErr"></p>
+          <div class="row-between"><label for="newPwd">New password</label><button type="button" class="link" id="forgotBtn">Forgot password?</button></div>
+          <div class="pwd"><input id="newPwd" type="password" autocomplete="new-password"><button type="button" class="toggle" data-target="newPwd">Show</button></div>
+          <div class="meter"><span></span><span></span><span></span><span></span></div>
+          <p class="hint" id="meterText">Enter a password</p>
+          <label for="confPwd">Confirm new password</label>
+          <div class="pwd"><input id="confPwd" type="password" autocomplete="new-password"><button type="button" class="toggle" data-target="confPwd">Show</button></div>
+          <p class="error" id="confPwdErr"></p>
+          <button class="btn" type="submit">Change password</button>
+        </form>
+      </section>
+    </div>
+
+    <!-- Countries -->
+    <section class="card">
+      <div class="row-between">
+        <h2>Scholarship countries</h2>
+        <span class="badge" id="countBadge">0 selected</span>
+      </div>
+      <p class="muted">Pick every country where you'd like to study. You can change this any time.</p>
+
+      <label for="countrySearch">Search countries</label>
+      <div class="combo">
+        <input id="countrySearch" type="text" placeholder="Start typing a country" autocomplete="off" role="combobox" aria-expanded="false" aria-controls="countryList">
+        <ul id="countryList" class="dropdown" role="listbox" hidden></ul>
+      </div>
+
+      <h3>Popular destinations</h3>
+      <div class="chips" id="popular"></div>
+
+      <h3>Your selection</h3>
+      <div class="chips" id="selected"></div>
+      <p class="hint" id="emptyMsg">No countries yet. Choose from the list above.</p>
+
+      <div class="row-between actions">
+        <button class="link" id="clearAll" type="button">Clear all</button>
+        <button class="btn" id="saveCountries" type="button">Save countries</button>
+      </div>
+    </section>
+  </div>
+</main>
+
+<!-- Forgot password dialog -->
+<div class="modal" id="forgotModal" hidden>
+  <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="fpTitle">
+    <h2 id="fpTitle">Reset your password</h2>
+    <p class="muted">We'll email a reset link to <strong id="fpEmail"></strong>.</p>
+    <div class="row-end">
+      <button class="btn btn-light" id="fpCancel" type="button">Cancel</button>
+      <button class="btn" id="fpSend" type="button">Send reset link</button>
+    </div>
+  </div>
+</div>
+
+<div class="toasts" id="toasts" aria-live="polite"></div>
+<script src="script.js"></script>
+</body>
+</html>
