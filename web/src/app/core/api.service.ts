@@ -1,4 +1,4 @@
-import { HttpClient, HttpErrorResponse } from '@angular/common/http';
+import { HttpClient, HttpErrorResponse, HttpParams } from '@angular/common/http';
 import { Injectable, inject } from '@angular/core';
 import { firstValueFrom } from 'rxjs';
 
@@ -116,7 +116,33 @@ export type NewScholarship = {
   name: string;
   provider: string;
   url?: string | null;
+  awardAmount?: { amount: number; currency: string } | null;
   deadline?: { date: string; timezone: string } | null;
+};
+
+export type CatalogTag = 'essay' | 'recommendation' | 'transcript' | 'video' | 'financial' | 'resume';
+
+export type CatalogItem = {
+  catalogId: string;
+  organization: string;
+  name: string;
+  deadline: string | null;
+  minGpa: number | null;
+  promptOrMaterials: string;
+  sourceUrl: string | null;
+  tags: CatalogTag[];
+  deadlinePassed: boolean;
+  addedScholarshipId: string | null;
+};
+
+export type CatalogQuery = {
+  q?: string;
+  deadline?: 'upcoming' | '30' | '90' | 'all';
+  gpa?: number | null;
+  requires?: CatalogTag[];
+  excludes?: CatalogTag[];
+  organization?: string;
+  sort?: 'deadline' | 'name' | 'gpa';
 };
 
 @Injectable({ providedIn: 'root' })
@@ -149,6 +175,23 @@ export class ApiService {
     firstValueFrom(this.http.get<Scholarship & { requirements: Requirement[] }>(`/api/scholarships/${id}`));
   createScholarship = (body: NewScholarship) => firstValueFrom(this.http.post<Scholarship>('/api/scholarships', body));
   archiveScholarship = (id: string) => firstValueFrom(this.http.post(`/api/scholarships/${id}/archive`, {}));
+
+  /** Discover page: search and filter the scholarship catalog. */
+  catalog(query: CatalogQuery) {
+    let params = new HttpParams();
+    if (query.q) params = params.set('q', query.q);
+    if (query.deadline) params = params.set('deadline', query.deadline);
+    if (query.gpa !== undefined && query.gpa !== null) params = params.set('gpa', String(query.gpa));
+    if (query.requires?.length) params = params.set('requires', query.requires.join(','));
+    if (query.excludes?.length) params = params.set('excludes', query.excludes.join(','));
+    if (query.organization) params = params.set('organization', query.organization);
+    if (query.sort) params = params.set('sort', query.sort);
+    return firstValueFrom(
+      this.http.get<{ items: CatalogItem[]; total: number; organizations: string[]; tags: CatalogTag[] }>('/api/catalog', { params }),
+    );
+  }
+  addFromCatalog = (catalogId: string) =>
+    firstValueFrom(this.http.post<{ scholarshipId: string; alreadyAdded: boolean }>(`/api/catalog/${catalogId}/add`, {}));
 
   viewSource = (sourceId: string, versionId: string) =>
     firstValueFrom(this.http.get<{ url: string }>(`/api/sources/${sourceId}/versions/${versionId}/view`));

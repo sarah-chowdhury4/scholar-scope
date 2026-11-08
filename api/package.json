@@ -7,6 +7,7 @@
     "dev": "nodemon --legacy-watch --watch src --watch ../shared/src --ext ts --exec tsx src/index.ts",
     "start": "tsx src/index.ts",
     "seed": "tsx scripts/seed.ts",
+    "seed:catalog": "tsx scripts/seed.ts --catalog-only",
     "typecheck": "tsc -p tsconfig.json"
   },
   "dependencies": {

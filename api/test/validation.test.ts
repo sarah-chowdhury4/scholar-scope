@@ -38,3 +38,16 @@ describe('safeFileName', () => {
     expect(safeFileName('My Essay (final).pdf')).toBe('My_Essay_final_.pdf');
   });
 });
+
+import { catalogQuerySchema } from '../src/routes/catalog';
+
+describe('catalogQuerySchema', () => {
+  it('reads comma-separated tags and defaults', () => {
+    const q = catalogQuerySchema.parse({ requires: 'essay,video', gpa: '3.2' });
+    expect(q).toMatchObject({ requires: ['essay', 'video'], excludes: [], gpa: 3.2, deadline: 'upcoming', sort: 'deadline' });
+  });
+  it('rejects unknown tags and silly GPAs', () => {
+    expect(() => catalogQuerySchema.parse({ requires: 'bribe' })).toThrow();
+    expect(() => catalogQuerySchema.parse({ gpa: '12' })).toThrow();
+  });
+});

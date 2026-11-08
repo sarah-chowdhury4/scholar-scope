@@ -12,6 +12,7 @@ import { passwordResetRouter } from './routes/passwordReset';
 import { scholarshipsRouter } from './routes/scholarships';
 import { uploadsRouter } from './routes/uploads';
 import { jobsRouter, sourcesRouter, alertsRouter } from './routes/misc';
+import { catalogRouter } from './routes/catalog';
 
 export function createApp() {
   const app = express();
@@ -47,6 +48,7 @@ export function createApp() {
   api.use('/jobs', jobsRouter);
   api.use('/sources', sourcesRouter);
   api.use('/alerts', alertsRouter);
+  api.use('/catalog', catalogRouter);
   app.use('/api', api);
   app.use('/api', (_req, res) => res.status(404).json({ error: 'Not found' }));
 
