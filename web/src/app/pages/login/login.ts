@@ -1,18 +1,24 @@
 import { Component, inject, signal } from '@angular/core';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
-import { ActivatedRoute, Router } from '@angular/router';
+import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { AuthService } from '../../core/auth.service';
 import { ApiService } from '../../core/api.service';
 import { environment } from '../../../environments/environment';
 
 @Component({
   selector: 'app-login',
-  imports: [ReactiveFormsModule],
+  imports: [ReactiveFormsModule, RouterLink],
   template: `
     <section class="card narrow">
       <h1>{{ mode() === 'signin' ? 'Sign in' : 'Create your account' }}</h1>
       @if (route.snapshot.queryParamMap.get('reason') === 'idle') {
         <p class="notice" role="status">You were signed out after 30 minutes without activity.</p>
+      }
+      @if (route.snapshot.queryParamMap.get('reason') === 'password') {
+        <p class="notice" role="status">Password changed. Sign in with the new password.</p>
+      }
+      @if (route.snapshot.queryParamMap.get('reason') === 'email') {
+        <p class="notice" role="status">Email changed. Sign in with the new address.</p>
       }
       <form [formGroup]="form" (ngSubmit)="submit()">
         <label for="email">Email</label>
@@ -41,6 +47,9 @@ import { environment } from '../../../environments/environment';
         }
         <button type="submit" [disabled]="busy()">{{ mode() === 'signin' ? 'Sign in' : 'Create account' }}</button>
       </form>
+      @if (mode() === 'signin') {
+        <a routerLink="/forgot-password">Forgot password?</a>
+      }
       <button class="link" type="button" (click)="toggle()">
         {{ mode() === 'signin' ? 'New here? Create an account' : 'Already have an account? Sign in' }}
       </button>

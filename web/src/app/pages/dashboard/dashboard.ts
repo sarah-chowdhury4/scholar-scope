@@ -11,6 +11,13 @@ import { ApiService, type Scholarship } from '../../core/api.service';
   template: `
     <h1>Your scholarships</h1>
     <p class="hint">Sorted by nearest deadline. Anything marked <span class="badge unverified">Unverified</span> has no source yet.</p>
+    @if (profileNote()) {
+      <p class="notice">
+        Your profile still needs {{ profileNote() }}.
+        <a routerLink="/profile">Update your profile</a>
+        so recommendations and domestic or international rules have the facts they need.
+      </p>
+    }
 
     @if (loading()) {
       <p>Loading…</p>
@@ -56,6 +63,7 @@ import { ApiService, type Scholarship } from '../../core/api.service';
         <input id="url" type="url" formControlName="url" placeholder="https://" />
         <label for="deadline">Deadline (optional)</label>
         <input id="deadline" type="date" formControlName="deadline" />
+        <p class="hint">This date is stored in {{ deadlineZone() }}. Change that on your profile if it is not where you live.</p>
         @if (error()) {
           <p class="error" role="alert">{{ error() }}</p>
         }
@@ -69,6 +77,8 @@ export class Dashboard implements OnInit {
   protected readonly items = signal<Scholarship[]>([]);
   protected readonly loading = signal(true);
   protected readonly error = signal('');
+  protected readonly deadlineZone = signal(Intl.DateTimeFormat().resolvedOptions().timeZone);
+  protected readonly profileNote = signal('');
   protected readonly form = inject(FormBuilder).nonNullable.group({
     name: ['', Validators.required],
     provider: ['', Validators.required],
@@ -87,7 +97,10 @@ export class Dashboard implements OnInit {
   async load() {
     this.loading.set(true);
     try {
-      this.items.set((await this.api.scholarships()).items);
+      const [list, me] = await Promise.all([this.api.scholarships(), this.api.me().catch(() => null)]);
+      this.items.set(list.items);
+      if (me?.timezoneChosen && me.timezone) this.deadlineZone.set(me.timezone);
+      this.profileNote.set(me && me.readinessPercent < 100 ? me.missingForRecommendations.join('; ') : '');
     } finally {
       this.loading.set(false);
     }
@@ -101,7 +114,7 @@ export class Dashboard implements OnInit {
         name: v.name,
         provider: v.provider,
         url: v.url || null,
-        deadline: v.deadline ? { date: v.deadline, timezone: Intl.DateTimeFormat().resolvedOptions().timeZone } : null,
+        deadline: v.deadline ? { date: v.deadline, timezone: this.deadlineZone() } : null,
       });
       this.form.reset();
       await this.load();

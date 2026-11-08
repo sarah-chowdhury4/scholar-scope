@@ -11,7 +11,7 @@
  */
 import { readFileSync } from 'node:fs';
 import { FieldValue, Timestamp } from 'firebase-admin/firestore';
-import { assertSafeEnvironment, auth, db, userDoc, ensureAppConfig, getAppConfig } from '@scholarscope/shared';
+import { assertSafeEnvironment, auth, db, userDoc, ensureAppConfig, getAppConfig, claimEmail, normalizeEmail } from '@scholarscope/shared';
 
 if (process.env.APP_ENV !== 'local') {
   console.error('The seed script only runs against the local emulators (APP_ENV=local).');
@@ -65,17 +65,26 @@ try {
 } catch {
   uid = (await auth().createUser({ email, password, emailVerified: true })).uid;
 }
+const loginEmail = normalizeEmail(email) ?? email.trim().toLowerCase();
+const existingUser = await userDoc(uid).get();
 await userDoc(uid).set(
   {
-    email,
-    timezone: 'UTC',
-    consent: { version: 'seed', acceptedAt: new Date() },
-    notificationPrefs: { email: true, inApp: true },
-    deletion: null,
-    createdAt: FieldValue.serverTimestamp(),
+    email: loginEmail,
+    ...(existingUser.get('emails')
+      ? {}
+      : { emails: [{ address: loginEmail, verified: true, primary: true }] }),
+    timezone: existingUser.get('timezone') ?? 'UTC',
+    consent: existingUser.get('consent') ?? { version: 'seed', acceptedAt: new Date() },
+    notificationPrefs: existingUser.get('notificationPrefs') ?? { email: true, inApp: true },
+    deletion: existingUser.get('deletion') ?? null,
+    createdAt: existingUser.get('createdAt') ?? FieldValue.serverTimestamp(),
   },
   { merge: true },
 );
+if ((await claimEmail(loginEmail, uid)) === 'taken') {
+  console.error(`Email ${loginEmail} is already indexed to another account.`);
+  process.exit(1);
+}
 
 let created = 0;
 for (const r of rows.slice(0, maxScholarshipsPerStudent)) {

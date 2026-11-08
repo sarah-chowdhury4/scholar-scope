@@ -6,14 +6,14 @@
  *   docker compose run --rm deleter <uid>      # delete one student now
  *
  * Removes: users/{uid} and everything under it, all stored files and versions under u/{uid}/,
- * the sign-in account. Audit log entries are kept (1-year TTL) but their subjectUid is replaced
- * by a salted hash so they no longer identify the student.
+ * the sign-in account, and the email-address index. Audit log entries are kept (1-year TTL)
+ * but their subjectUid is replaced by a salted hash so they no longer identify the student.
  */
 import { createHash, randomBytes } from 'node:crypto';
 import { assertSafeEnvironment, log } from '@scholarscope/shared';
 
 assertSafeEnvironment();
-const { db, auth, userDoc, storage, buckets, writeAudit } = await import('@scholarscope/shared');
+const { db, auth, userDoc, storage, buckets, writeAudit, releaseAllEmails } = await import('@scholarscope/shared');
 
 async function deleteUser(uid: string) {
   const store = await storage();
@@ -22,6 +22,7 @@ async function deleteUser(uid: string) {
     files += await store.deletePrefix(bucket, `u/${uid}/`);
   }
 
+  await releaseAllEmails(uid);
   await db().recursiveDelete(userDoc(uid));
 
   try {

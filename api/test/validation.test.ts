@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { createScholarshipSchema, createUploadSchema, safeFileName } from '../src/validation';
+import { createScholarshipSchema, createUploadSchema, passwordChangeSchema, profilePatchSchema, safeFileName } from '../src/validation';
 
 describe('createScholarshipSchema', () => {
   it('accepts a minimal record', () => {
@@ -18,6 +18,17 @@ describe('createUploadSchema', () => {
     expect(() =>
       createUploadSchema.parse({ fileName: 'a.exe', contentType: 'application/x-msdownload', size: 10, purpose: 'source' }),
     ).toThrow();
+  });
+});
+
+describe('profile schemas', () => {
+  it('accepts a partial profile update and rejects unknown fields', () => {
+    expect(profilePatchSchema.parse({ displayName: 'Aisha Rahman', countriesOfInterest: ['Canada'] }).displayName).toBe('Aisha Rahman');
+    expect(() => profilePatchSchema.parse({ password: 'nope' })).toThrow();
+  });
+  it('keeps the sign-up password length', () => {
+    expect(() => passwordChangeSchema.parse({ currentPassword: 'x', newPassword: 'short' })).toThrow();
+    expect(passwordChangeSchema.parse({ currentPassword: 'x', newPassword: 'a-long-password' }).newPassword).toBe('a-long-password');
   });
 });
 

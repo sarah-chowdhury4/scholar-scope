@@ -16,6 +16,11 @@
   color: var(--muted);
   flex: 1;
 }
+.topbar a.nav {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+}
 main {
   max-width: 960px;
   margin: 0 auto;

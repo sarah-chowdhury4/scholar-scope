@@ -54,6 +54,77 @@ export const addUrlSourceSchema = z.object({
 
 export const consentSchema = z.object({ version: z.string().min(1).max(32) });
 
+export const profilePatchSchema = z
+  .object({
+    displayName: z.string().trim().max(80, 'Name must be 80 characters or fewer.').nullable().optional(),
+    timezone: z.string().trim().min(1).max(64).optional(),
+    notificationPrefs: z.object({ email: z.boolean() }).optional(),
+    countriesOfInterest: z.array(z.string()).max(15, 'You can save up to 15 countries.').optional(),
+    citizenships: z.array(z.string()).max(4, 'You can save up to 4 citizenships.').optional(),
+    currentLocation: z.string().nullable().optional(),
+    residencyStatus: z.string().nullable().optional(),
+    schoolCountry: z.string().nullable().optional(),
+    birthYear: z.number().int().nullable().optional(),
+    studyLanguages: z.string().max(120, 'Languages must be 120 characters or fewer.').nullable().optional(),
+    education: z
+      .object({
+        highestLevel: z.string().nullable().optional(),
+        enrollment: z.string().nullable().optional(),
+        fieldOfStudy: z.string().nullable().optional(),
+        gpa: z.number().nullable().optional(),
+        gpaScale: z.string().nullable().optional(),
+        expectedGraduation: z.string().nullable().optional(),
+      })
+      .optional(),
+  })
+  .strict();
+
+export const emailAddressSchema = z.object({ address: z.string().trim().min(1, 'Enter a valid email address.') }).strict();
+
+export const changeEmailSchema = z
+  .object({
+    currentAddress: z.string().trim().min(1, 'Enter a valid email address.'),
+    newAddress: z.string().trim().min(1, 'Enter a valid email address.'),
+    currentPassword: z.string().optional(),
+  })
+  .strict();
+
+export const verifyEmailSchema = z.object({ code: z.string().trim() }).strict();
+
+export const primaryEmailSchema = z
+  .object({
+    address: z.string().trim().min(1, 'Enter a valid email address.'),
+    currentPassword: z.string(),
+  })
+  .strict();
+
+export const passwordChangeSchema = z
+  .object({
+    currentPassword: z.string(),
+    newPassword: z
+      .string()
+      .min(12, 'Use a password with at least 12 characters.')
+      .max(128, 'That password is too long.'),
+  })
+  .strict();
+
+export const deleteAccountSchema = z.object({ currentPassword: z.string() }).strict();
+
+export const passwordResetRequestSchema = z
+  .object({ email: z.string().trim().min(1, 'Enter a valid email address.').max(254) })
+  .strict();
+
+export const passwordResetConfirmSchema = z
+  .object({
+    email: z.string().trim().min(1, 'Enter a valid email address.').max(254),
+    code: z.string().trim(),
+    newPassword: z
+      .string()
+      .min(12, 'Use a password with at least 12 characters.')
+      .max(128, 'That password is too long.'),
+  })
+  .strict();
+
 /** Keep only safe characters in object keys. */
 export function safeFileName(name: string): string {
   const cleaned = name.normalize('NFKD').replace(/[^\w.-]+/g, '_').replace(/_+/g, '_');

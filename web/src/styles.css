@@ -41,10 +41,32 @@ a { color: var(--accent); }
 form { display: grid; gap: 0.4rem; }
 label { font-weight: 600; margin-top: 0.4rem; }
 label.check { display: flex; gap: 0.5rem; font-weight: 400; align-items: flex-start; }
-input:not([type='checkbox']) { font: inherit; padding: 0.55rem; border: 1px solid var(--line); border-radius: 6px; width: 100%; }
+input:not([type='checkbox']), select {
+  font: inherit;
+  padding: 0.55rem;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  width: 100%;
+  background: var(--surface);
+  color: var(--ink);
+}
 button { font: inherit; padding: 0.55rem 1rem; border-radius: 6px; border: 1px solid var(--accent); background: var(--accent); color: #fff; cursor: pointer; min-height: 44px; }
 button:disabled { opacity: 0.6; cursor: not-allowed; }
-button.link { background: none; border: none; color: var(--accent); padding: 0.25rem 0; min-height: auto; text-decoration: underline; }
+button.link, a.nav { background: none; border: none; color: var(--accent); padding: 0.25rem 0; min-height: auto; text-decoration: underline; font-weight: 600; }
+button.secondary { background: var(--surface); color: var(--ink); border-color: var(--line); }
+button.danger { background: var(--bad-ink); border-color: var(--bad-ink); }
+.success { background: var(--ok-bg); color: var(--ok-ink); padding: 0.5rem; border-radius: 6px; }
+.actions, .chips { display: flex; flex-wrap: wrap; gap: 0.4rem; align-items: center; }
+.email-row { display: flex; flex-wrap: wrap; gap: 0.5rem; align-items: center; justify-content: space-between; border-top: 1px solid var(--line); padding: 0.6rem 0; }
+.chip { font: inherit; min-height: 44px; padding: 0.2rem 0.7rem; border-radius: 999px; border: 1px solid var(--line); background: var(--surface); color: var(--ink); cursor: pointer; }
+.chip.on, .chip.picked { background: var(--accent); color: #fff; border-color: var(--accent); }
+.bar, .meter { height: 8px; background: var(--line); border-radius: 99px; overflow: hidden; }
+.bar > span, .meter > span { display: block; height: 100%; background: var(--accent); }
+.suggest { position: relative; }
+.suggest ul { position: absolute; z-index: 2; left: 0; right: 0; max-height: 220px; overflow: auto; margin: 0.2rem 0 0; padding: 0; list-style: none; background: var(--surface); border: 1px solid var(--line); border-radius: 6px; }
+.suggest li { padding: 0.45rem 0.6rem; cursor: pointer; }
+.suggest li.none { cursor: default; color: var(--muted); }
+.suggest li.active, .suggest li:hover { background: var(--page); }
 .badge { display: inline-block; font-size: 0.8rem; font-weight: 600; padding: 0.1rem 0.5rem; border-radius: 999px; margin-left: 0.4rem; }
 .badge.verified { background: var(--ok-bg); color: var(--ok-ink); }
 .badge.needs_review { background: var(--warn-bg); color: var(--warn-ink); }

@@ -1,4 +1,4 @@
-import { HttpClient } from '@angular/common/http';
+import { HttpClient, HttpErrorResponse } from '@angular/common/http';
 import { Injectable, inject } from '@angular/core';
 import { firstValueFrom } from 'rxjs';
 
@@ -34,7 +34,83 @@ export type Requirement = {
   current: { value: Record<string, unknown>; citation: Citation | null };
 };
 
-export type Me = { uid: string; email: string | null; consent: { version: string } | null; scholarshipCount: number };
+export type ProfileEmail = { address: string; verified: boolean; primary: boolean };
+
+export type Education = {
+  highestLevel: string | null;
+  enrollment: string | null;
+  fieldOfStudy: string | null;
+  gpa: number | null;
+  gpaScale: string | null;
+  expectedGraduation: string | null;
+};
+
+export type Me = {
+  uid: string;
+  email: string | null;
+  displayName: string | null;
+  timezone: string;
+  timezoneChosen: boolean;
+  consent: { version: string; acceptedAt: string | null } | null;
+  scholarshipCount: number;
+  notificationPrefs: { email: boolean; inApp: boolean };
+  deletion: { requestedAt: string | null; completedAt: string | null } | null;
+  emails: ProfileEmail[];
+  pendingEmail: { address: string; replaces: string | null } | null;
+  countriesOfInterest: string[];
+  citizenships: string[];
+  currentLocation: string | null;
+  residencyStatus: string | null;
+  schoolCountry: string | null;
+  birthYear: number | null;
+  studyLanguages: string | null;
+  education: Education;
+  domesticCountries: string[];
+  schoolNote: string | null;
+  hints: string[];
+  missingForRecommendations: string[];
+  readinessPercent: number;
+};
+
+export type ProfileOptions = {
+  countries: string[];
+  popularCountries: string[];
+  educationLevels: { id: string; label: string }[];
+  enrollments: { id: string; label: string }[];
+  residencyStatuses: { id: string; label: string }[];
+  gpaScales: { id: string; label: string }[];
+  limits: { maxEmails: number; maxCountriesOfInterest: number; maxCitizenships: number; minPasswordLength: number };
+};
+
+export type ProfilePatch = {
+  displayName?: string | null;
+  timezone?: string;
+  notificationPrefs?: { email: boolean };
+  countriesOfInterest?: string[];
+  citizenships?: string[];
+  currentLocation?: string | null;
+  residencyStatus?: string | null;
+  schoolCountry?: string | null;
+  birthYear?: number | null;
+  studyLanguages?: string | null;
+  education?: {
+    highestLevel?: string | null;
+    enrollment?: string | null;
+    fieldOfStudy?: string | null;
+    gpa?: number | null;
+    gpaScale?: string | null;
+    expectedGraduation?: string | null;
+  };
+};
+
+export function apiMessage(err: unknown, fallback: string): string {
+  if (err instanceof HttpErrorResponse) {
+    if (err.status === 0) return 'Could not reach ScholarScope. Check your connection and try again.';
+    const body = err.error as { error?: unknown } | null;
+    if (body && typeof body.error === 'string' && body.error.trim()) return body.error;
+  }
+  return fallback;
+}
 
 export type NewScholarship = {
   name: string;
@@ -48,6 +124,24 @@ export class ApiService {
   private readonly http = inject(HttpClient);
 
   me = () => firstValueFrom(this.http.get<Me>('/api/me'));
+  profileOptions = () => firstValueFrom(this.http.get<ProfileOptions>('/api/me/options'));
+  updateProfile = (body: ProfilePatch) => firstValueFrom(this.http.patch<Me>('/api/me', body));
+  addEmail = (address: string) => firstValueFrom(this.http.post<Me>('/api/me/emails', { address }));
+  changeEmail = (body: { currentAddress: string; newAddress: string; currentPassword?: string }) =>
+    firstValueFrom(this.http.post<Me>('/api/me/emails/change', body));
+  verifyEmail = (code: string) => firstValueFrom(this.http.post<Me>('/api/me/emails/verify', { code }));
+  resendEmailCode = () => firstValueFrom(this.http.post<Me>('/api/me/emails/resend', {}));
+  cancelEmailChange = () => firstValueFrom(this.http.post<Me>('/api/me/emails/cancel', {}));
+  removeEmail = (address: string) => firstValueFrom(this.http.post<Me>('/api/me/emails/remove', { address }));
+  makePrimaryEmail = (address: string, currentPassword: string) =>
+    firstValueFrom(this.http.post<Me>('/api/me/emails/primary', { address, currentPassword }));
+  changePassword = (currentPassword: string, newPassword: string) =>
+    firstValueFrom(this.http.post<Me>('/api/me/password', { currentPassword, newPassword }));
+  deleteAccount = (currentPassword: string) =>
+    firstValueFrom(this.http.post<Me>('/api/me/delete', { currentPassword }));
+  requestPasswordReset = (email: string) => firstValueFrom(this.http.post<{ ok: boolean }>('/api/auth/password-reset', { email }));
+  confirmPasswordReset = (email: string, code: string, newPassword: string) =>
+    firstValueFrom(this.http.post<{ email: string }>('/api/auth/password-reset/confirm', { email, code, newPassword }));
   consent = (version: string) => firstValueFrom(this.http.post('/api/me/consent', { version }));
 
   scholarships = () => firstValueFrom(this.http.get<{ items: Scholarship[] }>('/api/scholarships'));

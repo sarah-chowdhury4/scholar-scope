@@ -2,6 +2,7 @@
   <a routerLink="/" class="brand">ScholarScope</a>
   <span class="tagline">No source, no claim.</span>
   @if (auth.signedIn()) {
+    <a routerLink="/profile" class="nav">Profile</a>
     <button type="button" class="link" (click)="auth.signOut()">Sign out</button>
   }
 </header>

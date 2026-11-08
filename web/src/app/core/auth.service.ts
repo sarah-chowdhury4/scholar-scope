@@ -59,6 +59,11 @@ export class AuthService {
     return (await this.auth.currentUser?.getIdToken()) ?? null;
   }
 
+  /** Force a new token after the sign-in email changes. */
+  async refreshToken(): Promise<void> {
+    await this.auth.currentUser?.getIdToken(true);
+  }
+
   private resetIdle() {
     clearTimeout(this.idleTimer);
     this.idleTimer = setTimeout(() => {

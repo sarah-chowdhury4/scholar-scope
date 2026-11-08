@@ -6,7 +6,9 @@ import { resolve } from 'node:path';
 import { ZodError } from 'zod';
 import { log, errorMessage } from '@scholarscope/shared';
 import { requireAuth } from './auth';
+import { HttpError } from './http';
 import { meRouter } from './routes/me';
+import { passwordResetRouter } from './routes/passwordReset';
 import { scholarshipsRouter } from './routes/scholarships';
 import { uploadsRouter } from './routes/uploads';
 import { jobsRouter, sourcesRouter, alertsRouter } from './routes/misc';
@@ -33,6 +35,8 @@ export function createApp() {
   }
 
   app.get('/api/health', (_req, res) => res.json({ status: 'ok' }));
+  // Password reset is used from the sign-in page, before a token exists.
+  app.use('/api/auth', passwordResetRouter);
 
   const api = express.Router();
   api.use(rateLimit({ windowMs: 60_000, limit: 120, standardHeaders: 'draft-8', legacyHeaders: false }));
@@ -54,6 +58,7 @@ export function createApp() {
   }
 
   app.use((err: unknown, req: Request, res: Response, _next: NextFunction) => {
+    if (err instanceof HttpError) return res.status(err.status).json({ error: err.message });
     if (err instanceof ZodError) {
       return res.status(400).json({ error: 'Invalid request', details: err.issues.map((i) => ({ path: i.path.join('.'), message: i.message })) });
     }

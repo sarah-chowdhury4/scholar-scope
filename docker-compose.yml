@@ -147,12 +147,16 @@ services:
       AWS_ACCESS_KEY_ID: test
       AWS_SECRET_ACCESS_KEY: test
       CORS_ORIGIN: http://localhost:4200
+      MAIL_BACKEND: smtp
+      SMTP_HOST: mailpit
+      SMTP_PORT: "1025"
     ports:
       - "127.0.0.1:3000:3000"
     depends_on:
       firebase: { condition: service_healthy }
       minio-init: { condition: service_completed_successfully }
       localstack: { condition: service_healthy }
+      mailpit: { condition: service_started }
 
   # ---------- Worker: scan, OCR, extract, diff, draft, alerts ----------
   worker:
