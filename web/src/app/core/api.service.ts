@@ -24,6 +24,21 @@ export type Scholarship = {
   recheck?: { status: string; lastVerifiedAt?: { _seconds: number } | null };
 };
 
+export type StudentDocument = {
+  id: string;
+  type: string;
+  title: string;
+  fileName: string;
+  scanStatus: string;
+  ready: boolean;
+  usedIn: string[];
+};
+
+export type ScholarshipDocuments = {
+  needed: { type: string; label: string; document: StudentDocument | null }[];
+  extras: StudentDocument[];
+};
+
 export type Requirement = {
   id: string;
   kind: string;
@@ -172,7 +187,15 @@ export class ApiService {
 
   scholarships = () => firstValueFrom(this.http.get<{ items: Scholarship[] }>('/api/scholarships'));
   scholarship = (id: string) =>
-    firstValueFrom(this.http.get<Scholarship & { requirements: Requirement[] }>(`/api/scholarships/${id}`));
+    firstValueFrom(
+      this.http.get<Scholarship & { requirements: Requirement[]; documents: ScholarshipDocuments }>(`/api/scholarships/${id}`),
+    );
+
+  documents = () => firstValueFrom(this.http.get<{ items: StudentDocument[] }>('/api/documents'));
+  linkDocument = (id: string, scholarshipIds: string[]) =>
+    firstValueFrom(this.http.patch<{ items: StudentDocument[] }>(`/api/documents/${id}`, { scholarshipIds }));
+  removeDocument = (id: string) => firstValueFrom(this.http.delete<{ items: StudentDocument[] }>(`/api/documents/${id}`));
+  viewDocument = (id: string) => firstValueFrom(this.http.get<{ url: string }>(`/api/documents/${id}/view`));
   createScholarship = (body: NewScholarship) => firstValueFrom(this.http.post<Scholarship>('/api/scholarships', body));
   archiveScholarship = (id: string) => firstValueFrom(this.http.post(`/api/scholarships/${id}/archive`, {}));
 
@@ -201,6 +224,28 @@ export class ApiService {
       this.http.get<{ type: string; status: string; progress: number; error: string | null; nextJobId: string | null }>(`/api/jobs/${id}`),
     );
 
+  /** Upload one application file. A transcript, passport, or birth certificate replaces the file already saved for that kind. */
+  async uploadDocument(file: File, documentType: string, title?: string): Promise<string> {
+    const contentType = contentTypeFor(file);
+    if (!contentType) throw new Error('Use a PDF, Word, text, or image file.');
+    const init = await firstValueFrom(
+      this.http.post<{ uploadUrl: string; itemId: string; uploadId: string; headers: Record<string, string> }>('/api/uploads', {
+        fileName: file.name,
+        contentType,
+        size: file.size,
+        purpose: 'material',
+        documentType,
+        title,
+      }),
+    );
+    const put = await fetch(init.uploadUrl, { method: 'PUT', headers: init.headers, body: file });
+    if (!put.ok) throw new Error(`Upload failed (${put.status})`);
+    const done = await firstValueFrom(
+      this.http.post<{ jobId: string }>(`/api/uploads/material/${init.itemId}/${init.uploadId}/complete`, {}),
+    );
+    return done.jobId;
+  }
+
   /** Upload a guideline document: get a presigned URL, PUT the file to storage, then start processing. */
   async uploadSource(scholarshipId: string, file: File): Promise<string> {
     const init = await firstValueFrom(
@@ -219,4 +264,19 @@ export class ApiService {
     );
     return done.jobId;
   }
+}
+
+const UPLOAD_TYPES: Record<string, string> = {
+  pdf: 'application/pdf',
+  docx: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+  txt: 'text/plain',
+  png: 'image/png',
+  jpg: 'image/jpeg',
+  jpeg: 'image/jpeg',
+};
+
+function contentTypeFor(file: File): string | null {
+  if (Object.values(UPLOAD_TYPES).includes(file.type)) return file.type;
+  const ext = file.name.split('.').pop()?.toLowerCase() ?? '';
+  return UPLOAD_TYPES[ext] ?? null;
 }

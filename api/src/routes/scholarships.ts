@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { FieldValue, Timestamp } from 'firebase-admin/firestore';
 import { db, userDoc, getAppConfig, writeAudit } from '@scholarscope/shared';
 import { createScholarshipSchema, updateScholarshipSchema } from '../validation';
+import { documentsForScholarship, listStudentDocuments } from '../studentDocuments';
 
 export const scholarshipsRouter = Router();
 
@@ -99,9 +100,16 @@ scholarshipsRouter.get('/:id', async (req, res) => {
   const snap = await ref.get();
   if (!snap.exists) return res.status(404).json({ error: 'Not found' });
   const reqs = await ref.collection('requirements').where('removedAt', '==', null).get();
+  const requirements = reqs.docs.map((d) => ({ id: d.id, ...d.data() }));
+  const documents = documentsForScholarship(
+    await listStudentDocuments(req.uid!),
+    requirements.map((item) => ({ kind: item.kind as string | undefined, label: item.label as string | undefined })),
+    snap.id,
+  );
   res.json({
     ...serialize(snap.id, snap.data()!),
-    requirements: reqs.docs.map((d) => ({ id: d.id, ...d.data() })),
+    requirements,
+    documents,
   });
 });
 

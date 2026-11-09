@@ -1,7 +1,7 @@
 import { Component, OnInit, inject, input, signal } from '@angular/core';
 import { DatePipe } from '@angular/common';
 import { RouterLink } from '@angular/router';
-import { ApiService, type Requirement, type Scholarship } from '../../core/api.service';
+import { ApiService, apiMessage, type Requirement, type Scholarship, type ScholarshipDocuments } from '../../core/api.service';
 
 @Component({
   selector: 'app-scholarship',
@@ -25,6 +25,52 @@ import { ApiService, type Requirement, type Scholarship } from '../../core/api.s
         <input id="file" type="file" accept=".pdf,.docx,.txt,.png,.jpg,.jpeg" (change)="upload($event)" [disabled]="busy()" />
         @if (status()) {
           <p role="status">{{ status() }}</p>
+        }
+      </section>
+
+      <section class="card">
+        <h2>Your documents for this application</h2>
+        <p class="hint">
+          A transcript, passport, or birth certificate is uploaded once in <a routerLink="/documents">Documents</a>.
+          The same file shows up here when this scholarship asks for it.
+        </p>
+        @for (slot of s.documents.needed; track slot.type) {
+          <div class="email-row">
+            <div>
+              <strong>{{ slot.label }}</strong>
+              @if (slot.document) {
+                <span class="badge" [class]="slot.document.scanStatus === 'clean' ? 'verified' : slot.document.scanStatus === 'pending' ? 'needs_review' : 'unverified'">
+                  {{ scanLabel(slot.document.scanStatus) }}
+                </span>
+                <p class="muted">{{ slot.document.fileName }}</p>
+              } @else {
+                <p class="muted">Not uploaded yet.</p>
+              }
+            </div>
+            <div class="actions">
+              @if (slot.document?.ready) {
+                <button type="button" class="secondary" (click)="openDocument(slot.document!.id)">Open</button>
+              }
+              <a routerLink="/documents">{{ slot.document ? 'Replace' : 'Upload' }}</a>
+            </div>
+          </div>
+        }
+        @for (doc of s.documents.extras; track doc.id) {
+          <div class="email-row">
+            <div>
+              <strong>{{ doc.title }}</strong>
+              <span class="badge" [class]="doc.scanStatus === 'clean' ? 'verified' : doc.scanStatus === 'pending' ? 'needs_review' : 'unverified'">
+                {{ scanLabel(doc.scanStatus) }}
+              </span>
+              <p class="muted">{{ doc.fileName }}</p>
+            </div>
+            @if (doc.ready) {
+              <button type="button" class="secondary" (click)="openDocument(doc.id)">Open</button>
+            }
+          </div>
+        }
+        @if (s.documents.needed.length === 0 && s.documents.extras.length === 0) {
+          <p>This scholarship does not list a transcript, passport, or birth certificate. You can still keep those files, and attach any other file, in <a routerLink="/documents">Documents</a>.</p>
         }
       </section>
 
@@ -65,7 +111,7 @@ export class ScholarshipPage implements OnInit {
   /** Route parameter (component input binding). */
   readonly id = input.required<string>();
   private readonly api = inject(ApiService);
-  protected readonly data = signal<Scholarship | null>(null);
+  protected readonly data = signal<(Scholarship & { requirements: Requirement[]; documents: ScholarshipDocuments }) | null>(null);
   protected readonly requirements = signal<Requirement[]>([]);
   protected readonly busy = signal(false);
   protected readonly status = signal('');
@@ -82,6 +128,23 @@ export class ScholarshipPage implements OnInit {
     const s = await this.api.scholarship(this.id());
     this.data.set(s);
     this.requirements.set(s.requirements);
+  }
+
+  scanLabel(status: string) {
+    if (status === 'clean') return 'Saved';
+    if (status === 'pending') return 'Checking the file';
+    if (status === 'infected') return 'Blocked';
+    if (status === 'too_large') return 'Too large';
+    return 'Not accepted';
+  }
+
+  async openDocument(id: string) {
+    try {
+      const { url } = await this.api.viewDocument(id);
+      window.open(url, '_blank', 'noopener');
+    } catch (err) {
+      this.status.set(apiMessage(err, 'Could not open that file.'));
+    }
   }
 
   async openSource(sourceId: string, versionId: string) {

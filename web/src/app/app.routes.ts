@@ -21,6 +21,12 @@ export const routes: Routes = [
     title: 'Profile · ScholarScope',
   },
   {
+    path: 'documents',
+    canActivate: [authGuard],
+    loadComponent: () => import('./pages/documents/documents').then((m) => m.DocumentsPage),
+    title: 'Documents · ScholarScope',
+  },
+  {
     path: 'discover',
     canActivate: [authGuard],
     loadComponent: () => import('./pages/discover/discover').then((m) => m.Discover),

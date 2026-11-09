@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import { FieldValue } from 'firebase-admin/firestore';
 import { randomUUID } from 'node:crypto';
-import { userDoc, getAppConfig, storage, buckets, enqueueJob, writeAudit } from '@scholarscope/shared';
+import { userDoc, getAppConfig, storage, buckets, enqueueJob, writeAudit, isOnceDocument, studentDocumentLabel } from '@scholarscope/shared';
 import { addUrlSourceSchema, createUploadSchema, safeFileName } from '../validation';
 
 export const uploadsRouter = Router();
@@ -24,21 +24,58 @@ uploadsRouter.post('/', async (req, res) => {
     const sch = await user.collection('scholarships').doc(body.scholarshipId).get();
     if (!sch.exists) return res.status(404).json({ error: 'Scholarship not found' });
   }
+  if (body.purpose === 'material' && !body.documentType) {
+    return res.status(400).json({ error: 'Choose what kind of document this is.' });
+  }
+  if (body.purpose === 'material' && body.documentType === 'other' && !body.title?.trim()) {
+    return res.status(400).json({ error: 'Name this document so you can tell it apart.' });
+  }
 
   const collection = body.purpose === 'source' ? 'sources' : 'materials';
-  const itemRef = user.collection(collection).doc();
+  let itemRef = user.collection(collection).doc();
+  let replacing = false;
+  if (body.purpose === 'material' && body.documentType && isOnceDocument(body.documentType)) {
+    const existing = await user.collection('materials').where('type', '==', body.documentType).limit(1).get();
+    const found = existing.docs[0];
+    if (found) {
+      itemRef = found.ref;
+      replacing = true;
+    }
+  }
+  if (body.purpose === 'material' && body.documentType === 'other' && !replacing) {
+    const others = await user.collection('materials').where('type', '==', 'other').get();
+    if (others.size >= 20) return res.status(400).json({ error: 'You can save up to 20 other documents.' });
+  }
   const versionRef = itemRef.collection('versions').doc();
   const quarantineKey = `u/${req.uid}/incoming/${versionRef.id}/${safeFileName(body.fileName)}`;
+  const materialTitle =
+    body.documentType === 'other' ? body.title!.trim() : body.documentType ? studentDocumentLabel(body.documentType) : body.fileName;
 
-  await itemRef.set({
-    ...(body.purpose === 'source'
-      ? { kind: 'upload', url: null, scholarshipIds: [body.scholarshipId], robots: null, lastFetch: null }
-      : { type: 'other', typeSuggested: null, typeConfirmed: false, usedIn: [], synthetic: true, facts: {} }),
-    title: body.fileName,
-    currentVersionId: null,
-    createdAt: FieldValue.serverTimestamp(),
-    updatedAt: FieldValue.serverTimestamp(),
-  });
+  if (body.purpose === 'source' || !replacing) {
+    await itemRef.set({
+      ...(body.purpose === 'source'
+        ? { kind: 'upload', url: null, scholarshipIds: [body.scholarshipId], robots: null, lastFetch: null }
+        : {
+            type: body.documentType,
+            typeSuggested: null,
+            typeConfirmed: true,
+            usedIn: [],
+            synthetic: true,
+            facts: {},
+          }),
+      title: body.purpose === 'source' ? body.fileName : materialTitle,
+      fileName: body.fileName,
+      scanStatus: 'pending',
+      currentVersionId: null,
+      createdAt: FieldValue.serverTimestamp(),
+      updatedAt: FieldValue.serverTimestamp(),
+    });
+  } else {
+    await itemRef.set(
+      { fileName: body.fileName, scanStatus: 'pending', updatedAt: FieldValue.serverTimestamp() },
+      { merge: true },
+    );
+  }
   await versionRef.set({
     quarantine: { bucket: buckets.uploads(), key: quarantineKey },
     declaredContentType: body.contentType,

@@ -20,6 +20,7 @@ import { ApiService, type Scholarship } from '../../core/api.service';
         <div class="actions">
           <a class="button" routerLink="/discover">Discover scholarships</a>
           <a class="button secondary" routerLink="/scholarships/new">Add your own</a>
+          <a class="button secondary" routerLink="/documents">Documents</a>
         </div>
       }
     </div>
@@ -39,6 +40,7 @@ import { ApiService, type Scholarship } from '../../core/api.service';
       <section class="card empty">
         <h2>Your dashboard is empty</h2>
         <p>Start by finding scholarships to track. You can follow up to {{ limit }}.</p>
+        <p>Transcripts, passports, and other application files are kept in <a routerLink="/documents">Documents</a>.</p>
         <div class="actions">
           <a class="button" routerLink="/discover">Discover scholarships</a>
           <a class="button secondary" routerLink="/scholarships/new">Add one that isn't listed</a>

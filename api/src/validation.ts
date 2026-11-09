@@ -45,7 +45,16 @@ export const createUploadSchema = z.object({
   /** Scholarship guidelines (a source) or a library item (a material). */
   purpose: z.enum(['source', 'material']),
   scholarshipId: z.string().min(1).max(128).optional(),
+  /** Set for a student's own application file (transcript, passport, and so on). */
+  documentType: z.enum(['transcript', 'passport', 'birth_certificate', 'other']).optional(),
+  title: z.string().trim().max(120, 'The name must be 120 characters or fewer.').optional(),
 });
+
+export const documentLinksSchema = z
+  .object({
+    scholarshipIds: z.array(z.string().min(1).max(128)).max(15, 'A document can be shown on up to 15 scholarships.'),
+  })
+  .strict();
 
 export const addUrlSourceSchema = z.object({
   scholarshipId: z.string().min(1).max(128),
