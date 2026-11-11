@@ -1,22 +1,24 @@
 import { Router } from 'express';
-import { db, userDoc, writeAudit, storage, buckets } from '@scholarscope/shared';
+import { db, userDoc, writeAudit, storage, buckets, isStudentDocumentType } from '@scholarscope/shared';
 import { documentLinksSchema } from '../validation';
 import { listStudentDocuments } from '../studentDocuments';
 
 export const documentsRouter = Router();
 
-/** The student's application files. One transcript, passport, and birth certificate; other files are extra. */
+/** The student's application files. Transcripts and certificates are named and can repeat. A passport and a birth certificate stay one file each. */
 documentsRouter.get('/', async (req, res) => {
   res.json({ items: await listStudentDocuments(req.uid!) });
 });
 
-/** Choose which scholarships an extra document shows up on. */
+/** Choose which scholarships a saved file shows up on, including when the requirement text does not name it. */
 documentsRouter.patch('/:id', async (req, res) => {
   const body = documentLinksSchema.parse(req.body);
   const user = userDoc(req.uid!);
   const ref = user.collection('materials').doc(req.params.id);
   const snap = await ref.get();
-  if (!snap.exists || snap.get('type') !== 'other') return res.status(404).json({ error: 'Document not found' });
+  if (!snap.exists || !isStudentDocumentType(String(snap.get('type') ?? ''))) {
+    return res.status(404).json({ error: 'Document not found' });
+  }
 
   const unique = [...new Set(body.scholarshipIds)];
   for (const id of unique) {

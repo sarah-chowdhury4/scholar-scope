@@ -1,4 +1,4 @@
-import { documentsAskedFor, studentDocumentLabel, STUDENT_DOCUMENT_TYPES, userDoc, type StudentDocumentType } from '@scholarscope/shared';
+import { documentsAskedFor, studentDocumentHeading, STUDENT_DOCUMENT_TYPES, userDoc, type StudentDocumentType } from '@scholarscope/shared';
 
 export type StudentDocumentDto = {
   id: string;
@@ -49,9 +49,10 @@ export function documentsForScholarship(
 ) {
   const needed = documentsAskedFor(requirements).map((type) => ({
     type,
-    label: studentDocumentLabel(type),
-    document: docs.find((doc) => doc.type === type) ?? null,
+    label: studentDocumentHeading(type),
+    documents: docs.filter((doc) => doc.type === type),
   }));
-  const extras = docs.filter((doc) => doc.type === 'other' && doc.usedIn.includes(scholarshipId));
+  const shown = new Set(needed.flatMap((group) => group.documents.map((doc) => doc.id)));
+  const extras = docs.filter((doc) => doc.usedIn.includes(scholarshipId) && !shown.has(doc.id));
   return { needed, extras };
 }

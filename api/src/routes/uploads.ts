@@ -1,7 +1,17 @@
 import { Router } from 'express';
 import { FieldValue } from 'firebase-admin/firestore';
 import { randomUUID } from 'node:crypto';
-import { userDoc, getAppConfig, storage, buckets, enqueueJob, writeAudit, isOnceDocument, studentDocumentLabel } from '@scholarscope/shared';
+import {
+  userDoc,
+  getAppConfig,
+  storage,
+  buckets,
+  enqueueJob,
+  writeAudit,
+  isOnceDocument,
+  normalizeDocumentTitle,
+  studentDocumentLabel,
+} from '@scholarscope/shared';
 import { addUrlSourceSchema, createUploadSchema, safeFileName } from '../validation';
 
 export const uploadsRouter = Router();
@@ -27,29 +37,38 @@ uploadsRouter.post('/', async (req, res) => {
   if (body.purpose === 'material' && !body.documentType) {
     return res.status(400).json({ error: 'Choose what kind of document this is.' });
   }
-  if (body.purpose === 'material' && body.documentType === 'other' && !body.title?.trim()) {
+  if (body.purpose === 'material' && body.documentType && !isOnceDocument(body.documentType) && !body.title?.trim()) {
     return res.status(400).json({ error: 'Name this document so you can tell it apart.' });
   }
 
   const collection = body.purpose === 'source' ? 'sources' : 'materials';
   let itemRef = user.collection(collection).doc();
   let replacing = false;
-  if (body.purpose === 'material' && body.documentType && isOnceDocument(body.documentType)) {
-    const existing = await user.collection('materials').where('type', '==', body.documentType).limit(1).get();
-    const found = existing.docs[0];
+  const materialTitle =
+    body.purpose === 'material' && body.documentType && !isOnceDocument(body.documentType)
+      ? body.title!.trim()
+      : body.documentType
+        ? studentDocumentLabel(body.documentType)
+        : body.fileName;
+  if (body.purpose === 'material' && body.documentType) {
+    const existing = await user.collection('materials').where('type', '==', body.documentType).get();
+    const titleKey = normalizeDocumentTitle(materialTitle);
+    const found = isOnceDocument(body.documentType)
+      ? existing.docs[0]
+      : existing.docs.find((doc) => normalizeDocumentTitle(String(doc.get('title') ?? '')) === titleKey);
     if (found) {
       itemRef = found.ref;
       replacing = true;
+    } else if (!isOnceDocument(body.documentType)) {
+      const all = await user.collection('materials').get();
+      const named = all.docs.filter((doc) => !isOnceDocument(String(doc.get('type') ?? ''))).length;
+      if (named >= 30) {
+        return res.status(400).json({ error: 'You can save up to 30 transcripts, certificates, and other files.' });
+      }
     }
-  }
-  if (body.purpose === 'material' && body.documentType === 'other' && !replacing) {
-    const others = await user.collection('materials').where('type', '==', 'other').get();
-    if (others.size >= 20) return res.status(400).json({ error: 'You can save up to 20 other documents.' });
   }
   const versionRef = itemRef.collection('versions').doc();
   const quarantineKey = `u/${req.uid}/incoming/${versionRef.id}/${safeFileName(body.fileName)}`;
-  const materialTitle =
-    body.documentType === 'other' ? body.title!.trim() : body.documentType ? studentDocumentLabel(body.documentType) : body.fileName;
 
   if (body.purpose === 'source' || !replacing) {
     await itemRef.set({

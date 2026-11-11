@@ -31,29 +31,28 @@ import { ApiService, apiMessage, type Requirement, type Scholarship, type Schola
       <section class="card">
         <h2>Your documents for this application</h2>
         <p class="hint">
-          A transcript, passport, or birth certificate is uploaded once in <a routerLink="/documents">Documents</a>.
-          The same file shows up here when this scholarship asks for it.
+          Files from <a routerLink="/documents">Documents</a> show up here when this scholarship asks for that kind of paper.
+          A transcript requirement shows every transcript you have saved, such as high school and undergraduate.
         </p>
-        @for (slot of s.documents.needed; track slot.type) {
-          <div class="email-row">
-            <div>
-              <strong>{{ slot.label }}</strong>
-              @if (slot.document) {
-                <span class="badge" [class]="slot.document.scanStatus === 'clean' ? 'verified' : slot.document.scanStatus === 'pending' ? 'needs_review' : 'unverified'">
-                  {{ scanLabel(slot.document.scanStatus) }}
+        @for (group of s.documents.needed; track group.type) {
+          <p><strong>{{ group.label }}</strong></p>
+          @if (group.documents.length === 0) {
+            <p class="muted">None uploaded yet. <a routerLink="/documents">Add one in Documents</a>.</p>
+          }
+          @for (doc of group.documents; track doc.id) {
+            <div class="email-row">
+              <div>
+                <strong>{{ doc.title }}</strong>
+                <span class="badge" [class]="doc.scanStatus === 'clean' ? 'verified' : doc.scanStatus === 'pending' ? 'needs_review' : 'unverified'">
+                  {{ scanLabel(doc.scanStatus) }}
                 </span>
-                <p class="muted">{{ slot.document.fileName }}</p>
-              } @else {
-                <p class="muted">Not uploaded yet.</p>
+                <p class="muted">{{ doc.fileName }}</p>
+              </div>
+              @if (doc.ready) {
+                <button type="button" class="secondary" (click)="openDocument(doc.id)">Open</button>
               }
             </div>
-            <div class="actions">
-              @if (slot.document?.ready) {
-                <button type="button" class="secondary" (click)="openDocument(slot.document!.id)">Open</button>
-              }
-              <a routerLink="/documents">{{ slot.document ? 'Replace' : 'Upload' }}</a>
-            </div>
-          </div>
+          }
         }
         @for (doc of s.documents.extras; track doc.id) {
           <div class="email-row">
@@ -70,7 +69,7 @@ import { ApiService, apiMessage, type Requirement, type Scholarship, type Schola
           </div>
         }
         @if (s.documents.needed.length === 0 && s.documents.extras.length === 0) {
-          <p>This scholarship does not list a transcript, passport, or birth certificate. You can still keep those files, and attach any other file, in <a routerLink="/documents">Documents</a>.</p>
+          <p>This scholarship does not name a transcript, certificate, passport, or birth certificate. You can still keep those files in <a routerLink="/documents">Documents</a> and choose the scholarships that should show them.</p>
         }
       </section>
 

@@ -35,7 +35,7 @@ export type StudentDocument = {
 };
 
 export type ScholarshipDocuments = {
-  needed: { type: string; label: string; document: StudentDocument | null }[];
+  needed: { type: string; label: string; documents: StudentDocument[] }[];
   extras: StudentDocument[];
 };
 

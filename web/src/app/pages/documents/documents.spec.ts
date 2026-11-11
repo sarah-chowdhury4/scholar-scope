@@ -3,15 +3,26 @@ import { provideRouter } from '@angular/router';
 import { DocumentsPage } from './documents';
 import { ApiService, type StudentDocument } from '../../core/api.service';
 
-const transcript: StudentDocument = {
-  id: 'doc-1',
-  type: 'transcript',
-  title: 'Transcript',
-  fileName: 'transcript.pdf',
-  scanStatus: 'clean',
-  ready: true,
-  usedIn: [],
-};
+const transcripts: StudentDocument[] = [
+  {
+    id: 'doc-hs',
+    type: 'transcript',
+    title: 'High school transcript',
+    fileName: 'school.pdf',
+    scanStatus: 'clean',
+    ready: true,
+    usedIn: [],
+  },
+  {
+    id: 'doc-ug',
+    type: 'transcript',
+    title: 'Undergraduate transcript',
+    fileName: 'university.pdf',
+    scanStatus: 'clean',
+    ready: true,
+    usedIn: [],
+  },
+];
 
 describe('Documents', () => {
   async function render(items: StudentDocument[]) {
@@ -36,19 +47,23 @@ describe('Documents', () => {
     return fixture.nativeElement as HTMLElement;
   }
 
-  it('offers the one-time files and a place for anything else', async () => {
+  it('offers more than one transcript and country-specific school certificates', async () => {
     const el = await render([]);
-    expect(el.textContent).toContain('Transcript');
+    expect(el.textContent).toContain('High school transcript');
+    expect(el.textContent).toContain('Undergraduate transcript');
+    expect(el.textContent).toContain('IGCSE');
+    expect(el.textContent).toContain('A-level');
+    expect(el.textContent).toContain('Degree certificate');
     expect(el.textContent).toContain('Passport');
     expect(el.textContent).toContain('Birth certificate');
     expect(el.textContent).toContain('Not uploaded yet.');
-    expect(el.textContent).toContain('Other documents');
   });
 
-  it('shows a transcript that was already uploaded', async () => {
-    const el = await render([transcript]);
-    expect(el.textContent).toContain('transcript.pdf');
-    expect(el.textContent).toContain('Saved');
-    expect(el.textContent).toContain('Replace file');
+  it('lists each saved transcript by name', async () => {
+    const el = await render(transcripts);
+    expect(el.textContent).toContain('High school transcript');
+    expect(el.textContent).toContain('school.pdf');
+    expect(el.textContent).toContain('Undergraduate transcript');
+    expect(el.textContent).toContain('university.pdf');
   });
 });
