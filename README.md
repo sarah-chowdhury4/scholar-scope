@@ -235,6 +235,11 @@ Open http://localhost:4200. You should see the sign-in page. Choose **Create an 
    ```
 
 5. Each requirement now shows its quoted sentence and a **From source** / **Needs review** badge. **Open source** opens the stored file.
+6. On a requirement, try **Looks right**, **Fix** (saved as a new version) and **Not a requirement**; tick the box when it's done. **History** lists every version.
+7. Paste a page address under **Or paste the scholarship's web page**. Run `docker compose exec worker npm run cron:recheck` after the page changes: the scholarship shows **What changed** with the old and new wording side by side, and **Alerts** in the top menu gets a new item.
+8. In **Documents**, upload a synthetic transcript or passport. After the virus scan, the AI check lists what it found (wrong kind of file, name differs from your profile, passport expiry). The scholarship page adds checks against its deadline and minimum GPA.
+9. On an essay requirement, open **Draft this essay with AI**, write a few lines of notes, and **Write a draft**. Sentences not based on your notes are marked; edit, then **Approve this draft**.
+10. On the dashboard, download the calendar (.ics) or checklist (.csv), or open **Print or save as PDF**.
 
 ### Optional: a demo student with scholarships already added
 
@@ -376,7 +381,7 @@ The local setup does **not** provide encryption at rest, IAM enforcement in Loca
 | Scholarship records (up to 15), dashboard sorted by deadline, empty state for new students | Done |
 | Discover page: catalog search, filters (deadline, GPA, provider, what's required), add to my list | Done |
 | Add a scholarship that isn't in the catalog (name, provider, page, award, deadline) | Done |
-| Landing page before sign-in | To do |
+| Landing page before sign-in | Done |
 | Upload → scan → store original → extract with citations | Done |
 | Paste a scholarship page URL as a source (joins the daily re-check), list of sources | Done |
 | Confirm / correct / reject an extracted item, tick items done, version history | Done |

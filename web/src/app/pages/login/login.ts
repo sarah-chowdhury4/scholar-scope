@@ -62,7 +62,9 @@ export class Login {
   private readonly router = inject(Router);
   protected readonly route = inject(ActivatedRoute);
 
-  protected readonly mode = signal<'signin' | 'signup'>('signin');
+  protected readonly mode = signal<'signin' | 'signup'>(
+    inject(ActivatedRoute).snapshot.queryParamMap.get('mode') === 'signup' ? 'signup' : 'signin',
+  );
   protected readonly busy = signal(false);
   protected readonly error = signal('');
 

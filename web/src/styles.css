@@ -131,3 +131,9 @@ textarea { font: inherit; width: 100%; padding: 0.55rem; border: 1px solid var(-
   body { background: #fff; color: #000; }
   a { color: #000; }
 }
+.hero { padding: 1.5rem 0 1rem; }
+.hero h1 { font-size: 2rem; line-height: 1.2; max-width: 32ch; }
+.hero .lead { font-size: 1.1rem; max-width: 60ch; }
+.steps { list-style: none; padding: 0; display: grid; gap: 0.75rem; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); counter-reset: step; }
+.steps li { counter-increment: step; }
+.steps li strong::before { content: counter(step) '. '; color: var(--accent); }
