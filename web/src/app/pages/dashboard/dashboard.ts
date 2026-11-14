@@ -22,6 +22,11 @@ import { ApiService, type Scholarship } from '../../core/api.service';
           <a class="button secondary" routerLink="/scholarships/new">Add your own</a>
           <a class="button secondary" routerLink="/documents">Documents</a>
         </div>
+        <div class="actions small">
+          <button type="button" class="link" (click)="download('calendar.ics')">Add deadlines to my calendar (.ics)</button>
+          <button type="button" class="link" (click)="download('checklist.csv')">Download checklist (.csv)</button>
+          <a routerLink="/print">Print or save as PDF</a>
+        </div>
       }
     </div>
     @if (profileNote()) {
@@ -111,6 +116,14 @@ export class Dashboard implements OnInit {
       this.profileNote.set(me.readinessPercent < 100 ? me.missingForRecommendations.join('; ') : '');
     } catch {
       this.profileNote.set('');
+    }
+  }
+
+  async download(path: 'calendar.ics' | 'checklist.csv') {
+    try {
+      await this.api.download(path);
+    } catch {
+      this.error.set('Could not create that file. Try again.');
     }
   }
 

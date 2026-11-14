@@ -123,3 +123,11 @@ details.draft summary { cursor: pointer; font-weight: 600; color: var(--accent);
 textarea { font: inherit; width: 100%; padding: 0.55rem; border: 1px solid var(--line); border-radius: 6px; background: var(--surface); color: var(--ink); box-sizing: border-box; }
 .draft-text { background: var(--page); border-radius: 6px; padding: 0.5rem 0.75rem; white-space: pre-wrap; }
 .draft-text .unsupported { background: var(--warn-bg); color: var(--warn-ink); text-decoration: underline wavy; }
+.print-block { break-inside: avoid; border-top: 1px solid var(--line); padding-top: 0.5rem; margin-top: 0.75rem; }
+.print-list { list-style: none; padding: 0; display: grid; gap: 0.35rem; }
+.print-list .box { font-size: 1.1rem; margin-right: 0.3rem; }
+@media print {
+  .topbar, .no-print { display: none !important; }
+  body { background: #fff; color: #000; }
+  a { color: #000; }
+}

@@ -346,6 +346,19 @@ export class ApiService {
   editDraft = (id: string, text: string) => firstValueFrom(this.http.patch<Draft>(`/api/drafts/${id}`, { text }));
   approveDraft = (id: string) => firstValueFrom(this.http.post<Draft>(`/api/drafts/${id}/approve`, {}));
   discardDraft = (id: string) => firstValueFrom(this.http.post<{ ok: boolean }>(`/api/drafts/${id}/discard`, {}));
+  /** Download an export with the sign-in token (a plain link would not carry it). */
+  async download(path: 'calendar.ics' | 'checklist.csv'): Promise<void> {
+    const blob = await firstValueFrom(this.http.get(`/api/exports/${path}`, { responseType: 'blob' }));
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = path === 'calendar.ics' ? 'scholarship-deadlines.ics' : 'scholarship-checklist.csv';
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+  }
+
   viewSource = (sourceId: string, versionId: string) =>
     firstValueFrom(this.http.get<{ url: string }>(`/api/sources/${sourceId}/versions/${versionId}/view`));
 

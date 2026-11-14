@@ -17,6 +17,7 @@ import { documentsRouter } from './routes/documents';
 import { requirementsRouter } from './routes/requirements';
 import { changesRouter } from './routes/changes';
 import { draftsRouter } from './routes/drafts';
+import { exportsRouter } from './routes/exports';
 
 export function createApp() {
   const app = express();
@@ -57,6 +58,7 @@ export function createApp() {
   api.use('/catalog', catalogRouter);
   api.use('/documents', documentsRouter);
   api.use('/drafts', draftsRouter);
+  api.use('/exports', exportsRouter);
   app.use('/api', api);
   app.use('/api', (_req, res) => res.status(404).json({ error: 'Not found' }));
 

@@ -391,7 +391,7 @@ The local setup does **not** provide encryption at rest, IAM enforcement in Loca
 | Student document library (transcripts, certificates, passport…) | Done |
 | AI document checks (Gemini): right kind of file, name vs profile, expiry vs deadline, GPA vs minimum, official / English rules | Done |
 | Essay drafts with Gemini from the student's own notes, each sentence tied to a note, edit + approval, daily limit | Done |
-| Calendar (ICS) and PDF/CSV export | To do |
+| Calendar (ICS with reminders), CSV checklist, print / save-as-PDF view | Done |
 | Google Cloud adapters (GCS, Cloud Tasks, Secret Manager) | Stubs in `shared/src/platform/` |
 
 ---

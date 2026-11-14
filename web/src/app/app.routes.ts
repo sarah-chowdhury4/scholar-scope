@@ -27,6 +27,12 @@ export const routes: Routes = [
     title: 'Documents · ScholarScope',
   },
   {
+    path: 'print',
+    canActivate: [authGuard],
+    loadComponent: () => import('./pages/print/print').then((m) => m.PrintPage),
+    title: 'Checklist · ScholarScope',
+  },
+  {
     path: 'alerts',
     canActivate: [authGuard],
     loadComponent: () => import('./pages/alerts/alerts').then((m) => m.AlertsPage),

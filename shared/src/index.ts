@@ -18,6 +18,7 @@ export * from './documentChecks';
 export * from './requirements';
 export * from './diff';
 export * from './drafts';
+export * from './exports';
 export { storage, buckets, type Storage } from './platform/storage/index';
 export { queue, QUEUE_FOR_JOB, queueForJob, type Queue } from './platform/queue/index';
 export { consume } from './platform/queue/sqs';
