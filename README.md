@@ -74,7 +74,6 @@ cd scholar-scope
 | LocalStack auth token | app.localstack.cloud → *Auth Token* (free account) | `.env` → `LOCALSTACK_AUTH_TOKEN` |
 | Gemini API key | aistudio.google.com → *Get API key* | `.env.secrets` → `GEMINI_API_KEY` |
 | Gemini model id | AI Studio → model list (exact id of the current Flash model) | `.env` → `GEMINI_MODEL` |
-| NVIDIA NIM key (optional for now) | build.nvidia.com → *Get API Key* | `.env.secrets` → `NVIDIA_API_KEY` |
 
 > **Synthetic documents only.** Free-tier AI inputs may be kept or used by the provider. Never upload real student records to a local setup.
 
@@ -162,7 +161,7 @@ The first start takes several minutes: the Firebase image downloads the emulator
 docker compose logs --tail 20 minio-init localstack
 ```
 
-contains `MinIO ready: …` and `LocalStack ready: 3 queues + DLQs, secrets loaded.`
+contains `MinIO ready: …` and `LocalStack ready: 2 queues + DLQs, secrets loaded.`
 
 ### 6. Check each service
 
@@ -170,8 +169,8 @@ contains `MinIO ready: …` and `LocalStack ready: 3 queues + DLQs, secrets load
 |---|---|---|
 | Firebase | open http://localhost:4000 | Emulator UI with Firestore and Authentication |
 | MinIO | open http://localhost:9001, log in with `MINIO_ROOT_USER` / `MINIO_ROOT_PASSWORD` from `.env` | buckets `uploads`, `originals`, `exports` |
-| Queues | `docker compose exec localstack awslocal sqs list-queues` | six queues (`gemini`, `nim`, `default`, each with a `-dlq`) |
-| Secrets (names only) | `docker compose exec localstack awslocal secretsmanager list-secrets --query "SecretList[].Name"` | `scholarscope/gemini-api-key` (+ `nvidia-api-key` if set) |
+| Queues | `docker compose exec localstack awslocal sqs list-queues` | four queues (`gemini`, `default`, each with a `-dlq`) |
+| Secrets (names only) | `docker compose exec localstack awslocal secretsmanager list-secrets --query "SecretList[].Name"` | `scholarscope/gemini-api-key` |
 | Mailpit | open http://localhost:8025 | empty inbox |
 
 The `awslocal is deprecated` banner is harmless.
@@ -191,7 +190,7 @@ docker compose up -d --build api worker
 docker compose logs --tail 20 api worker
 ```
 
-**Done when:** the logs show `api_started`, `worker_started` and three `queue_consumer_started` lines, and http://localhost:3000/api/health returns `{"status":"ok"}`.
+**Done when:** the logs show `api_started`, `worker_started` and two `queue_consumer_started` lines, and http://localhost:3000/api/health returns `{"status":"ok"}`.
 
 ### 9. Load the scholarship catalog
 
@@ -359,6 +358,7 @@ local/      emulator config, MinIO policies + tests, LocalStack init, dev Docker
 - **Uploads are untrusted:** size limit, real file-type check from the file's bytes, then a ClamAV scan before anything reads them.
 - **Saved web pages are fetched safely:** robots.txt is honoured, and private or internal addresses are blocked.
 - **Document text is data, not instructions:** the AI is told to ignore instructions inside documents, and every extracted item must quote the source; quotes not found in the stored text become "Unverified".
+- **AI document checks never read out ID numbers:** the prompt and the response schema have no field for passport or ID numbers, and every fact must quote the file before a rule uses it.
 - **Firestore rules deny all direct client access.**
 - **Emulator settings can't reach a deployment:** the API and worker refuse to start if emulator variables are set outside `APP_ENV=local`.
 
@@ -385,7 +385,8 @@ The local setup does **not** provide encryption at rest, IAM enforcement in Loca
 | In-app alerts list, change alerts | To do |
 | Delete my data | Done |
 | Side-by-side diff view, acknowledging changes | To do |
-| Material library, matching (NIM embeddings) | To do |
+| Student document library (transcripts, certificates, passport…) | Done |
+| AI document checks (Gemini): right kind of file, name vs profile, expiry vs deadline, GPA vs minimum, official / English rules | Done |
 | Draft generation with citations, approval | To do |
 | Calendar (ICS) and PDF/CSV export | To do |
 | Google Cloud adapters (GCS, Cloud Tasks, Secret Manager) | Stubs in `shared/src/platform/` |

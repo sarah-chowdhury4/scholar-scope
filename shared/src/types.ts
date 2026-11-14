@@ -44,14 +44,13 @@ export type ScholarshipStatus = (typeof SCHOLARSHIP_STATUSES)[number];
 
 export type ScanStatus = 'pending' | 'clean' | 'infected' | 'rejected_type' | 'too_large';
 
-export type QueueName = 'gemini' | 'nim' | 'default';
+export type QueueName = 'gemini' | 'default';
 
 export type JobType =
   | 'scan'
   | 'extract'
   | 'fetch_url'
-  | 'classify'
-  | 'embed'
+  | 'check_document'
   | 'diff'
   | 'draft'
   | 'alert_email';

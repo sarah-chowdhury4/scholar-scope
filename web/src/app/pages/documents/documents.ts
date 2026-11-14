@@ -1,6 +1,7 @@
 import { Component, OnInit, inject, signal } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import { ApiService, apiMessage, type Scholarship, type StudentDocument } from '../../core/api.service';
+import { DocumentCheckView } from './document-check';
 
 type Group = {
   type: string;
@@ -71,7 +72,7 @@ const GROUPS: readonly Group[] = [
 
 @Component({
   selector: 'app-documents',
-  imports: [RouterLink],
+  imports: [RouterLink, DocumentCheckView],
   template: `
     <h1>Documents</h1>
     <p class="hint">
@@ -79,6 +80,11 @@ const GROUPS: readonly Group[] = [
       extra scholarships that should show a file.
     </p>
     <p class="hint">PDF, Word, image, or text file, up to 25 MB. Files are virus-scanned before anything reads them.</p>
+    <p class="hint">
+      After the virus check, an AI check (Gemini) reads each file and tells you if it looks like the wrong kind of document,
+      the name differs from your profile, or a passport is close to expiring. It never stores ID numbers.
+      Use synthetic test documents only while ScholarScope runs on the free AI tier.
+    </p>
     <p><a routerLink="/">← My scholarships</a></p>
 
     @if (status()) {
@@ -107,9 +113,13 @@ const GROUPS: readonly Group[] = [
                 @if (doc.ready) {
                   <button type="button" class="secondary" [disabled]="busy() !== null" (click)="open(doc)">Open</button>
                 }
+                @if (canRecheck(doc)) {
+                  <button type="button" class="secondary" [disabled]="busy() !== null" (click)="recheck(doc)">Check again</button>
+                }
                 <button type="button" class="secondary" [disabled]="busy() !== null" (click)="remove(doc)">Remove</button>
               </div>
             </div>
+            <app-document-check [check]="doc.check" />
             @if (scholarships().length === 0) {
               <p class="hint">Add a scholarship first, then you can show this file on it.</p>
             } @else {
@@ -259,6 +269,27 @@ export class DocumentsPage implements OnInit {
     }
   }
 
+  canRecheck(doc: StudentDocument) {
+    return doc.ready && doc.check?.status !== 'queued' && doc.check?.status !== 'running';
+  }
+
+  async recheck(doc: StudentDocument) {
+    this.busy.set(doc.id);
+    this.note('Checking the document again…', false);
+    try {
+      const { jobId, items } = await this.api.checkDocument(doc.id);
+      this.items.set(items);
+      await this.waitFor(jobId);
+      await this.refresh();
+      this.note('Check finished.', false);
+    } catch (err) {
+      this.note(err instanceof Error ? err.message : apiMessage(err, 'Could not check that document.'), true);
+      await this.refresh();
+    } finally {
+      this.busy.set(null);
+    }
+  }
+
   async remove(doc: StudentDocument) {
     if (!confirm(`Remove "${doc.title}"? Scholarships that show it will no longer include this file.`)) return;
     this.busy.set(doc.id);
@@ -296,8 +327,17 @@ export class DocumentsPage implements OnInit {
     try {
       const jobId = await this.api.uploadDocument(file, type, title);
       this.note('Checking the file for viruses…', false);
-      await this.waitFor(jobId);
+      const checkJob = await this.waitFor(jobId);
       await this.refresh();
+      if (checkJob) {
+        this.note('File saved. The AI check is reading it now…', false);
+        try {
+          await this.waitFor(checkJob);
+        } catch {
+          // The file is saved either way; the check result (or its error) shows on the file.
+        }
+        await this.refresh();
+      }
       this.note('File saved. Scholarships that ask for this kind of document will show it.', false);
     } catch (err) {
       this.note(err instanceof Error ? err.message : apiMessage(err, 'Upload failed.'), true);
@@ -320,10 +360,12 @@ export class DocumentsPage implements OnInit {
     this.statusBad.set(bad);
   }
 
-  private async waitFor(jobId: string): Promise<void> {
+  /** Poll a job until it finishes; returns the follow-up job id (scan → AI check), if any. */
+  private async waitFor(jobId: string): Promise<string | null> {
     for (let i = 0; i < 60; i++) {
       const job = await this.api.job(jobId);
-      if (job.status === 'done') return;
+      if (job.status === 'done') return job.nextJobId;
+      if (job.status === 'paused_ai_off') return null;
       if (job.status === 'failed') throw new Error(job.error ?? 'That file could not be saved.');
       await new Promise((r) => setTimeout(r, 2000));
     }

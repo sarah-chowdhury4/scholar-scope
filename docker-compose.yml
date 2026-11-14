@@ -85,7 +85,7 @@ services:
       SERVICES: sqs,secretsmanager
       AWS_DEFAULT_REGION: us-east-1
     env_file:
-      - .env.secrets                 # GEMINI_API_KEY, NVIDIA_API_KEY, BREVO_API_KEY -> Secrets Manager
+      - .env.secrets                 # GEMINI_API_KEY, BREVO_API_KEY -> Secrets Manager
     volumes:
       - ./local/localstack/init-ready.sh:/etc/localstack/init/ready.d/10-init.sh:ro
     ports:
@@ -192,7 +192,6 @@ services:
       OCR_BACKEND: tesseract
       GEMINI_BACKEND: aistudio                       # "vertex" on Google Cloud
       GEMINI_MODEL: ${GEMINI_MODEL:?set GEMINI_MODEL in .env}
-      NIM_BASE_URL: https://integrate.api.nvidia.com/v1
       AI_REAL_STUDENT_DATA_ALLOWED: "false"          # synthetic documents only (NFR-1.5)
       MAIL_BACKEND: smtp                             # "brevo" to send real emails
       SMTP_HOST: mailpit
@@ -201,7 +200,6 @@ services:
       CRON_RECHECK: "0 2 * * *"
       CRON_DEADLINE_ALERTS: "0 13 * * *"
       GEMINI_RATE_PER_SEC: "1"                       # same limits as the Cloud Tasks queues
-      NIM_RATE_PER_MIN: "30"
     depends_on:
       firebase: { condition: service_healthy }
       minio-init: { condition: service_completed_successfully }

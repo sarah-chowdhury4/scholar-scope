@@ -56,7 +56,12 @@ export async function handleScan(job: JobMessage): Promise<void> {
     { merge: true },
   );
 
-  const nextJobId = itemRef.parent.id === 'sources' && !isDuplicate ? await enqueueJob(job.uid, 'extract', versionRef.path) : undefined;
+  // Guidelines are extracted; a student's own file gets an AI document check.
+  const followUp = itemRef.parent.id === 'sources' ? 'extract' : 'check_document';
+  const nextJobId = isDuplicate ? undefined : await enqueueJob(job.uid, followUp, versionRef.path);
+  if (nextJobId && followUp === 'check_document') {
+    await itemRef.set({ check: { status: 'queued', versionId: versionRef.id, jobId: nextJobId } }, { merge: true });
+  }
   await updateJob(job.uid, job.jobId, { status: 'done', progress: 100, nextJobId });
   log.info('upload_scanned', { target: job.target, mime: type.mime, duplicate: isDuplicate });
 }

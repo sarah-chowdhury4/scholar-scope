@@ -32,11 +32,34 @@ export type StudentDocument = {
   scanStatus: string;
   ready: boolean;
   usedIn: string[];
+  /** AI check of the current file; null until it has run once. */
+  check: DocumentCheck | null;
 };
 
+export type FindingSeverity = 'ok' | 'warning' | 'problem';
+
+export type DocumentFinding = {
+  code: string;
+  severity: FindingSeverity;
+  message: string;
+  quote: string | null;
+  page: number | null;
+};
+
+export type DocumentCheck = {
+  status: 'queued' | 'running' | 'done' | 'paused' | 'failed';
+  reason: string | null;
+  severity: FindingSeverity | null;
+  findings: DocumentFinding[];
+  checkedAt: string | null;
+};
+
+/** A saved file as shown on one scholarship, with findings against that scholarship's deadline and rules. */
+export type ScholarshipDocument = StudentDocument & { scholarshipFindings: DocumentFinding[] };
+
 export type ScholarshipDocuments = {
-  needed: { type: string; label: string; documents: StudentDocument[] }[];
-  extras: StudentDocument[];
+  needed: { type: string; label: string; documents: ScholarshipDocument[] }[];
+  extras: ScholarshipDocument[];
 };
 
 export type Requirement = {
@@ -196,6 +219,8 @@ export class ApiService {
     firstValueFrom(this.http.patch<{ items: StudentDocument[] }>(`/api/documents/${id}`, { scholarshipIds }));
   removeDocument = (id: string) => firstValueFrom(this.http.delete<{ items: StudentDocument[] }>(`/api/documents/${id}`));
   viewDocument = (id: string) => firstValueFrom(this.http.get<{ url: string }>(`/api/documents/${id}/view`));
+  checkDocument = (id: string) =>
+    firstValueFrom(this.http.post<{ jobId: string; items: StudentDocument[] }>(`/api/documents/${id}/check`, {}));
   createScholarship = (body: NewScholarship) => firstValueFrom(this.http.post<Scholarship>('/api/scholarships', body));
   archiveScholarship = (id: string) => firstValueFrom(this.http.post(`/api/scholarships/${id}/archive`, {}));
 

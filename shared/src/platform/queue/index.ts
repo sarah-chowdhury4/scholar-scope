@@ -4,7 +4,7 @@ import type { JobMessage, QueueName } from '../../types';
  * Job queues behind one interface.
  *   QUEUE_BACKEND=sqs        -> LocalStack SQS locally (the worker polls)
  *   QUEUE_BACKEND=cloudtasks -> Cloud Tasks on Google Cloud (pushes HTTP POSTs to the worker)
- * Queues: gemini (accuracy-critical AI), nim (light AI), default (scan, OCR, fetch, email).
+ * Queues: gemini (every AI call: extraction, document checks, diffs, drafts), default (scan, OCR, fetch, email).
  */
 export interface Queue {
   enqueue(queue: QueueName, message: JobMessage): Promise<void>;
@@ -33,6 +33,5 @@ export const QUEUE_FOR_JOB: Record<JobMessage['type'], QueueName> = {
   extract: 'gemini',
   diff: 'gemini',
   draft: 'gemini',
-  classify: 'nim',
-  embed: 'nim',
+  check_document: 'gemini',
 };

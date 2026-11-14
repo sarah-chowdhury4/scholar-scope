@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { db, userDoc, writeAudit, storage, buckets, isStudentDocumentType } from '@scholarscope/shared';
+import { db, userDoc, writeAudit, storage, buckets, isStudentDocumentType, enqueueJob } from '@scholarscope/shared';
 import { documentLinksSchema } from '../validation';
 import { listStudentDocuments } from '../studentDocuments';
 
@@ -37,6 +37,33 @@ documentsRouter.patch('/:id', async (req, res) => {
   });
   const items = await listStudentDocuments(req.uid!);
   res.json({ items });
+});
+
+/** Run the AI document check again on the current file (after a profile name change, or a failed or paused check). */
+documentsRouter.post('/:id/check', async (req, res) => {
+  const ref = userDoc(req.uid!).collection('materials').doc(req.params.id);
+  const snap = await ref.get();
+  const versionId = snap.get('currentVersionId') as string | undefined;
+  if (!snap.exists || !versionId || !isStudentDocumentType(String(snap.get('type') ?? ''))) {
+    return res.status(404).json({ error: 'Document not found' });
+  }
+  const status = snap.get('check.status') as string | undefined;
+  if (status === 'queued' || status === 'running') {
+    return res.status(409).json({ error: 'This file is already being checked.' });
+  }
+  const versionRef = ref.collection('versions').doc(versionId);
+  if ((await versionRef.get()).get('scan.status') !== 'clean') {
+    return res.status(409).json({ error: 'This file is not ready to check yet.' });
+  }
+  const jobId = await enqueueJob(req.uid!, 'check_document', versionRef.path);
+  await ref.set({ check: { status: 'queued', versionId, jobId } }, { merge: true });
+  await writeAudit({
+    actor: { type: 'student', id: req.uid! },
+    subjectUid: req.uid!,
+    action: 'document.check_requested',
+    resource: ref.path,
+  });
+  res.status(202).json({ jobId, items: await listStudentDocuments(req.uid!) });
 });
 
 documentsRouter.delete('/:id', async (req, res) => {

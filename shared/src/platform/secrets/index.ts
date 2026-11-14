@@ -3,7 +3,7 @@
  *   SECRETS_BACKEND=aws -> LocalStack Secrets Manager locally (loaded from .env.secrets)
  *   SECRETS_BACKEND=env -> plain env vars injected by Cloud Run `--set-secrets` (Secret Manager)
  */
-export type SecretName = 'gemini-api-key' | 'nvidia-api-key' | 'brevo-api-key';
+export type SecretName = 'gemini-api-key' | 'brevo-api-key';
 
 const cache = new Map<SecretName, string>();
 

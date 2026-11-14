@@ -19,6 +19,7 @@ import {
 import { extractText } from '../text/extractText';
 import { EXTRACT_PROMPT_VERSION, EXTRACT_SCHEMA, EXTRACT_SYSTEM, EXTRACT_TASK, type ExtractedItem } from '../prompts/extract';
 import { recomputeCounts, upsertRequirement } from '../requirements';
+import { consumePages, recordTokens } from '../usage';
 
 /**
  * Extract requirements from one stored source version (FR-2.2–2.4, FR-2.6).
@@ -142,20 +143,3 @@ export async function handleExtract(job: JobMessage): Promise<void> {
   log.info('extraction_done', { target: job.target, ...stats, ocr: text.ocrUsed, pages: text.pageCount });
 }
 
-async function consumePages(uid: string, pages: number, limit: number): Promise<boolean> {
-  const ref = userDoc(uid).collection('usage').doc(new Date().toISOString().slice(0, 10));
-  return db().runTransaction(async (tx) => {
-    const used = ((await tx.get(ref)).get('extractedPages') as number | undefined) ?? 0;
-    if (used + pages > limit) return false;
-    tx.set(ref, { extractedPages: FieldValue.increment(pages) }, { merge: true });
-    return true;
-  });
-}
-
-async function recordTokens(uid: string, input?: number, output?: number) {
-  const ref = userDoc(uid).collection('usage').doc(new Date().toISOString().slice(0, 10));
-  await ref.set(
-    { geminiInputTokens: FieldValue.increment(input ?? 0), geminiOutputTokens: FieldValue.increment(output ?? 0) },
-    { merge: true },
-  );
-}

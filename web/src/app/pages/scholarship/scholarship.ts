@@ -2,10 +2,11 @@ import { Component, OnInit, inject, input, signal } from '@angular/core';
 import { DatePipe } from '@angular/common';
 import { RouterLink } from '@angular/router';
 import { ApiService, apiMessage, type Requirement, type Scholarship, type ScholarshipDocuments } from '../../core/api.service';
+import { DocumentCheckView } from '../documents/document-check';
 
 @Component({
   selector: 'app-scholarship',
-  imports: [RouterLink, DatePipe],
+  imports: [RouterLink, DatePipe, DocumentCheckView],
   template: `
     <p><a routerLink="/">← All scholarships</a></p>
     @if (data(); as s) {
@@ -52,6 +53,7 @@ import { ApiService, apiMessage, type Requirement, type Scholarship, type Schola
                 <button type="button" class="secondary" (click)="openDocument(doc.id)">Open</button>
               }
             </div>
+            <app-document-check [check]="doc.check" [extra]="doc.scholarshipFindings" />
           }
         }
         @for (doc of s.documents.extras; track doc.id) {
@@ -67,6 +69,7 @@ import { ApiService, apiMessage, type Requirement, type Scholarship, type Schola
               <button type="button" class="secondary" (click)="openDocument(doc.id)">Open</button>
             }
           </div>
+          <app-document-check [check]="doc.check" [extra]="doc.scholarshipFindings" />
         }
         @if (s.documents.needed.length === 0 && s.documents.extras.length === 0) {
           <p>This scholarship does not name a transcript, certificate, passport, or birth certificate. You can still keep those files in <a routerLink="/documents">Documents</a> and choose the scholarships that should show them.</p>

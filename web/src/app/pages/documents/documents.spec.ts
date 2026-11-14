@@ -12,6 +12,7 @@ const transcripts: StudentDocument[] = [
     scanStatus: 'clean',
     ready: true,
     usedIn: [],
+    check: null,
   },
   {
     id: 'doc-ug',
@@ -21,6 +22,7 @@ const transcripts: StudentDocument[] = [
     scanStatus: 'clean',
     ready: true,
     usedIn: [],
+    check: null,
   },
 ];
 
@@ -65,5 +67,25 @@ describe('Documents', () => {
     expect(el.textContent).toContain('school.pdf');
     expect(el.textContent).toContain('Undergraduate transcript');
     expect(el.textContent).toContain('university.pdf');
+  });
+
+  it('shows the AI check findings for a saved file', async () => {
+    const el = await render([
+      {
+        ...transcripts[0]!,
+        check: {
+          status: 'done',
+          reason: null,
+          severity: 'problem',
+          checkedAt: '2026-11-14T00:00:00Z',
+          findings: [
+            { code: 'type_mismatch', severity: 'problem', message: 'You saved this as a transcript, but it looks like a passport.', quote: null, page: null },
+          ],
+        },
+      },
+    ]);
+    expect(el.textContent).toContain('1 problem');
+    expect(el.textContent).toContain('it looks like a passport');
+    expect(el.textContent).toContain('Check again');
   });
 });
