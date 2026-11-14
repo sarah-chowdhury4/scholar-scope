@@ -5,6 +5,7 @@ import { handleExtract } from './extract';
 import { handleFetchUrl } from './fetchUrl';
 import { handleCheckDocument } from './checkDocument';
 import { handleDiff } from './diff';
+import { handleDraft } from './draft';
 
 type Handler = (job: JobMessage) => Promise<void>;
 
@@ -18,6 +19,7 @@ const HANDLERS: Partial<Record<JobType, Handler>> = {
   fetch_url: handleFetchUrl,
   check_document: handleCheckDocument,
   diff: handleDiff,
+  draft: handleDraft,
 };
 
 const MAX_ATTEMPTS = 3;
@@ -35,7 +37,7 @@ export async function runJob(job: JobMessage, attempt: number): Promise<void> {
   } catch (err) {
     const final = attempt >= MAX_ATTEMPTS;
     await updateJob(job.uid, job.jobId, { status: final ? 'failed' : 'queued', error: errorMessage(err) });
-    if (job.type === 'extract' || job.type === 'check_document') {
+    if (job.type === 'extract' || job.type === 'check_document' || job.type === 'draft') {
       log.error(`${job.type}_failed`, { jobId: job.jobId, attempt, error: errorMessage(err) });
     }
     if (final) await markGivenUp(job, errorMessage(err));
@@ -52,6 +54,9 @@ async function markGivenUp(job: JobMessage, error: string): Promise<void> {
       await versionRef.set({ check }, { merge: true });
       const materialRef = versionRef.parent.parent!;
       if ((await materialRef.get()).get('currentVersionId') === versionRef.id) await materialRef.set({ check }, { merge: true });
+    }
+    if (job.type === 'draft') {
+      await db().doc(job.target).set({ status: 'failed', error: 'The draft could not be written. Try again later.' }, { merge: true });
     }
   } catch (err) {
     log.error('mark_given_up_failed', { jobId: job.jobId, error: errorMessage(err), cause: error });

@@ -126,6 +126,27 @@ export type AlertItem = {
   createdAt: string | null;
 };
 
+export type DraftSentence = { text: string; basedOn: string[]; supported: boolean; paragraph: number };
+
+export type Draft = {
+  id: string;
+  scholarshipId: string;
+  requirementId: string;
+  status: 'queued' | 'writing' | 'ready' | 'approved' | 'failed' | 'paused' | 'discarded';
+  error: string | null;
+  prompt: { label: string; quote: string | null; wordLimit: number | null };
+  notes: string;
+  sentences: DraftSentence[];
+  facts: { id: string; text: string; from: 'notes' | 'profile' }[];
+  text: string;
+  edited: boolean;
+  wordCount: number;
+  unsupportedCount: number;
+  suggestion: string | null;
+  createdAt: string | null;
+  approvedAt: string | null;
+};
+
 export type ProfileEmail = { address: string; verified: boolean; primary: boolean };
 
 export type Education = {
@@ -318,6 +339,13 @@ export class ApiService {
   unreadAlerts = () => firstValueFrom(this.http.get<{ unread: number }>('/api/alerts/unread-count'));
   markAlertRead = (id: string) => firstValueFrom(this.http.post<{ ok: boolean }>(`/api/alerts/${id}/read`, {}));
   markAllAlertsRead = () => firstValueFrom(this.http.post<{ ok: boolean }>('/api/alerts/read-all', {}));
+  drafts = (scholarshipId: string) => firstValueFrom(this.http.get<{ items: Draft[] }>('/api/drafts', { params: { scholarshipId } }));
+  draft = (id: string) => firstValueFrom(this.http.get<Draft>(`/api/drafts/${id}`));
+  createDraft = (body: { scholarshipId: string; requirementId: string; notes: string; includeGpa: boolean }) =>
+    firstValueFrom(this.http.post<{ draftId: string; jobId: string }>('/api/drafts', body));
+  editDraft = (id: string, text: string) => firstValueFrom(this.http.patch<Draft>(`/api/drafts/${id}`, { text }));
+  approveDraft = (id: string) => firstValueFrom(this.http.post<Draft>(`/api/drafts/${id}/approve`, {}));
+  discardDraft = (id: string) => firstValueFrom(this.http.post<{ ok: boolean }>(`/api/drafts/${id}/discard`, {}));
   viewSource = (sourceId: string, versionId: string) =>
     firstValueFrom(this.http.get<{ url: string }>(`/api/sources/${sourceId}/versions/${versionId}/view`));
 

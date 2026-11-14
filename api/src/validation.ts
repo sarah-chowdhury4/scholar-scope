@@ -89,6 +89,23 @@ export const reviewSchema = z.discriminatedUnion('action', [
 
 export const readinessSchema = z.object({ readiness: z.enum(['missing', 'in_draft', 'ready']) }).strict();
 
+/** Ask for an essay draft. The notes are the student's own facts; the draft may use nothing else (FR-6). */
+export const createDraftSchema = z
+  .object({
+    scholarshipId: z.string().min(1).max(128),
+    requirementId: z.string().min(1).max(128),
+    notes: z
+      .string()
+      .trim()
+      .min(40, 'Write a few lines about your own experience first. The draft only uses what you write.')
+      .max(4000, 'Keep your notes under 4000 characters.'),
+    includeGpa: z.boolean().optional(),
+  })
+  .strict();
+
+export const editDraftSchema = z.object({ text: z.string().max(20_000, 'That draft is too long.') }).strict();
+export const approveDraftSchema = z.object({ text: z.string().max(20_000, 'That draft is too long.').optional() }).strict();
+
 export const consentSchema = z.object({ version: z.string().min(1).max(32) });
 
 export const profilePatchSchema = z

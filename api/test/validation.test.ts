@@ -68,3 +68,12 @@ describe('reviewSchema', () => {
     expect(() => reviewSchema.parse({ action: 'approve' })).toThrow();
   });
 });
+
+describe('createDraftSchema', () => {
+  it('needs the student to write their own notes first', async () => {
+    const { createDraftSchema } = await import('../src/validation');
+    expect(() => createDraftSchema.parse({ scholarshipId: 's', requirementId: 'r', notes: 'too short' })).toThrow();
+    const ok = createDraftSchema.parse({ scholarshipId: 's', requirementId: 'r', notes: 'I led the robotics club for two years and tutored younger students.' });
+    expect(ok.notes).toContain('robotics');
+  });
+});

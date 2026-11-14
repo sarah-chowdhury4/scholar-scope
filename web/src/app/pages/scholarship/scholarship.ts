@@ -13,10 +13,11 @@ import {
 import { DocumentCheckView } from '../documents/document-check';
 import { RequirementCard } from './requirement-card';
 import { ChangeReview } from './change-review';
+import { EssayDraft } from './essay-draft';
 
 @Component({
   selector: 'app-scholarship',
-  imports: [RouterLink, DatePipe, DocumentCheckView, RequirementCard, ChangeReview],
+  imports: [RouterLink, DatePipe, DocumentCheckView, RequirementCard, ChangeReview, EssayDraft],
   template: `
     <p><a routerLink="/">← All scholarships</a></p>
     @if (data(); as s) {
@@ -121,7 +122,11 @@ import { ChangeReview } from './change-review';
       }
       <ul class="cards">
         @for (r of requirements(); track r.id) {
-          <li appRequirementCard [requirement]="r" [scholarshipId]="s.id" (changed)="load()" (openSource)="openSource($event.sourceId, $event.sourceVersionId)"></li>
+          <li appRequirementCard [requirement]="r" [scholarshipId]="s.id" (changed)="load()" (openSource)="openSource($event.sourceId, $event.sourceVersionId)">
+            @if (draftable(r)) {
+              <app-essay-draft [requirement]="r" [scholarshipId]="s.id" (changed)="load()" />
+            }
+          </li>
         }
       </ul>
       <p>
@@ -212,6 +217,11 @@ export class ScholarshipPage implements OnInit {
       this.busy.set(false);
       await this.load();
     }
+  }
+
+  /** Same rule as the API (shared isDraftable): essays and personal statements. */
+  draftable(r: Requirement) {
+    return r.kind === 'essay' || /\b(essay|personal statement|statement of purpose|short answer|cover letter|motivation letter)\b/i.test(r.label);
   }
 
   async toggleRemoved() {
