@@ -85,6 +85,19 @@ export type RequirementVersion = {
 
 export type RemovedRequirement = { id: string; kind: string; label: string; removedAt: string | null };
 
+export type SourceSummary = {
+  id: string;
+  kind: 'upload' | 'url';
+  title: string;
+  url: string | null;
+  currentVersionId: string | null;
+  robotsAllowed: boolean | null;
+  lastFetch: { ok: boolean; at: string | null } | null;
+  scanStatus: string | null;
+  extraction: { status: string; itemsFound: number | null } | null;
+  capturedAt: string | null;
+};
+
 export type ProfileEmail = { address: string; verified: boolean; primary: boolean };
 
 export type Education = {
@@ -265,6 +278,10 @@ export class ApiService {
       this.http.get<{ items: RequirementVersion[] }>(`/api/scholarships/${scholarshipId}/requirements/${requirementId}/versions`),
     );
 
+  sources = (scholarshipId: string) =>
+    firstValueFrom(this.http.get<{ items: SourceSummary[] }>('/api/sources', { params: { scholarshipId } }));
+  addSourceUrl = (scholarshipId: string, url: string) =>
+    firstValueFrom(this.http.post<{ sourceId: string; jobId: string }>('/api/uploads/url', { scholarshipId, url }));
   viewSource = (sourceId: string, versionId: string) =>
     firstValueFrom(this.http.get<{ url: string }>(`/api/sources/${sourceId}/versions/${versionId}/view`));
 

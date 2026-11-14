@@ -108,3 +108,6 @@ code { background: var(--page); padding: 0.1rem 0.3rem; border-radius: 4px; }
 .req-head label.check { margin-top: 0; }
 form.edit { margin-top: 0.5rem; }
 ol.history { margin: 0.5rem 0 0; padding-left: 1.2rem; display: grid; gap: 0.4rem; }
+.url-form { margin-top: 0.75rem; }
+.url-form .actions input { flex: 1 1 260px; }
+h3 { font-size: 1rem; margin: 0.75rem 0 0.25rem; }

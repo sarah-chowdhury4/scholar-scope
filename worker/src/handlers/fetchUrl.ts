@@ -96,7 +96,7 @@ export async function handleFetchUrl(job: JobMessage): Promise<void> {
     uploadedBy: { type: 'system', id: 'recheck' },
   });
   await sourceRef.update({ currentVersionId: versionRef.id, lastTextHash: textHash, updatedAt: FieldValue.serverTimestamp() });
-  await enqueueJob(job.uid, 'extract', versionRef.path);
-  await updateJob(job.uid, job.jobId, { status: 'done', progress: 100 });
+  const nextJobId = await enqueueJob(job.uid, 'extract', versionRef.path);
+  await updateJob(job.uid, job.jobId, { status: 'done', progress: 100, nextJobId });
   log.info('recheck_changed', { target: job.target });
 }

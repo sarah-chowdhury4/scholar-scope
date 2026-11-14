@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { FieldValue } from 'firebase-admin/firestore';
+import { FieldValue, Timestamp } from 'firebase-admin/firestore';
 import { randomUUID } from 'node:crypto';
 import {
   userDoc,
@@ -130,25 +130,53 @@ uploadsRouter.post('/:purpose/:itemId/:uploadId/complete', async (req, res) => {
   res.status(202).json({ jobId });
 });
 
-/** Add a scholarship web page as a source (FR-2.1); the worker fetches it (honouring robots.txt). */
+/**
+ * Add a scholarship web page as a source (FR-2.1); the worker fetches it (honouring robots.txt).
+ * One source per page per student: pasting the same URL again re-checks it now.
+ * If the scholarship has no page yet, this one becomes its page and joins the daily re-check (FR-3.5).
+ */
 uploadsRouter.post('/url', async (req, res) => {
   const body = addUrlSourceSchema.parse(req.body);
   const user = userDoc(req.uid!);
-  const sch = await user.collection('scholarships').doc(body.scholarshipId).get();
+  const schRef = user.collection('scholarships').doc(body.scholarshipId);
+  const sch = await schRef.get();
   if (!sch.exists) return res.status(404).json({ error: 'Scholarship not found' });
+  if (sch.get('status') === 'archived') return res.status(409).json({ error: 'This scholarship is archived.' });
 
-  const sourceRef = user.collection('sources').doc(randomUUID());
-  await sourceRef.set({
-    kind: 'url',
-    url: body.url,
-    title: body.url,
-    scholarshipIds: [body.scholarshipId],
-    currentVersionId: null,
-    robots: null,
-    lastFetch: null,
-    createdAt: FieldValue.serverTimestamp(),
-    updatedAt: FieldValue.serverTimestamp(),
-  });
+  const url = new URL(body.url).toString();
+  const existing = await user.collection('sources').where('kind', '==', 'url').where('url', '==', url).limit(1).get();
+  let sourceRef = existing.docs[0]?.ref;
+  if (sourceRef) {
+    await sourceRef.update({ scholarshipIds: FieldValue.arrayUnion(body.scholarshipId), updatedAt: FieldValue.serverTimestamp() });
+  } else {
+    sourceRef = user.collection('sources').doc(randomUUID());
+    await sourceRef.set({
+      kind: 'url',
+      url,
+      title: url,
+      scholarshipIds: [body.scholarshipId],
+      currentVersionId: null,
+      robots: null,
+      lastFetch: null,
+      createdAt: FieldValue.serverTimestamp(),
+      updatedAt: FieldValue.serverTimestamp(),
+    });
+  }
+  if (!sch.get('url')) {
+    await schRef.update({
+      url,
+      'recheck.enabled': true,
+      'recheck.nextCheckAt': Timestamp.fromMillis(Date.now() + 23 * 60 * 60 * 1000),
+      updatedAt: FieldValue.serverTimestamp(),
+    });
+  }
   const jobId = await enqueueJob(req.uid!, 'fetch_url', sourceRef.path);
+  await writeAudit({
+    actor: { type: 'student', id: req.uid! },
+    subjectUid: req.uid!,
+    action: 'source.url_added',
+    resource: sourceRef.path,
+    after: { scholarshipId: body.scholarshipId },
+  });
   res.status(202).json({ sourceId: sourceRef.id, jobId });
 });
