@@ -74,6 +74,7 @@ cd scholar-scope
 | LocalStack auth token | app.localstack.cloud → *Auth Token* (free account) | `.env` → `LOCALSTACK_AUTH_TOKEN` |
 | Gemini API key | aistudio.google.com → *Get API key* | `.env.secrets` → `GEMINI_API_KEY` |
 | Gemini model id | AI Studio → model list (exact id of the current Flash model) | `.env` → `GEMINI_MODEL` |
+| NVIDIA NIM key (optional) | build.nvidia.com → *Get API Key*. No key? Set `NIM_ENABLED=false` in `.env` and NIM calls run on Gemini | `.env.secrets` → `NVIDIA_API_KEY` |
 
 > **Synthetic documents only.** Free-tier AI inputs may be kept or used by the provider. Never upload real student records to a local setup.
 
@@ -120,7 +121,7 @@ done
 rm .env.bak
 ```
 
-Then open `.env` and set `LOCALSTACK_AUTH_TOKEN` and `GEMINI_MODEL`; open `.env.secrets` and set `GEMINI_API_KEY`. Use any text editor: `notepad .env` (Windows), `open -e .env` (macOS) or `nano .env` (Linux).
+Then open `.env` and set `LOCALSTACK_AUTH_TOKEN` and `GEMINI_MODEL`; open `.env.secrets` and set `GEMINI_API_KEY`. If you have an NVIDIA key, set `NVIDIA_API_KEY` too; if not, set `NIM_ENABLED=false` in `.env` so the NIM jobs run on Gemini. Use any text editor: `notepad .env` (Windows), `open -e .env` (macOS) or `nano .env` (Linux).
 
 Both files are git-ignored. If this is a fresh copy rather than a clone, run `git init -b main` first, then confirm with `git status` that neither file is listed.
 
@@ -161,7 +162,7 @@ The first start takes several minutes: the Firebase image downloads the emulator
 docker compose logs --tail 20 minio-init localstack
 ```
 
-contains `MinIO ready: …` and `LocalStack ready: 2 queues + DLQs, secrets loaded.`
+contains `MinIO ready: …` and `LocalStack ready: 3 queues + DLQs, secrets loaded.`
 
 ### 6. Check each service
 
@@ -169,8 +170,8 @@ contains `MinIO ready: …` and `LocalStack ready: 2 queues + DLQs, secrets load
 |---|---|---|
 | Firebase | open http://localhost:4000 | Emulator UI with Firestore and Authentication |
 | MinIO | open http://localhost:9001, log in with `MINIO_ROOT_USER` / `MINIO_ROOT_PASSWORD` from `.env` | buckets `uploads`, `originals`, `exports` |
-| Queues | `docker compose exec localstack awslocal sqs list-queues` | four queues (`gemini`, `default`, each with a `-dlq`) |
-| Secrets (names only) | `docker compose exec localstack awslocal secretsmanager list-secrets --query "SecretList[].Name"` | `scholarscope/gemini-api-key` |
+| Queues | `docker compose exec localstack awslocal sqs list-queues` | six queues (`gemini`, `nim`, `default`, each with a `-dlq`) |
+| Secrets (names only) | `docker compose exec localstack awslocal secretsmanager list-secrets --query "SecretList[].Name"` | `scholarscope/gemini-api-key` (+ `nvidia-api-key` if set) |
 | Mailpit | open http://localhost:8025 | empty inbox |
 
 The `awslocal is deprecated` banner is harmless.
@@ -190,7 +191,7 @@ docker compose up -d --build api worker
 docker compose logs --tail 20 api worker
 ```
 
-**Done when:** the logs show `api_started`, `worker_started` and two `queue_consumer_started` lines, and http://localhost:3000/api/health returns `{"status":"ok"}`.
+**Done when:** the logs show `api_started`, `worker_started` and three `queue_consumer_started` lines, and http://localhost:3000/api/health returns `{"status":"ok"}`.
 
 ### 9. Load the scholarship catalog
 
@@ -334,6 +335,7 @@ Before pasting logs into an issue or chat, check them for passwords and keys.
 | Email (Brevo) | Mailpit (`mailpit`) |
 | Cloud Vision OCR | Tesseract inside the worker |
 | Vertex AI Gemini | Gemini API, Google AI Studio free tier |
+| NVIDIA NIM | Hosted NIM API (or Gemini with `NIM_ENABLED=false`) |
 | NVIDIA NIM | Hosted NIM API |
 | Cloud Scheduler | `node-cron` inside the worker |
 

@@ -67,3 +67,27 @@ export async function generateJson<T>(options: {
     outputTokens: response.usageMetadata?.candidatesTokenCount,
   };
 }
+
+/** Plain-text answer (used for NIM chat calls when NIM_ENABLED=false). */
+export async function geminiText(system: string, user: string, maxOutputTokens = 400): Promise<string> {
+  const ai = await gemini();
+  const response = await ai.models.generateContent({
+    model: geminiModel(),
+    contents: [{ role: 'user', parts: [{ text: user }] }],
+    config: { systemInstruction: system, temperature: 0, maxOutputTokens },
+  });
+  return response.text ?? '';
+}
+
+/** Embeddings (used for NIM embedding calls when NIM_ENABLED=false). */
+export async function geminiEmbed(texts: string[], taskType: 'RETRIEVAL_DOCUMENT' | 'RETRIEVAL_QUERY'): Promise<number[][]> {
+  const ai = await gemini();
+  const response = await ai.models.embedContent({
+    model: process.env.GEMINI_EMBED_MODEL || 'gemini-embedding-001',
+    contents: texts,
+    config: { taskType },
+  });
+  const vectors = (response.embeddings ?? []).map((item) => item.values ?? []);
+  if (vectors.length !== texts.length) throw new Error('Gemini returned a different number of embeddings than texts');
+  return vectors;
+}

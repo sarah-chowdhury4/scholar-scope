@@ -19,6 +19,8 @@ process.on('SIGINT', () => stop.abort());
 
 // Same rate limits as the Cloud Tasks queues in the cloud design
 void consume('gemini', 60 * envNumber('GEMINI_RATE_PER_SEC', 1), runJob, stop.signal);
+// With NIM_ENABLED=false nothing new is queued here (NIM jobs go to the gemini queue); it still drains old messages.
+void consume('nim', envNumber('NIM_RATE_PER_MIN', 30), runJob, stop.signal);
 void consume('default', 300, runJob, stop.signal);
 
 if (process.env.SCHEDULER === 'cron') {

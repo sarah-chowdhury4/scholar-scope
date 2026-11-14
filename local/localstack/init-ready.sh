@@ -4,10 +4,10 @@
 # and loads API keys from .env.secrets into LocalStack Secrets Manager.
 set -euo pipefail
 
-# --- Queues: gemini-queue, default-queue -------------------------------------
+# --- Queues: gemini-queue, nim-queue, default-queue -------------------------
 # maxReceiveCount=3 matches "at most 3 attempts" on Cloud Tasks. SQS has no
-# dispatch-rate setting, so the worker enforces 1/s on the Gemini queue.
-for Q in gemini default; do
+# dispatch-rate setting, so the worker enforces 1/s (Gemini) and 30/min (NIM).
+for Q in gemini nim default; do
   awslocal sqs create-queue --queue-name "${Q}-dlq" >/dev/null
   DLQ_URL=$(awslocal sqs get-queue-url --queue-name "${Q}-dlq" --query QueueUrl --output text)
   DLQ_ARN=$(awslocal sqs get-queue-attributes --queue-url "$DLQ_URL" \
@@ -30,6 +30,7 @@ put_secret() {  # $1=name  $2=value
   echo "secret $1: stored"
 }
 put_secret scholarscope/gemini-api-key "${GEMINI_API_KEY:-}"
+put_secret scholarscope/nvidia-api-key "${NVIDIA_API_KEY:-}"
 put_secret scholarscope/brevo-api-key  "${BREVO_API_KEY:-}"
 
-echo "LocalStack ready: 2 queues + DLQs, secrets loaded."
+echo "LocalStack ready: 3 queues + DLQs, secrets loaded."
