@@ -68,9 +68,22 @@ export type Requirement = {
   label: string;
   verification: Verification;
   readiness: string;
-  changeFlag: { active: boolean } | null;
+  changeFlag: { active: boolean; changeId?: string } | null;
   current: { value: Record<string, unknown>; citation: Citation | null };
+  review?: { status: 'confirmed' | 'corrected' | 'rejected' | 'restored'; at: string | null } | null;
+  currentVersionNo?: number;
 };
+
+export type RequirementVersion = {
+  id: string;
+  versionNo: number;
+  value: Record<string, unknown>;
+  citation: Citation | null;
+  origin: string;
+  createdAt: string | null;
+};
+
+export type RemovedRequirement = { id: string; kind: string; label: string; removedAt: string | null };
 
 export type ProfileEmail = { address: string; verified: boolean; primary: boolean };
 
@@ -240,6 +253,17 @@ export class ApiService {
   }
   addFromCatalog = (catalogId: string) =>
     firstValueFrom(this.http.post<{ scholarshipId: string; alreadyAdded: boolean }>(`/api/catalog/${catalogId}/add`, {}));
+
+  reviewRequirement = (scholarshipId: string, requirementId: string, body: Record<string, unknown>) =>
+    firstValueFrom(this.http.post<{ ok: boolean }>(`/api/scholarships/${scholarshipId}/requirements/${requirementId}/review`, body));
+  setRequirementReadiness = (scholarshipId: string, requirementId: string, readiness: 'missing' | 'in_draft' | 'ready') =>
+    firstValueFrom(this.http.patch<{ ok: boolean }>(`/api/scholarships/${scholarshipId}/requirements/${requirementId}`, { readiness }));
+  removedRequirements = (scholarshipId: string) =>
+    firstValueFrom(this.http.get<{ items: RemovedRequirement[] }>(`/api/scholarships/${scholarshipId}/requirements/removed`));
+  requirementVersions = (scholarshipId: string, requirementId: string) =>
+    firstValueFrom(
+      this.http.get<{ items: RequirementVersion[] }>(`/api/scholarships/${scholarshipId}/requirements/${requirementId}/versions`),
+    );
 
   viewSource = (sourceId: string, versionId: string) =>
     firstValueFrom(this.http.get<{ url: string }>(`/api/sources/${sourceId}/versions/${versionId}/view`));

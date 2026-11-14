@@ -63,6 +63,32 @@ export const addUrlSourceSchema = z.object({
   url: httpsOrHttpUrl,
 });
 
+/** A student's review of one extracted requirement (FR-2.5). */
+export const reviewSchema = z.discriminatedUnion('action', [
+  z.object({ action: z.literal('confirm') }).strict(),
+  z.object({ action: z.literal('restore') }).strict(),
+  z.object({ action: z.literal('reject'), reason: z.string().trim().max(300).optional() }).strict(),
+  z
+    .object({
+      action: z.literal('correct'),
+      label: z.string().trim().min(1, 'Describe the requirement.').max(300),
+      details: z.string().trim().max(1000).optional(),
+      wordLimit: z.number().int().positive().max(100_000).nullable().optional(),
+      minGpa: z.number().nonnegative().max(100).nullable().optional(),
+      deadline: z
+        .object({
+          date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Use YYYY-MM-DD'),
+          time: z.string().regex(/^\d{2}:\d{2}$/, 'Use HH:MM').optional(),
+          timezone: z.string().min(1).max(64).default('UTC'),
+        })
+        .nullable()
+        .optional(),
+    })
+    .strict(),
+]);
+
+export const readinessSchema = z.object({ readiness: z.enum(['missing', 'in_draft', 'ready']) }).strict();
+
 export const consentSchema = z.object({ version: z.string().min(1).max(32) });
 
 export const profilePatchSchema = z

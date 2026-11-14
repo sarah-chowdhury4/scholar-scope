@@ -3,6 +3,7 @@ import { FieldValue, Timestamp } from 'firebase-admin/firestore';
 import { db, userDoc, getAppConfig, writeAudit, minGpaFromRequirements } from '@scholarscope/shared';
 import { createScholarshipSchema, updateScholarshipSchema } from '../validation';
 import { scholarshipDocuments } from '../studentDocuments';
+import { toPlain } from '../serialize';
 
 type RequirementRecord = {
   id: string;
@@ -117,7 +118,7 @@ scholarshipsRouter.get('/:id', async (req, res) => {
   });
   res.json({
     ...serialize(snap.id, snap.data()!),
-    requirements,
+    requirements: requirements.map((item) => toPlain(item)),
     documents,
   });
 });

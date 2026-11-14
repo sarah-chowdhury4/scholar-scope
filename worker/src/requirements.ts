@@ -104,22 +104,4 @@ export async function upsertRequirement(
   });
 }
 
-/** Recompute the dashboard counts on the scholarship head (FR-1.4). */
-export async function recomputeCounts(scholarshipRef: DocumentReference): Promise<void> {
-  const reqs = await scholarshipRef.collection('requirements').where('removedAt', '==', null).get();
-  const counts = { open: 0, changed: 0, unverified: 0, needsReview: 0, ready: 0, total: reqs.size };
-  for (const r of reqs.docs) {
-    const readiness = r.get('readiness');
-    const verification = r.get('verification');
-    if (readiness === 'ready') counts.ready++;
-    else counts.open++;
-    if (readiness === 'changed' || r.get('changeFlag.active')) counts.changed++;
-    if (verification === 'unverified') counts.unverified++;
-    if (verification === 'needs_review') counts.needsReview++;
-  }
-  await scholarshipRef.update({
-    counts,
-    readinessPct: counts.total ? Math.round((counts.ready / counts.total) * 100) : 0,
-    updatedAt: FieldValue.serverTimestamp(),
-  });
-}
+export { recomputeCounts } from '@scholarscope/shared';

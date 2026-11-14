@@ -1,12 +1,13 @@
 import { Component, OnInit, inject, input, signal } from '@angular/core';
 import { DatePipe } from '@angular/common';
 import { RouterLink } from '@angular/router';
-import { ApiService, apiMessage, type Requirement, type Scholarship, type ScholarshipDocuments } from '../../core/api.service';
+import { ApiService, apiMessage, type RemovedRequirement, type Requirement, type Scholarship, type ScholarshipDocuments } from '../../core/api.service';
 import { DocumentCheckView } from '../documents/document-check';
+import { RequirementCard } from './requirement-card';
 
 @Component({
   selector: 'app-scholarship',
-  imports: [RouterLink, DatePipe, DocumentCheckView],
+  imports: [RouterLink, DatePipe, DocumentCheckView, RequirementCard],
   template: `
     <p><a routerLink="/">← All scholarships</a></p>
     @if (data(); as s) {
@@ -82,28 +83,23 @@ import { DocumentCheckView } from '../documents/document-check';
       }
       <ul class="cards">
         @for (r of requirements(); track r.id) {
-          <li class="card" [class.changed]="r.changeFlag?.active">
-            <p>
-              <strong>{{ r.label }}</strong>
-              <span class="badge" [class]="r.verification">{{ label(r.verification) }}</span>
-              @if (r.changeFlag?.active) {
-                <span class="badge changed">Changed</span>
-              }
-            </p>
-            @if (r.current.citation; as c) {
-              <blockquote>
-                “{{ c.quote }}”
-                <footer>
-                  {{ c.page ? 'Page ' + c.page : 'Whole document' }}{{ c.ocrDerived ? ' · read by OCR' : '' }} ·
-                  <button class="link" type="button" (click)="openSource(c.sourceId, c.sourceVersionId)">Open source</button>
-                </footer>
-              </blockquote>
-            } @else {
-              <p class="warning">No source found for this item. Don't rely on it until it's confirmed.</p>
-            }
-          </li>
+          <li appRequirementCard [requirement]="r" [scholarshipId]="s.id" (changed)="load()" (openSource)="openSource($event.sourceId, $event.sourceVersionId)"></li>
         }
       </ul>
+      <p>
+        <button type="button" class="link" (click)="toggleRemoved()">{{ removed() ? 'Hide removed items' : 'Show items you removed' }}</button>
+      </p>
+      @if (removed(); as items) {
+        @if (items.length === 0) {
+          <p class="muted">You have not removed anything.</p>
+        }
+        @for (item of items; track item.id) {
+          <div class="email-row">
+            <span>{{ item.label }}</span>
+            <button type="button" class="secondary" (click)="restore(item.id)">Put back</button>
+          </div>
+        }
+      }
     } @else {
       <p>Loading…</p>
     }
@@ -117,6 +113,7 @@ export class ScholarshipPage implements OnInit {
   protected readonly requirements = signal<Requirement[]>([]);
   protected readonly busy = signal(false);
   protected readonly status = signal('');
+  protected readonly removed = signal<RemovedRequirement[] | null>(null);
 
   async ngOnInit() {
     await this.load();
@@ -130,6 +127,24 @@ export class ScholarshipPage implements OnInit {
     const s = await this.api.scholarship(this.id());
     this.data.set(s);
     this.requirements.set(s.requirements);
+  }
+
+  async toggleRemoved() {
+    if (this.removed()) {
+      this.removed.set(null);
+      return;
+    }
+    this.removed.set((await this.api.removedRequirements(this.id())).items);
+  }
+
+  async restore(requirementId: string) {
+    try {
+      await this.api.reviewRequirement(this.id(), requirementId, { action: 'restore' });
+      this.removed.set((await this.api.removedRequirements(this.id())).items);
+      await this.load();
+    } catch (err) {
+      this.status.set(apiMessage(err, 'Could not put that back.'));
+    }
   }
 
   scanLabel(status: string) {

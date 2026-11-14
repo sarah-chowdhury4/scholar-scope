@@ -104,3 +104,7 @@ code { background: var(--page); padding: 0.1rem 0.3rem; border-radius: 4px; }
 .findings li.problem { border-left-color: var(--bad-ink); background: var(--bad-bg); color: var(--bad-ink); }
 .findings li.warning { border-left-color: var(--warn-ink); background: var(--warn-bg); color: var(--warn-ink); }
 .findings li.ok { border-left-color: var(--ok-ink); background: var(--ok-bg); color: var(--ok-ink); }
+.req-head { display: flex; flex-wrap: wrap; gap: 0.4rem; align-items: flex-start; justify-content: space-between; }
+.req-head label.check { margin-top: 0; }
+form.edit { margin-top: 0.5rem; }
+ol.history { margin: 0.5rem 0 0; padding-left: 1.2rem; display: grid; gap: 0.4rem; }

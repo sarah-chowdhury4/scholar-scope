@@ -379,7 +379,7 @@ The local setup does **not** provide encryption at rest, IAM enforcement in Loca
 | Landing page before sign-in | To do |
 | Upload → scan → store original → extract with citations | Done |
 | Paste a scholarship page URL as a source (UI) | To do (API ready) |
-| Confirm / correct / reject an extracted item | To do |
+| Confirm / correct / reject an extracted item, tick items done, version history | Done |
 | OCR for images and scanned PDFs | Done (Tesseract locally) |
 | Requirement versions + change flag on re-extraction | Done (basic pairing by requirement name) |
 | Daily page re-check (robots.txt, change detection) | Done |

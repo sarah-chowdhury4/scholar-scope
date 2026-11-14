@@ -51,3 +51,20 @@ describe('catalogQuerySchema', () => {
     expect(() => catalogQuerySchema.parse({ gpa: '12' })).toThrow();
   });
 });
+
+describe('reviewSchema', () => {
+  it('accepts each review action', async () => {
+    const { reviewSchema } = await import('../src/validation');
+    expect(reviewSchema.parse({ action: 'confirm' })).toEqual({ action: 'confirm' });
+    expect(reviewSchema.parse({ action: 'reject', reason: 'Not for this year' }).action).toBe('reject');
+    const corrected = reviewSchema.parse({ action: 'correct', label: 'Essay, 650 words', wordLimit: 650, deadline: { date: '2027-01-15' } });
+    expect(corrected).toMatchObject({ action: 'correct', wordLimit: 650, deadline: { date: '2027-01-15', timezone: 'UTC' } });
+  });
+
+  it('rejects an empty correction and unknown fields', async () => {
+    const { reviewSchema } = await import('../src/validation');
+    expect(() => reviewSchema.parse({ action: 'correct', label: '  ' })).toThrow();
+    expect(() => reviewSchema.parse({ action: 'confirm', verification: 'verified' })).toThrow();
+    expect(() => reviewSchema.parse({ action: 'approve' })).toThrow();
+  });
+});
