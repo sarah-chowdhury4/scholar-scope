@@ -384,9 +384,10 @@ The local setup does **not** provide encryption at rest, IAM enforcement in Loca
 | Requirement versions + change flag on re-extraction | Done (basic pairing by requirement name) |
 | Daily page re-check (robots.txt, change detection) | Done |
 | Deadline alerts (email, de-duplicated; stored for in-app) | Done |
-| In-app alerts list, change alerts | To do |
+| Change alerts (in-app record + email, de-duplicated) | Done |
+| In-app alerts list | To do |
 | Delete my data | Done |
-| Side-by-side diff view, acknowledging changes | To do |
+| Side-by-side diff view with an AI (Gemini) summary, acknowledging changes | Done |
 | Student document library (transcripts, certificates, passport…) | Done |
 | AI document checks (Gemini): right kind of file, name vs profile, expiry vs deadline, GPA vs minimum, official / English rules | Done |
 | Draft generation with citations, approval | To do |

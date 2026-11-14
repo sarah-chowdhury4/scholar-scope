@@ -98,6 +98,23 @@ export type SourceSummary = {
   capturedAt: string | null;
 };
 
+export type DiffSegment = { type: 'same' | 'added' | 'removed'; text: string };
+
+export type RequirementChange = {
+  id: string;
+  requirementId: string;
+  label: string;
+  status: 'open' | 'acknowledged';
+  detectedAt: string | null;
+  acknowledgedAt: string | null;
+  from: { sourceId: string; sourceVersionId: string } | null;
+  to: { sourceId: string; sourceVersionId: string } | null;
+  fromQuote: string;
+  toQuote: string;
+  diff: { before: DiffSegment[]; after: DiffSegment[] };
+  aiSummary: { summary: string; whatToDo: string; importance: string; model: string | null } | null;
+};
+
 export type ProfileEmail = { address: string; verified: boolean; primary: boolean };
 
 export type Education = {
@@ -282,6 +299,10 @@ export class ApiService {
     firstValueFrom(this.http.get<{ items: SourceSummary[] }>('/api/sources', { params: { scholarshipId } }));
   addSourceUrl = (scholarshipId: string, url: string) =>
     firstValueFrom(this.http.post<{ sourceId: string; jobId: string }>('/api/uploads/url', { scholarshipId, url }));
+  changes = (scholarshipId: string) =>
+    firstValueFrom(this.http.get<{ items: RequirementChange[] }>(`/api/scholarships/${scholarshipId}/changes`));
+  acknowledgeChange = (scholarshipId: string, changeId: string) =>
+    firstValueFrom(this.http.post<{ ok: boolean }>(`/api/scholarships/${scholarshipId}/changes/${changeId}/acknowledge`, {}));
   viewSource = (sourceId: string, versionId: string) =>
     firstValueFrom(this.http.get<{ url: string }>(`/api/sources/${sourceId}/versions/${versionId}/view`));
 

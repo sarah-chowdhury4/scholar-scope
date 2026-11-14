@@ -12,10 +12,11 @@ import {
 } from '../../core/api.service';
 import { DocumentCheckView } from '../documents/document-check';
 import { RequirementCard } from './requirement-card';
+import { ChangeReview } from './change-review';
 
 @Component({
   selector: 'app-scholarship',
-  imports: [RouterLink, DatePipe, DocumentCheckView, RequirementCard],
+  imports: [RouterLink, DatePipe, DocumentCheckView, RequirementCard, ChangeReview],
   template: `
     <p><a routerLink="/">← All scholarships</a></p>
     @if (data(); as s) {
@@ -106,6 +107,13 @@ import { RequirementCard } from './requirement-card';
           <p>This scholarship does not name a transcript, certificate, passport, or birth certificate. You can still keep those files in <a routerLink="/documents">Documents</a> and choose the scholarships that should show them.</p>
         }
       </section>
+
+      <app-change-review
+        [scholarshipId]="s.id"
+        [refreshKey]="requirements()"
+        (changed)="load()"
+        (openSource)="openSource($event.sourceId, $event.sourceVersionId)"
+      />
 
       <h2>Requirements</h2>
       @if (requirements().length === 0) {

@@ -15,6 +15,7 @@ import { jobsRouter, sourcesRouter, alertsRouter } from './routes/misc';
 import { catalogRouter } from './routes/catalog';
 import { documentsRouter } from './routes/documents';
 import { requirementsRouter } from './routes/requirements';
+import { changesRouter } from './routes/changes';
 
 export function createApp() {
   const app = express();
@@ -46,6 +47,7 @@ export function createApp() {
   api.use(requireAuth);
   api.use('/me', meRouter);
   api.use('/scholarships/:id/requirements', requirementsRouter);
+  api.use('/scholarships/:id/changes', changesRouter);
   api.use('/scholarships', scholarshipsRouter);
   api.use('/uploads', uploadsRouter);
   api.use('/jobs', jobsRouter);

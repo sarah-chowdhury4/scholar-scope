@@ -4,6 +4,7 @@ import { handleScan } from './scan';
 import { handleExtract } from './extract';
 import { handleFetchUrl } from './fetchUrl';
 import { handleCheckDocument } from './checkDocument';
+import { handleDiff } from './diff';
 
 type Handler = (job: JobMessage) => Promise<void>;
 
@@ -16,6 +17,7 @@ const HANDLERS: Partial<Record<JobType, Handler>> = {
   extract: handleExtract,
   fetch_url: handleFetchUrl,
   check_document: handleCheckDocument,
+  diff: handleDiff,
 };
 
 const MAX_ATTEMPTS = 3;

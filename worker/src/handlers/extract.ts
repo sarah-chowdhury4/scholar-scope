@@ -11,6 +11,7 @@ import {
   quoteHash,
   parseSourceDeadline,
   updateJob,
+  enqueueJob,
   log,
   type Citation,
   type JobMessage,
@@ -20,6 +21,7 @@ import { extractText } from '../text/extractText';
 import { EXTRACT_PROMPT_VERSION, EXTRACT_SCHEMA, EXTRACT_SYSTEM, EXTRACT_TASK, type ExtractedItem } from '../prompts/extract';
 import { recomputeCounts, upsertRequirement } from '../requirements';
 import { consumePages, recordTokens } from '../usage';
+import { createChangeAlert } from '../alerts';
 
 /**
  * Extract requirements from one stored source version (FR-2.2–2.4, FR-2.6).
@@ -113,7 +115,7 @@ export async function handleExtract(job: JobMessage): Promise<void> {
 
     for (const sid of scholarshipIds) {
       const schRef = userDoc(job.uid).collection('scholarships').doc(sid);
-      const outcome = await upsertRequirement(schRef, {
+      const { outcome, changeId } = await upsertRequirement(schRef, {
         kind: item.kind,
         label: item.label,
         value,
@@ -124,6 +126,10 @@ export async function handleExtract(job: JobMessage): Promise<void> {
         createdBy: { type: 'ai', id: geminiModel() },
       });
       stats[outcome]++;
+      if (changeId) {
+        await createChangeAlert(job.uid, schRef, changeId, item.label);
+        await enqueueJob(job.uid, 'diff', schRef.collection('changes').doc(changeId).path);
+      }
 
       // A cited deadline replaces the student-typed one on the record (FR-1.5, FR-4.2)
       if (deadline && citation) {
