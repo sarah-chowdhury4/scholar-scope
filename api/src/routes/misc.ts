@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { userDoc, storage, buckets } from '@scholarscope/shared';
+import { db, userDoc, storage, buckets } from '@scholarscope/shared';
 
 function iso(value: unknown): string | null {
   return (value as { toDate?: () => Date } | undefined)?.toDate?.().toISOString() ?? null;
@@ -58,12 +58,52 @@ sourcesRouter.get('/:sourceId/versions/:versionId/view', async (req, res) => {
   res.json({ url, page: req.query.page ?? null });
 });
 
-/** In-app alerts (FR-7.1). */
+/** In-app alerts (FR-7.1): deadline reminders and requirement changes, newest first. */
 export const alertsRouter = Router();
+
+type AlertDto = {
+  id: string;
+  type: string;
+  title: string;
+  body: string;
+  scholarshipId: string | null;
+  changeId: string | null;
+  read: boolean;
+  createdAt: string | null;
+};
+
+function toAlert(doc: FirebaseFirestore.QueryDocumentSnapshot): AlertDto {
+  return {
+    id: doc.id,
+    type: String(doc.get('type') ?? 'info'),
+    title: String(doc.get('title') ?? ''),
+    body: String(doc.get('body') ?? ''),
+    scholarshipId: (doc.get('scholarshipId') as string | null) ?? null,
+    changeId: (doc.get('changeId') as string | null) ?? null,
+    read: doc.get('inApp.readAt') != null,
+    createdAt: iso(doc.get('createdAt')),
+  };
+}
 
 alertsRouter.get('/', async (req, res) => {
   const snap = await userDoc(req.uid!).collection('alerts').orderBy('createdAt', 'desc').limit(50).get();
-  res.json({ items: snap.docs.map((d) => ({ id: d.id, ...d.data(), createdAt: d.get('createdAt')?.toDate?.().toISOString() })) });
+  const items = snap.docs.map(toAlert);
+  res.json({ items, unread: items.filter((item) => !item.read).length });
+});
+
+/** For the badge in the top menu. */
+alertsRouter.get('/unread-count', async (req, res) => {
+  const snap = await userDoc(req.uid!).collection('alerts').where('inApp.readAt', '==', null).count().get();
+  res.json({ unread: snap.data().count });
+});
+
+alertsRouter.post('/read-all', async (req, res) => {
+  const snap = await userDoc(req.uid!).collection('alerts').where('inApp.readAt', '==', null).limit(400).get();
+  const batch = db().batch();
+  const now = new Date();
+  for (const doc of snap.docs) batch.set(doc.ref, { inApp: { readAt: now } }, { merge: true });
+  await batch.commit();
+  res.json({ ok: true, marked: snap.size });
 });
 
 alertsRouter.post('/:id/read', async (req, res) => {

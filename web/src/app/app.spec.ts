@@ -3,6 +3,7 @@ import { provideRouter } from '@angular/router';
 import { signal } from '@angular/core';
 import { App } from './app';
 import { AuthService } from './core/auth.service';
+import { AlertsStore } from './core/alerts.store';
 
 describe('App', () => {
   beforeEach(async () => {
@@ -11,6 +12,7 @@ describe('App', () => {
       providers: [
         provideRouter([]),
         { provide: AuthService, useValue: { signedIn: signal(false), signOut: () => Promise.resolve() } },
+        { provide: AlertsStore, useValue: { unread: signal(0), refresh: async () => undefined, set: () => undefined } },
       ],
     }).compileComponents();
   });

@@ -115,3 +115,6 @@ h3 { font-size: 1rem; margin: 0.75rem 0 0.25rem; }
 .side-by-side { display: grid; gap: 0.75rem; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); margin-bottom: 0.5rem; }
 .side-by-side del { background: var(--bad-bg); color: var(--bad-ink); text-decoration: line-through; }
 .side-by-side ins { background: var(--ok-bg); color: var(--ok-ink); text-decoration: none; font-weight: 600; }
+.alert-list { list-style: none; padding: 0; display: grid; gap: 0.75rem; }
+.alert-list li.unread { box-shadow: 0 0 0 2px var(--accent) inset; }
+.topbar nav a .count { display: inline-block; min-width: 1.4em; padding: 0 0.35em; margin-left: 0.25em; border-radius: 999px; background: var(--bad-ink); color: #fff; font-size: 0.8rem; text-align: center; }

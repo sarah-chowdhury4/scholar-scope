@@ -115,6 +115,17 @@ export type RequirementChange = {
   aiSummary: { summary: string; whatToDo: string; importance: string; model: string | null } | null;
 };
 
+export type AlertItem = {
+  id: string;
+  type: string;
+  title: string;
+  body: string;
+  scholarshipId: string | null;
+  changeId: string | null;
+  read: boolean;
+  createdAt: string | null;
+};
+
 export type ProfileEmail = { address: string; verified: boolean; primary: boolean };
 
 export type Education = {
@@ -303,6 +314,10 @@ export class ApiService {
     firstValueFrom(this.http.get<{ items: RequirementChange[] }>(`/api/scholarships/${scholarshipId}/changes`));
   acknowledgeChange = (scholarshipId: string, changeId: string) =>
     firstValueFrom(this.http.post<{ ok: boolean }>(`/api/scholarships/${scholarshipId}/changes/${changeId}/acknowledge`, {}));
+  alerts = () => firstValueFrom(this.http.get<{ items: AlertItem[]; unread: number }>('/api/alerts'));
+  unreadAlerts = () => firstValueFrom(this.http.get<{ unread: number }>('/api/alerts/unread-count'));
+  markAlertRead = (id: string) => firstValueFrom(this.http.post<{ ok: boolean }>(`/api/alerts/${id}/read`, {}));
+  markAllAlertsRead = () => firstValueFrom(this.http.post<{ ok: boolean }>('/api/alerts/read-all', {}));
   viewSource = (sourceId: string, versionId: string) =>
     firstValueFrom(this.http.get<{ url: string }>(`/api/sources/${sourceId}/versions/${versionId}/view`));
 

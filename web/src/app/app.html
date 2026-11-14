@@ -6,6 +6,12 @@
       <a routerLink="/" routerLinkActive="active" [routerLinkActiveOptions]="{ exact: true }">My scholarships</a>
       <a routerLink="/discover" routerLinkActive="active">Discover</a>
       <a routerLink="/documents" routerLinkActive="active">Documents</a>
+      <a routerLink="/alerts" routerLinkActive="active">
+        Alerts
+        @if (alerts.unread() > 0) {
+          <span class="count" [attr.aria-label]="alerts.unread() + ' unread'">{{ alerts.unread() }}</span>
+        }
+      </a>
       <a routerLink="/profile" routerLinkActive="active">Profile</a>
     </nav>
     <button type="button" class="link" (click)="auth.signOut()">Sign out</button>

@@ -385,7 +385,7 @@ The local setup does **not** provide encryption at rest, IAM enforcement in Loca
 | Daily page re-check (robots.txt, change detection) | Done |
 | Deadline alerts (email, de-duplicated; stored for in-app) | Done |
 | Change alerts (in-app record + email, de-duplicated) | Done |
-| In-app alerts list | To do |
+| In-app alerts page, unread count in the menu, mark read / all read | Done |
 | Delete my data | Done |
 | Side-by-side diff view with an AI (Gemini) summary, acknowledging changes | Done |
 | Student document library (transcripts, certificates, passport…) | Done |
