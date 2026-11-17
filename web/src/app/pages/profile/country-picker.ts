@@ -15,6 +15,7 @@ import { Component, computed, input, output, signal } from '@angular/core';
         role="combobox"
         [attr.aria-expanded]="open()"
         [attr.aria-controls]="inputId() + '-list'"
+        [attr.aria-activedescendant]="open() && matches().length ? optionId(active()) : null"
         aria-autocomplete="list"
         autocomplete="off"
         [placeholder]="placeholder()"
@@ -29,7 +30,7 @@ import { Component, computed, input, output, signal } from '@angular/core';
           <li class="none">No matching countries</li>
         } @else {
           @for (country of matches(); track country; let i = $index) {
-            <li role="option" [class.active]="i === active()" [attr.aria-selected]="i === active()" (mousedown)="$event.preventDefault()" (click)="pick(country)">
+            <li [id]="optionId(i)" role="option" [class.active]="i === active()" [attr.aria-selected]="i === active()" (mousedown)="$event.preventDefault()" (click)="pick(country)">
               {{ country }}
             </li>
           }
@@ -97,6 +98,11 @@ export class CountryPicker {
     return this.countries().filter((country) => !chosen.has(country) && (!q || country.toLowerCase().includes(q)));
   });
 
+  /** Screen readers follow the highlighted option through aria-activedescendant (WCAG 4.1.2). */
+  protected optionId(index: number): string {
+    return `${this.inputId()}-opt-${index}`;
+  }
+
   protected onInput(event: Event) {
     this.query.set((event.target as HTMLInputElement).value);
     this.active.set(0);
@@ -137,9 +143,11 @@ export class CountryPicker {
       event.preventDefault();
       this.open.set(true);
       if (items.length) this.active.update((i) => (i + 1) % items.length);
+      this.revealActive();
     } else if (event.key === 'ArrowUp') {
       event.preventDefault();
       if (items.length) this.active.update((i) => (i - 1 + items.length) % items.length);
+      this.revealActive();
     } else if (event.key === 'Enter') {
       event.preventDefault();
       const country = items[this.active()] ?? items[0];
@@ -147,5 +155,9 @@ export class CountryPicker {
     } else if (event.key === 'Escape') {
       this.open.set(false);
     }
+  }
+
+  private revealActive() {
+    setTimeout(() => document.getElementById(this.optionId(this.active()))?.scrollIntoView({ block: 'nearest' }));
   }
 }

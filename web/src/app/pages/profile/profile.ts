@@ -373,12 +373,21 @@ import { CountryPicker } from './country-picker';
       </div>
 
       @if (resetOpen()) {
-        <div class="modal" (click)="resetOpen.set(false)">
-          <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="fpTitle" (click)="$event.stopPropagation()" (keydown.escape)="resetOpen.set(false)">
+        <div class="modal" (click)="closeReset()">
+          <div
+            class="modal-card"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="fpTitle"
+            aria-describedby="fpText"
+            (click)="$event.stopPropagation()"
+            (keydown.escape)="closeReset()"
+            (keydown)="keepFocusInside($event)"
+          >
             <h2 id="fpTitle">Reset your password</h2>
-            <p class="muted">We'll email a 6-digit reset code to <strong>{{ me.email }}</strong>. You enter it on the next page with your new password.</p>
+            <p class="muted" id="fpText">We'll email a 6-digit reset code to <strong>{{ me.email }}</strong>. You enter it on the next page with your new password.</p>
             <div class="row-end">
-              <button type="button" class="secondary" (click)="resetOpen.set(false)">Cancel</button>
+              <button type="button" class="secondary" (click)="closeReset()">Cancel</button>
               <button type="button" id="fpSend" [disabled]="busy() !== null" (click)="sendReset()">Send reset code</button>
             </div>
           </div>
@@ -424,6 +433,7 @@ export class ProfilePage implements OnInit {
   protected readonly loading = signal(true);
   protected readonly loadError = signal('');
   protected readonly resetOpen = signal(false);
+  private resetReturn: HTMLElement | null = null;
   protected readonly busy = signal<string | null>(null);
   protected readonly errors = signal<Record<string, string>>({});
   protected readonly show = signal<Record<string, boolean>>({});
@@ -515,8 +525,35 @@ export class ProfilePage implements OnInit {
   }
 
   protected openReset() {
+    this.resetReturn = document.activeElement instanceof HTMLElement ? document.activeElement : null;
     this.resetOpen.set(true);
     setTimeout(() => document.getElementById('fpSend')?.focus());
+  }
+
+  /** Close the dialog and put focus back on the button that opened it (WCAG 2.4.3). */
+  protected closeReset() {
+    this.resetOpen.set(false);
+    const target = this.resetReturn;
+    this.resetReturn = null;
+    setTimeout(() => target?.focus());
+  }
+
+  /** Tab and Shift+Tab cycle inside the dialog instead of reaching the page behind it (WCAG 2.4.3). */
+  protected keepFocusInside(event: KeyboardEvent) {
+    if (event.key !== 'Tab') return;
+    const card = event.currentTarget as HTMLElement;
+    const items = [...card.querySelectorAll<HTMLElement>('button:not([disabled]), [href], input:not([disabled]), select, textarea, [tabindex]:not([tabindex="-1"])')];
+    if (!items.length) return;
+    const first = items[0]!;
+    const last = items[items.length - 1]!;
+    const active = document.activeElement;
+    if (event.shiftKey && (active === first || !card.contains(active))) {
+      event.preventDefault();
+      last.focus();
+    } else if (!event.shiftKey && (active === last || !card.contains(active))) {
+      event.preventDefault();
+      first.focus();
+    }
   }
 
   protected async sendReset() {
@@ -529,7 +566,7 @@ export class ProfilePage implements OnInit {
       await this.router.navigate(['/forgot-password'], { queryParams: { email, sent: '1' } });
     });
     if (this.errors()['reset']) {
-      this.resetOpen.set(false);
+      this.closeReset();
       this.setStatus(this.errors()['reset'], true);
     }
   }

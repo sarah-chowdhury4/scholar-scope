@@ -10,6 +10,8 @@
   --surface: #f7f6f0;
   --surface-2: #eef1e6;
   --line: #dbe0d0;
+  /* Borders that mark a control's edge must reach 3:1 (WCAG 1.4.11): 3.5:1 on cards, 3.2:1 on the page. */
+  --field-border: #76877a;
   --ink: #1d3a2b;
   --ink-soft: #5d6f62;
   --green: #234f3a;
@@ -77,11 +79,11 @@ input:not([type='checkbox']):not([type='radio']):not([type='file']), select, tex
   font: inherit;
   color: var(--ink);
   background: var(--field);
-  border: 1px solid var(--line);
+  border: 1px solid var(--field-border);
   border-radius: var(--radius-sm);
   min-height: 44px;
 }
-input[type='file'] { font: inherit; }
+input[type='file'] { font: inherit; max-width: 100%; } /* the browser's default minimum is wider than a 320px screen */
 input::placeholder, textarea::placeholder { color: #8b978e; }
 input[type='checkbox'] { width: 18px; height: 18px; accent-color: var(--green); margin-top: 2px; }
 fieldset { border: 1px solid var(--line); border-radius: var(--radius-sm); padding: 8px 14px 12px; margin: 12px 0 0; }
@@ -128,11 +130,12 @@ button.link:hover { background: none; color: var(--green-hover); }
   min-height: 40px; padding: 7px 14px;
   font: inherit; font-size: 14px; font-weight: 400;
   color: var(--ink); background: var(--field);
-  border: 1px solid var(--line); border-radius: 99px; cursor: pointer;
+  border: 1px solid var(--field-border); border-radius: 99px; cursor: pointer;
   transition: background 0.15s, border-color 0.15s;
 }
 .chip:hover { border-color: var(--olive); background: var(--field); }
-.chip.on { background: var(--leaf); border-color: var(--olive); color: var(--green); font-weight: 500; }
+.chip.on { background: var(--leaf); border-color: var(--green); color: var(--green); font-weight: 600; }
+.chip.on::before { content: '✓'; font-size: 13px; } /* selected is shown by a mark, not only by color */
 .chip.picked { background: var(--green); border-color: var(--green); color: #fff; padding-right: 10px; }
 .chip.picked:hover { background: var(--green-hover); }
 .chip.picked b { font-weight: 400; font-size: 16px; line-height: 1; opacity: 0.8; }
