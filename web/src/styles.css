@@ -197,10 +197,6 @@ code { background: var(--surface-2); padding: 1px 5px; border-radius: 4px; }
 .row { display: grid; grid-template-columns: 2fr 1fr; gap: 12px; }
 .filters { display: grid; gap: 12px; }
 .filter-grid { display: grid; gap: 12px; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); }
-.tag-filters { display: grid; gap: 8px; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); }
-.tag-filters label.tag { margin: 0; }
-.tag-filters label.tag.on select { border-color: var(--olive); background: var(--leaf); }
-.tag-filters label.tag.off select { border-color: var(--danger); background: var(--bad-bg); }
 @media (max-width: 900px) {
   .two-col { grid-template-columns: 1fr; }
 }

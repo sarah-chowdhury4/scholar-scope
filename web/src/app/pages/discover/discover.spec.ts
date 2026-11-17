@@ -50,6 +50,8 @@ describe('Discover', () => {
     expect(el.querySelector('select#deadline')).toBeTruthy();
     expect(el.querySelector('input#gpa')).toBeTruthy();
     expect(el.textContent).toContain('3 of 15 scholarships');
+    // A YYYY-MM-DD deadline shows as that same day in every time zone (it was a day early east of UTC).
+    expect(el.textContent).toContain('Jan 15, 2027');
     expect(el.textContent).toContain('Add to my scholarships');
     expect(el.textContent).toContain('Added · open');
     expect(el.textContent).toContain('Deadline passed');
@@ -72,5 +74,34 @@ describe('Discover', () => {
     fixture.componentInstance.setTag('essay', 'requires');
     await new Promise((r) => setTimeout(r));
     expect(queries.at(-1)).toMatchObject({ requires: ['essay'], excludes: ['video'] });
+  });
+
+  it('keeps the filter panel closed until the student opens it', async () => {
+    const fixture = await render();
+    const el = fixture.nativeElement as HTMLElement;
+    const panel = el.querySelector('#filter-panel') as HTMLElement;
+    const toggle = el.querySelector('.filters-toggle') as HTMLButtonElement;
+    expect(panel.hidden).toBe(true);
+    expect(toggle.getAttribute('aria-expanded')).toBe('false');
+    toggle.click();
+    fixture.detectChanges();
+    expect(panel.hidden).toBe(false);
+    expect(toggle.getAttribute('aria-expanded')).toBe('true');
+    expect(el.querySelector('label[for="tag-recommendation"]')?.textContent).toBe('Recommendation letter');
+  });
+
+  it('shows filters in use as chips that remove them', async () => {
+    const fixture = await render();
+    fixture.componentInstance.setTag('essay', 'requires');
+    fixture.componentInstance.setTag('video', 'excludes');
+    await new Promise((r) => setTimeout(r));
+    fixture.detectChanges();
+    const el = fixture.nativeElement as HTMLElement;
+    const chips = [...el.querySelectorAll('.active-filters .chip')].map((c) => c.textContent?.replace('×', '').trim());
+    expect(chips).toEqual(['Asks for essay', 'No video']);
+    expect(el.querySelector('.filters-toggle')?.textContent).toContain('2');
+    (el.querySelector('[aria-label="Remove filter: Asks for essay"]') as HTMLButtonElement).click();
+    await new Promise((r) => setTimeout(r));
+    expect(queries.at(-1)).toMatchObject({ requires: [], excludes: ['video'] });
   });
 });

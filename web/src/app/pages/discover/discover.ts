@@ -1,5 +1,5 @@
-import { Component, OnDestroy, OnInit, inject, signal } from '@angular/core';
-import { DatePipe, LowerCasePipe } from '@angular/common';
+import { Component, OnDestroy, OnInit, computed, inject, signal } from '@angular/core';
+import { DatePipe } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
 import { HttpErrorResponse } from '@angular/common/http';
@@ -16,7 +16,25 @@ const TAG_LABELS: Record<CatalogTag, string> = {
 
 @Component({
   selector: 'app-discover',
-  imports: [FormsModule, RouterLink, DatePipe, LowerCasePipe],
+  imports: [FormsModule, RouterLink, DatePipe],
+  styles: `
+    .search-row { display: grid; grid-template-columns: 1fr 220px auto; gap: 12px; align-items: end; }
+    .search-row label { margin-top: 0; }
+    .filters-toggle { min-width: 120px; }
+    .filters-toggle .count { display: inline-grid; place-items: center; min-width: 22px; height: 22px; padding: 0 6px; border-radius: 99px; background: var(--green); color: #fff; font-size: 12px; }
+    .active-filters { margin-top: 14px; }
+    .filter-panel { margin-top: 18px; padding-top: 4px; border-top: 1px solid var(--line); }
+    .filter-panel .filter-grid label { margin-top: 14px; }
+    .tag-grid { display: grid; gap: 0 12px; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); }
+    .tag-row label { margin: 12px 0 6px; }
+    @media (max-width: 700px) {
+      .search-row { grid-template-columns: 1fr auto; }
+      .search-row .search { grid-column: 1 / -1; }
+    }
+    @media (max-width: 420px) {
+      .search-row { grid-template-columns: 1fr; }
+    }
+  `,
   template: `
     <div class="page-head">
       <div>
@@ -27,37 +45,13 @@ const TAG_LABELS: Record<CatalogTag, string> = {
     </div>
 
     <section class="card filters" aria-label="Search and filters">
-      <div class="search">
-        <label for="q">Search</label>
-        <input id="q" type="search" placeholder="Name, provider or requirement (e.g. leadership, STEM, video)"
-               [ngModel]="q()" (ngModelChange)="onSearch($event)" />
-      </div>
-
-      <div class="filter-grid">
-        <div>
-          <label for="deadline">Deadline</label>
-          <select id="deadline" [ngModel]="deadline()" (ngModelChange)="deadline.set($event); reload()">
-            <option value="upcoming">Any upcoming</option>
-            <option value="30">Next 30 days</option>
-            <option value="90">Next 90 days</option>
-            <option value="all">Include closed</option>
-          </select>
+      <div class="search-row">
+        <div class="search">
+          <label for="q">Search</label>
+          <input id="q" type="search" placeholder="Name, provider or requirement (e.g. leadership, STEM, video)"
+                 [ngModel]="q()" (ngModelChange)="onSearch($event)" />
         </div>
-        <div>
-          <label for="gpa">My GPA</label>
-          <input id="gpa" type="number" min="0" max="5" step="0.01" placeholder="e.g. 3.4"
-                 [ngModel]="gpa()" (ngModelChange)="gpa.set($event === '' ? null : $event); reload()" />
-        </div>
-        <div>
-          <label for="org">Provider</label>
-          <select id="org" [ngModel]="organization()" (ngModelChange)="organization.set($event); reload()">
-            <option value="">All providers</option>
-            @for (o of organizations(); track o) {
-              <option [value]="o">{{ o }}</option>
-            }
-          </select>
-        </div>
-        <div>
+        <div class="sort">
           <label for="sort">Sort by</label>
           <select id="sort" [ngModel]="sort()" (ngModelChange)="sort.set($event); reload()">
             <option value="deadline">Nearest deadline</option>
@@ -65,26 +59,68 @@ const TAG_LABELS: Record<CatalogTag, string> = {
             <option value="gpa">Lowest GPA requirement</option>
           </select>
         </div>
+        <button type="button" class="secondary filters-toggle" aria-controls="filter-panel" [attr.aria-expanded]="showFilters()" (click)="showFilters.set(!showFilters())">
+          Filters
+          @if (activeFilters().length) {
+            <span class="count" aria-hidden="true">{{ activeFilters().length }}</span>
+            <span class="sr-only">({{ activeFilters().length }} on)</span>
+          }
+          <span aria-hidden="true">{{ showFilters() ? '▴' : '▾' }}</span>
+        </button>
       </div>
 
-      <fieldset>
-        <legend>What the application asks for</legend>
-        <div class="tag-filters">
+      @if (activeFilters().length) {
+        <div class="chips active-filters" aria-label="Filters in use">
+          @for (f of activeFilters(); track f.key) {
+            <button type="button" class="chip picked" [attr.aria-label]="'Remove filter: ' + f.label" (click)="removeFilter(f.key)">
+              {{ f.label }} <b aria-hidden="true">×</b>
+            </button>
+          }
+          <button type="button" class="link" (click)="clear()">Clear all</button>
+        </div>
+      }
+
+      <div id="filter-panel" class="filter-panel" [hidden]="!showFilters()">
+        <div class="filter-grid">
+          <div>
+            <label for="deadline">Deadline</label>
+            <select id="deadline" [ngModel]="deadline()" (ngModelChange)="deadline.set($event); reload()">
+              <option value="upcoming">Any upcoming</option>
+              <option value="30">Next 30 days</option>
+              <option value="90">Next 90 days</option>
+              <option value="all">Include closed</option>
+            </select>
+          </div>
+          <div>
+            <label for="gpa">My GPA</label>
+            <input id="gpa" type="number" min="0" max="5" step="0.01" placeholder="e.g. 3.4"
+                   [ngModel]="gpa()" (ngModelChange)="gpa.set($event === '' ? null : $event); reload()" />
+          </div>
+          <div>
+            <label for="org">Provider</label>
+            <select id="org" [ngModel]="organization()" (ngModelChange)="organization.set($event); reload()">
+              <option value="">All providers</option>
+              @for (o of organizations(); track o) {
+                <option [value]="o">{{ o }}</option>
+              }
+            </select>
+          </div>
+        </div>
+
+        <h3>What the application asks for</h3>
+        <div class="tag-grid">
           @for (t of tags; track t) {
-            <label class="check tag" [class.on]="requires().includes(t)" [class.off]="excludes().includes(t)">
-              <select [attr.aria-label]="labels[t]" [ngModel]="tagState(t)" (ngModelChange)="setTag(t, $event)">
-                <option value="any">{{ labels[t] }}: any</option>
-                <option value="requires">Must ask for {{ labels[t] | lowercase }}</option>
-                <option value="excludes">No {{ labels[t] | lowercase }}</option>
+            <div class="tag-row">
+              <label [attr.for]="'tag-' + t">{{ labels[t] }}</label>
+              <select [id]="'tag-' + t" [ngModel]="tagState(t)" (ngModelChange)="setTag(t, $event)">
+                <option value="any">Either way</option>
+                <option value="requires">Must ask for it</option>
+                <option value="excludes">Must not ask for it</option>
               </select>
-            </label>
+            </div>
           }
         </div>
-      </fieldset>
-
-      @if (hasFilters()) {
-        <button type="button" class="link" (click)="clear()">Clear all filters</button>
-      }
+      </div>
     </section>
 
     <p class="hint" role="status" aria-live="polite">
@@ -94,7 +130,7 @@ const TAG_LABELS: Record<CatalogTag, string> = {
       <p class="error" role="alert">{{ error() }}</p>
     }
     @if (!loading() && total() === 0) {
-      <p class="card">The catalog is empty. Load it with <code>docker compose exec api npm run seed:catalog -- seed/dataset.csv</code>.</p>
+      <p class="card">The catalog is empty. Load the team dataset with <code>docker compose exec api npm run seed:catalog</code>.</p>
     } @else if (!loading() && items().length === 0) {
       <p class="card">No scholarships match. Try fewer words or clear a filter.</p>
     }
@@ -106,7 +142,7 @@ const TAG_LABELS: Record<CatalogTag, string> = {
           <p class="muted">{{ s.organization }}</p>
           <p>
             @if (s.deadline) {
-              Due <strong>{{ s.deadline | date: 'mediumDate' : 'UTC' }}</strong>
+              Due <strong>{{ s.deadline | date: 'mediumDate' }}</strong>
               @if (s.deadlinePassed) { <span class="badge unverified">Closed</span> }
             } @else {
               <span class="muted">No deadline listed</span>
@@ -151,6 +187,22 @@ export class Discover implements OnInit, OnDestroy {
   protected readonly sort = signal<NonNullable<CatalogQuery['sort']>>('deadline');
   protected readonly requires = signal<CatalogTag[]>([]);
   protected readonly excludes = signal<CatalogTag[]>([]);
+  /** The filter panel stays closed until the student asks for it. Filters in use show as chips either way. */
+  protected readonly showFilters = signal(false);
+
+  protected readonly activeFilters = computed(() => {
+    const out: { key: string; label: string }[] = [];
+    const deadline = this.deadline();
+    if (deadline === '30') out.push({ key: 'deadline', label: 'Due in 30 days' });
+    if (deadline === '90') out.push({ key: 'deadline', label: 'Due in 90 days' });
+    if (deadline === 'all') out.push({ key: 'deadline', label: 'Including closed' });
+    const gpa = this.gpa();
+    if (gpa !== null && `${gpa}` !== '') out.push({ key: 'gpa', label: `My GPA ${gpa}` });
+    if (this.organization()) out.push({ key: 'org', label: this.organization() });
+    for (const t of this.requires()) out.push({ key: 'tag:' + t, label: `Asks for ${this.labels[t].toLowerCase()}` });
+    for (const t of this.excludes()) out.push({ key: 'tag:' + t, label: `No ${this.labels[t].toLowerCase()}` });
+    return out;
+  });
 
   private searchTimer: ReturnType<typeof setTimeout> | undefined;
   private requestNo = 0;
@@ -179,12 +231,19 @@ export class Discover implements OnInit, OnDestroy {
     void this.reload();
   }
 
-  hasFilters() {
-    return !!(this.q() || this.deadline() !== 'upcoming' || this.gpa() !== null || this.organization() || this.requires().length || this.excludes().length);
+  removeFilter(key: string) {
+    if (key === 'deadline') this.deadline.set('upcoming');
+    else if (key === 'gpa') this.gpa.set(null);
+    else if (key === 'org') this.organization.set('');
+    else if (key.startsWith('tag:')) {
+      const t = key.slice(4) as CatalogTag;
+      this.requires.update((list) => list.filter((x) => x !== t));
+      this.excludes.update((list) => list.filter((x) => x !== t));
+    }
+    void this.reload();
   }
 
   clear() {
-    this.q.set('');
     this.deadline.set('upcoming');
     this.gpa.set(null);
     this.organization.set('');
