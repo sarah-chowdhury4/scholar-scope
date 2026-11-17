@@ -74,7 +74,7 @@ cd scholar-scope
 | LocalStack auth token | app.localstack.cloud → *Auth Token* (free account) | `.env` → `LOCALSTACK_AUTH_TOKEN` |
 | Gemini API key | aistudio.google.com → *Get API key* | `.env.secrets` → `GEMINI_API_KEY` |
 | Gemini model id | AI Studio → model list (exact id of the current Flash model) | `.env` → `GEMINI_MODEL` |
-| Brevo key (optional: real emails) | brevo.com → free account → *Senders* (verify an address) → *SMTP & API* → *API keys*. Without one, every email goes to Mailpit | `.env.secrets` → `BREVO_API_KEY` |
+| Gmail app password (optional: real emails) | Google Account → Security → *App passwords* (needs 2-Step Verification). Without it, every email goes to Mailpit. Brevo also works; see *Send real emails* | `.env.secrets` → `SMTP_PASSWORD`, `.env` → `SMTP_USER` |
 | Jina Reader key (optional) | jina.ai → *Get API key*. Without one, saved pages are still read at 20 requests a minute | `.env.secrets` → `JINA_API_KEY` |
 | NVIDIA NIM key (optional) | build.nvidia.com → *Get API Key*. No key? Set `NIM_ENABLED=false` in `.env` and NIM calls run on Gemini | `.env.secrets` → `NVIDIA_API_KEY` |
 
@@ -253,17 +253,21 @@ This loads the catalog and adds catalog scholarships (up to 15) to a demo accoun
 
 ---
 
-### Optional: send real emails (Brevo, free)
+### Optional: send real emails (free)
 
-Locally every email (confirmation codes, password resets, deadline and change alerts) goes to the Mailpit test inbox at http://localhost:8025. To deliver them to real inboxes instead:
+Locally every email (confirmation codes, password resets, deadline and change alerts) goes to the Mailpit test inbox at http://localhost:8025. To deliver them to real inboxes, use a Gmail account (simplest) or Brevo.
 
-1. Create a free account at brevo.com (no card needed; the free plan sends about 300 emails a day).
-2. In Brevo, open **Senders, domains & dedicated IPs → Senders**, add the address emails should come from, and click the link Brevo emails you to verify it.
-3. Open **SMTP & API → API keys**, create a key, and put it in `.env.secrets` as `BREVO_API_KEY=...`.
-4. In `.env`, set `MAIL_BACKEND=brevo` and `MAIL_FROM=ScholarScope <the address you verified>`.
+**Gmail** (about 500 emails a day; use a Gmail account made for the project, not your personal one):
+
+1. On that Google account, turn on **2-Step Verification** (Google Account → Security).
+2. Open **Google Account → Security → App passwords** (or search "App passwords" in the account settings), create one named `ScholarScope`, and copy the 16-character password.
+3. Put it in `.env.secrets` as `SMTP_PASSWORD=...` (spaces don't matter).
+4. In `.env`, set `MAIL_BACKEND=gmail` and `SMTP_USER=the-gmail-address@gmail.com`. Optionally `MAIL_FROM=ScholarScope <the-gmail-address@gmail.com>` for the display name.
 5. Run `docker compose up -d --build localstack worker`.
 
-**Done when:** adding an email on your profile says *Code sent* and the code arrives (check spam the first time). If it says *We could not send the email*, `docker compose logs --tail 20 worker` shows Brevo's reason (most often an unverified sender). Remember that real addresses then get real emails, and the daily limit is shared by everyone using the key.
+**Brevo** (about 300 a day; the sign-up asks for company details): create a free account at brevo.com, verify a sender under **Senders**, create a key under **SMTP & API → API keys**, put it in `.env.secrets` as `BREVO_API_KEY`, and set `MAIL_BACKEND=brevo` and `MAIL_FROM=ScholarScope <the verified address>` in `.env`. Then run the same command as step 5.
+
+**Done when:** adding an email on your profile says *Code sent* and the code arrives (check spam the first time). If it says *We could not send the email*, `docker compose logs --tail 20 worker` says why (for Gmail, usually a normal password used instead of an app password). Real addresses then get real emails, and the daily limit is shared by everyone using the account or key.
 
 ## Local URLs
 

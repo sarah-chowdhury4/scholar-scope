@@ -32,3 +32,29 @@ describe('sendMail with Brevo', () => {
     expect(String(error)).not.toContain('xkeysib');
   });
 });
+
+describe('sendMail with Gmail', () => {
+  afterEach(() => {
+    delete process.env.MAIL_BACKEND;
+    delete process.env.SMTP_USER;
+    delete process.env.MAIL_FROM;
+  });
+
+  it('always sends as the Gmail address, keeping the display name', async () => {
+    const { gmailFrom } = await import('../src/platform/mail/index');
+    expect(gmailFrom('ScholarScope <alerts@scholarscope.local>', 'team.project@gmail.com')).toBe('ScholarScope <team.project@gmail.com>');
+    expect(gmailFrom('', 'team.project@gmail.com')).toBe('ScholarScope <team.project@gmail.com>');
+  });
+
+  it('explains a refused login and a used-up daily limit', async () => {
+    const { explainGmailError } = await import('../src/platform/mail/index');
+    expect(explainGmailError(new Error('Invalid login: 535-5.7.8 Username and Password not accepted')).message).toContain('app password');
+    expect(explainGmailError(new Error('550 5.4.5 Daily user sending limit exceeded')).message).toContain('daily sending limit');
+  });
+
+  it('says which setting is missing', async () => {
+    process.env.MAIL_BACKEND = 'gmail';
+    const { sendMail } = await import('../src/platform/mail/index');
+    await expect(sendMail({ to: 'a@example.org', subject: 's', text: 't' })).rejects.toThrow('SMTP_USER');
+  });
+});
