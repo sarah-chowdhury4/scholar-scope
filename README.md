@@ -195,15 +195,15 @@ docker compose logs --tail 20 api worker
 
 ### 9. Load the scholarship catalog
 
-The **Discover** page lists the scholarships in the catalog. Export the dataset to `api/seed/dataset.csv` (columns as in `api/seed/dataset.example.csv`, dates as `YYYY-MM-DD`; the file is git-ignored), then:
+The **Discover** page lists the scholarships in the catalog. The team dataset (15 scholarships) is in `Dataset/ScholarScope Updated Dataset.csv`; load it with:
 
 ```bash
-docker compose exec api npm run seed:catalog -- seed/dataset.csv
+docker compose exec api npm run seed:catalog
 ```
 
-No dataset at hand? Use the two fictional examples: `… seed:catalog -- seed/dataset.example.csv`.
+Run it again after the dataset changes: rows are matched by `Scholarship ID`, so it updates them instead of adding copies. To load another export instead, put it in `api/seed/` (columns as in `api/seed/dataset.example.csv`, or the dataset sheet's headers; dates as `YYYY-MM-DD`) and run `… seed:catalog -- seed/<file>.csv`.
 
-**Done when:** it prints `Catalog: N scholarships saved.`
+**Done when:** it prints `Catalog: 15 scholarships saved.`
 
 ### 10. Start the web app
 

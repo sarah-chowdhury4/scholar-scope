@@ -59,3 +59,22 @@ describe('filterCatalog', () => {
     expect(ids(filterCatalog(entries, { sort: 'name' }, today))).toEqual(['SCH-001', 'SCH-002', 'SCH-015']);
   });
 });
+
+describe('dataset sheet with display headers', () => {
+  it('reads "Scholarship ID", "Sponsoring Organization" and the other display names', async () => {
+    const { parseCsv, catalogEntryFromRow } = await import('../src/catalog');
+    const csv =
+      '\uFEFFScholarship ID,Sponsoring Organization,Scholarship Name,Current Deadline,Min GPA,Required Essay Prompt / Materials,Verified Source URL,Data Status / Version Flag\r\n' +
+      'SCH-014,Bryan Cameron Education Foundation ,Cameron Impact Scholarship ,2027-05-01,3.7,"Online application form, transcripts, an essay, and two letters of recommendation",https://example.org/x,v1.0 - Active\r\n';
+    const [row] = parseCsv(csv);
+    const entry = catalogEntryFromRow(row!);
+    expect(entry).toMatchObject({
+      catalogId: 'SCH-014',
+      organization: 'Bryan Cameron Education Foundation',
+      name: 'Cameron Impact Scholarship',
+      deadline: '2027-05-01',
+      minGpa: 3.7,
+      datasetStatus: 'Active',
+    });
+  });
+});

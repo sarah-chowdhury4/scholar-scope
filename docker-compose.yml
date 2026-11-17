@@ -124,6 +124,7 @@ services:
     volumes:
       - ./shared:/repo/shared
       - ./api:/repo/api
+      - ./Dataset:/repo/Dataset:ro    # the team's scholarship dataset, read by npm run seed:catalog
       # keep the container's Linux node_modules; never use ones installed on Windows
       - /repo/shared/node_modules
       - /repo/api/node_modules

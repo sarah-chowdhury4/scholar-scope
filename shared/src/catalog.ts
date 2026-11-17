@@ -69,7 +69,31 @@ export function parseCsv(text: string): CsvRow[] {
   if (row.some((c) => c.trim() !== '')) rows.push(row);
   const [header, ...body] = rows;
   if (!header) return [];
-  return body.map((cells) => Object.fromEntries(header.map((h, i) => [h.trim(), (cells[i] ?? '').trim()])));
+  const keys = header.map((h) => columnKey(h));
+  return body.map((cells) => Object.fromEntries(keys.map((key, i) => [key, (cells[i] ?? '').trim()])));
+}
+
+/**
+ * The dataset sheet is exported with display headers ("Scholarship ID", "Sponsoring Organization", ...);
+ * older exports use the database keys ("scholarship_id", ...). Both map to the same keys.
+ */
+const COLUMN_ALIASES: Record<string, string> = {
+  scholarshipid: 'scholarship_id',
+  organization: 'organization',
+  sponsoringorganization: 'organization',
+  scholarshipname: 'scholarship_name',
+  currentdeadline: 'current_deadline',
+  mingpa: 'min_gpa',
+  essayprompt: 'essay_prompt',
+  requiredessaypromptmaterials: 'essay_prompt',
+  verifiedsourceurl: 'verified_source_url',
+  versionflag: 'version_flag',
+  datastatusversionflag: 'version_flag',
+};
+
+export function columnKey(header: string): string {
+  const clean = header.replace(/^﻿/, '').trim();
+  return COLUMN_ALIASES[clean.toLowerCase().replace(/[^a-z0-9]/g, '')] ?? clean;
 }
 
 /** One dataset row → catalog entry, or an error message explaining why it was skipped. */
