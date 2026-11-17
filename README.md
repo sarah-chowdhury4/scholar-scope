@@ -408,6 +408,7 @@ The local setup does **not** provide encryption at rest, IAM enforcement in Loca
 - Work on a branch and open a pull request into `main`. CI (`.github/workflows/ci.yml`) must pass: typecheck and unit tests, Angular build and tests, a `docker-compose.yml` check, shell-script checks and a gitleaks secret scan.
 - **Never commit** `.env`, `.env.secrets`, real student documents or keys. If a key is ever committed or shown, revoke it and create a new one.
 - Keep shell scripts and Dockerfiles with LF line endings (`.gitattributes` handles this).
+- UI: the site follows the team's profile page design (`Profile setup/`). Colors, fonts and shared components live in `web/src/styles.css`; change a color in its `:root` block, not in a page.
 - New image versions: test locally, then update the digests in `.env.example` in the same pull request.
 
 ## License

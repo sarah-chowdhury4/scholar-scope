@@ -22,3 +22,8 @@
 <main>
   <router-outlet />
 </main>
+<div class="toasts" aria-live="polite">
+  @for (t of toasts.items(); track t.id) {
+    <div class="toast" [class.err]="t.error" [attr.role]="t.error ? 'alert' : 'status'" (click)="toasts.dismiss(t.id)">{{ t.message }}</div>
+  }
+</div>

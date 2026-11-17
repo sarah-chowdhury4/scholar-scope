@@ -1,31 +1,20 @@
 import { Component, computed, input, output, signal } from '@angular/core';
 
-/** Searchable country list. Multi-select for interests and citizenship, single-select for where someone lives. */
+/**
+ * Searchable country list, laid out like the team's profile design: search box, popular destinations,
+ * then the selection as removable chips. Multi-select for interests and citizenship, single-select for
+ * where someone lives. The label for the search box comes from the page (it matches `inputId`).
+ */
 @Component({
   selector: 'app-country-picker',
   template: `
-    @if (popular().length) {
-      <div class="chips" role="group" aria-label="Common countries">
-        @for (country of popular(); track country) {
-          <button
-            type="button"
-            class="chip"
-            [class.on]="selected().includes(country)"
-            [attr.aria-pressed]="selected().includes(country)"
-            (click)="toggle(country)"
-          >
-            {{ country }}
-          </button>
-        }
-      </div>
-    }
-
     <div class="suggest">
       <input
         [id]="inputId()"
         type="text"
         role="combobox"
         [attr.aria-expanded]="open()"
+        [attr.aria-controls]="inputId() + '-list'"
         aria-autocomplete="list"
         autocomplete="off"
         [placeholder]="placeholder()"
@@ -35,17 +24,12 @@ import { Component, computed, input, output, signal } from '@angular/core';
         (blur)="open.set(false)"
         (keydown)="onKey($event)"
       />
-      <ul [hidden]="!open()" role="listbox">
+      <ul [id]="inputId() + '-list'" [hidden]="!open()" role="listbox">
         @if (matches().length === 0) {
           <li class="none">No matching countries</li>
         } @else {
           @for (country of matches(); track country; let i = $index) {
-            <li
-              role="option"
-              [class.active]="i === active()"
-              (mousedown)="$event.preventDefault()"
-              (click)="pick(country)"
-            >
+            <li role="option" [class.active]="i === active()" [attr.aria-selected]="i === active()" (mousedown)="$event.preventDefault()" (click)="pick(country)">
               {{ country }}
             </li>
           }
@@ -53,17 +37,39 @@ import { Component, computed, input, output, signal } from '@angular/core';
       </ul>
     </div>
 
-    <div class="chips">
+    @if (popular().length) {
+      @if (headings()) {
+        <h3>Popular destinations</h3>
+      }
+      <div class="chips" [class.spaced]="!headings()" role="group" aria-label="Popular countries">
+        @for (country of popular(); track country) {
+          <button type="button" class="chip" [class.on]="selected().includes(country)" [attr.aria-pressed]="selected().includes(country)" (click)="toggle(country)">
+            {{ country }}
+          </button>
+        }
+      </div>
+    }
+
+    @if (headings()) {
+      <h3>Your selection</h3>
+    }
+    <div class="chips" [class.spaced]="!headings()">
       @for (country of selected(); track country) {
         <button type="button" class="chip picked" [attr.aria-label]="'Remove ' + country" (click)="remove(country)">
-          {{ country }} ×
+          {{ country }} <b aria-hidden="true">×</b>
         </button>
       }
-      @if (multiple() && selected().length) {
+      @if (showClear() && multiple() && selected().length) {
         <button type="button" class="link" (click)="clear()">Clear all</button>
       }
     </div>
-    <p class="hint">{{ selected().length }} selected</p>
+    @if (headings() && selected().length === 0) {
+      <p class="hint">{{ emptyText() }}</p>
+    }
+  `,
+  styles: `
+    .chips.spaced { margin-top: 10px; }
+    .chips.spaced:empty { display: none; }
   `,
 })
 export class CountryPicker {
@@ -73,7 +79,11 @@ export class CountryPicker {
   readonly multiple = input(true);
   readonly max = input(15);
   readonly inputId = input('country-search');
-  readonly placeholder = input('Search countries');
+  readonly placeholder = input('Start typing a country');
+  /** Show the "Popular destinations" / "Your selection" headings (the main countries card). */
+  readonly headings = input(false);
+  readonly showClear = input(true);
+  readonly emptyText = input('No countries yet. Choose from the list above.');
   readonly selectedChange = output<string[]>();
   readonly limitHit = output<string>();
 

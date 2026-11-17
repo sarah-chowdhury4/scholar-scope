@@ -1,337 +1,413 @@
 import { Component, OnInit, inject, signal } from '@angular/core';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
-import { Router, RouterLink } from '@angular/router';
+import { Router } from '@angular/router';
 import { ApiService, apiMessage, type Me, type ProfileOptions } from '../../core/api.service';
 import { AuthService } from '../../core/auth.service';
+import { ToastService } from '../../core/toast.service';
+import { MIN_PASSWORD_LENGTH, passwordHint, passwordLevel } from '../../core/password-strength';
 import { CountryPicker } from './country-picker';
 
 @Component({
   selector: 'app-profile',
-  imports: [ReactiveFormsModule, RouterLink, CountryPicker],
+  imports: [ReactiveFormsModule, CountryPicker],
   template: `
-    <h1>Your profile</h1>
-    <p class="hint">
-      Deadline emails go to your primary address. Citizenship, where you live, and your studies are what later
-      recommendations use to tell domestic and international awards apart.
-    </p>
-
-    @if (status()) {
-      <p [class]="statusBad() ? 'error' : 'success'" role="status">{{ status() }}</p>
-    }
-
     @if (loading()) {
       <p>Loading…</p>
     } @else if (loadError()) {
       <p class="error" role="alert">{{ loadError() }}</p>
       <button type="button" (click)="load()">Try again</button>
     } @else if (profile(); as me) {
-      <section class="card">
-        <h2>{{ me.displayName || 'Student' }}</h2>
-        <p class="muted">{{ me.email }}</p>
-        <p class="hint">Profile ready for recommendations: {{ me.readinessPercent }}%</p>
-        <div class="bar" aria-hidden="true"><span [style.width.%]="me.readinessPercent"></span></div>
-        @if (me.missingForRecommendations.length) {
-          <p>Still needed: {{ join(me.missingForRecommendations) }}.</p>
-        } @else {
-          <p>The facts recommendations need are filled in.</p>
-        }
-        @if (!me.timezoneChosen) {
-          <p class="hint">Deadlines you add still use this device's time zone until you save one below.</p>
-        }
-        @if (me.deletion?.requestedAt) {
-          <p class="warning" role="status">Deletion has been requested. It finishes when the deletion job runs.</p>
-        }
-      </section>
-
-      <section class="card">
-        <h2>Name</h2>
-        <form [formGroup]="nameForm" (ngSubmit)="saveName()">
-          <label for="displayName">Name</label>
-          <input id="displayName" formControlName="displayName" autocomplete="name" maxlength="80" />
-          @if (errors()['name']) { <p class="error" role="alert">{{ errors()['name'] }}</p> }
-          <button type="submit" [disabled]="busy() !== null">Save name</button>
-        </form>
-      </section>
-
-      <section class="card">
-        <h2>Email addresses</h2>
-        <p class="hint">
-          You sign in, and deadline alerts are sent, with the primary address. Other addresses stay for contact until
-          you confirm them and choose a new primary. You can keep up to {{ options()?.limits?.maxEmails ?? 5 }}.
-        </p>
-        @for (email of me.emails; track email.address) {
-          <div class="email-row">
-            <div>
-              <strong>{{ email.address }}</strong>
-              @if (email.primary) { <span class="badge verified">Primary</span> }
-              @if (email.verified) { <span class="badge verified">Confirmed</span> }
-            </div>
-            <div class="actions">
-              @if (!email.primary && email.verified) {
-                <button type="button" class="secondary" [disabled]="busy() !== null" (click)="startPrimary(email.address)">
-                  Make primary
-                </button>
-              }
-              @if (!email.primary) {
-                <button type="button" class="secondary" [disabled]="busy() !== null" (click)="removeEmail(email.address)">
-                  Remove
-                </button>
-              }
-            </div>
+      <section class="card profile-hero">
+        <div class="avatar" aria-hidden="true">{{ initial(me) }}</div>
+        <div class="hero-main">
+          <h1>{{ me.displayName || 'Your profile' }}</h1>
+          <p class="muted">{{ me.email }}</p>
+          <p class="hint">
+            Deadline emails go to your primary address. Citizenship, where you live and your studies tell domestic and
+            international awards apart.
+          </p>
+        </div>
+        <div class="complete">
+          <div class="complete-top"><span>Profile complete</span><strong>{{ me.readinessPercent }}%</strong></div>
+          <div class="progress-track" role="progressbar" aria-label="Profile complete" [attr.aria-valuenow]="me.readinessPercent" aria-valuemin="0" aria-valuemax="100">
+            <div class="progress-bar" [style.width.%]="me.readinessPercent"></div>
           </div>
-          @if (primaryFor() === email.address) {
-            <form (ngSubmit)="makePrimary(email.address)">
-              <label [attr.for]="'primaryPwd-' + email.address">Current password</label>
-              <input
-                [id]="'primaryPwd-' + email.address"
-                [type]="show()['primary'] ? 'text' : 'password'"
-                autocomplete="current-password"
-                [value]="primaryPassword()"
-                (input)="primaryPassword.set(text($event))"
-                required
-              />
-              <button type="button" class="link" (click)="toggleShow('primary')">{{ show()['primary'] ? 'Hide' : 'Show' }} password</button>
-              @if (errors()['primary']) { <p class="error" role="alert">{{ errors()['primary'] }}</p> }
-              <div class="actions">
-                <button type="submit" [disabled]="busy() !== null">Confirm primary</button>
-                <button type="button" class="secondary" (click)="primaryFor.set(null)">Cancel</button>
-              </div>
+          <p class="hint">
+            @if (me.missingForRecommendations.length) {
+              Add {{ join(me.missingForRecommendations) }}.
+            } @else {
+              Your profile is complete.
+            }
+          </p>
+        </div>
+      </section>
+      @if (!me.timezoneChosen) {
+        <p class="notice">Deadlines you add still use this device's time zone until you save one under Deadlines and alerts.</p>
+      }
+      @if (me.deletion?.requestedAt) {
+        <p class="warning" role="status">Deletion has been requested. It finishes when the deletion job runs.</p>
+      }
+
+      <div class="two-col">
+        <div class="col">
+          <section class="card">
+            <h2>Name</h2>
+            <p class="muted">Shown on your profile and used to check your documents.</p>
+            <form [formGroup]="nameForm" (ngSubmit)="saveName()">
+              <label for="displayName">Full name</label>
+              <input id="displayName" formControlName="displayName" autocomplete="name" maxlength="80" placeholder="As it appears on your documents" />
+              @if (errors()['name']) { <p class="error" role="alert">{{ errors()['name'] }}</p> }
+              <button type="submit" [disabled]="busy() !== null">Save name</button>
             </form>
-          }
-        }
-        @if (me.emails.length === 1) {
-          <p class="hint">Add another confirmed address before you can remove the primary.</p>
-        }
+          </section>
 
-        @if (me.pendingEmail) {
-          <form (ngSubmit)="verifyEmail()">
-            <p>
-              Confirmation pending for <strong>{{ me.pendingEmail.address }}</strong>.
-              @if (me.pendingEmail.replaces) {
-                This replaces {{ me.pendingEmail.replaces }} after you enter the code. Your sign-in email stays the same until then.
-              }
+          <section class="card">
+            <h2>Email addresses</h2>
+            <p class="muted">
+              You sign in, and alerts are sent, with the primary address. Up to {{ options()?.limits?.maxEmails ?? 5 }} addresses.
             </p>
-            <label for="emailCode">6-digit code</label>
-            <input id="emailCode" inputmode="numeric" autocomplete="one-time-code" maxlength="6" [value]="emailCode()" (input)="emailCode.set(text($event))" />
-            @if (errors()['verify']) { <p class="error" role="alert">{{ errors()['verify'] }}</p> }
-            <div class="actions">
-              <button type="submit" [disabled]="busy() !== null">Confirm email</button>
-              <button type="button" class="secondary" [disabled]="busy() !== null" (click)="resendCode()">Resend code</button>
-              <button type="button" class="secondary" [disabled]="busy() !== null" (click)="cancelEmail()">Cancel</button>
-            </div>
-          </form>
-        } @else {
-          <form [formGroup]="addForm" (ngSubmit)="addEmail()">
-            <label for="addEmail">Add an email</label>
-            <input id="addEmail" type="email" formControlName="address" autocomplete="email" />
-            @if (errors()['add']) { <p class="error" role="alert">{{ errors()['add'] }}</p> }
-            <button type="submit" [disabled]="busy() !== null || me.emails.length >= (options()?.limits?.maxEmails ?? 5)">
-              Send confirmation code
-            </button>
-          </form>
+            @for (email of me.emails; track email.address) {
+              <div class="email-row">
+                <div>
+                  <strong>{{ email.address }}</strong>
+                  @if (email.primary) { <span class="badge verified">Primary</span> }
+                  @if (email.verified) { <span class="badge verified">Confirmed</span> }
+                </div>
+                <div class="actions">
+                  @if (!email.primary && email.verified) {
+                    <button type="button" class="secondary" [disabled]="busy() !== null" (click)="startPrimary(email.address)">Make primary</button>
+                  }
+                  @if (!email.primary) {
+                    <button type="button" class="secondary" [disabled]="busy() !== null" (click)="removeEmail(email.address)">Remove</button>
+                  }
+                </div>
+              </div>
+              @if (primaryFor() === email.address) {
+                <form (ngSubmit)="makePrimary(email.address)">
+                  <label [attr.for]="'primaryPwd-' + email.address">Current password</label>
+                  <div class="pwd">
+                    <input [id]="'primaryPwd-' + email.address" [type]="show()['primary'] ? 'text' : 'password'" autocomplete="current-password" [value]="primaryPassword()" (input)="primaryPassword.set(text($event))" required />
+                    <button type="button" class="toggle" (click)="toggleShow('primary')" [attr.aria-pressed]="!!show()['primary']">{{ show()['primary'] ? 'Hide' : 'Show' }}</button>
+                  </div>
+                  @if (errors()['primary']) { <p class="error" role="alert">{{ errors()['primary'] }}</p> }
+                  <div class="actions">
+                    <button type="submit" [disabled]="busy() !== null">Confirm primary</button>
+                    <button type="button" class="secondary" (click)="primaryFor.set(null)">Cancel</button>
+                  </div>
+                </form>
+              }
+            }
+            @if (me.emails.length === 1) {
+              <p class="hint">Add another confirmed address before you can remove the primary.</p>
+            }
 
-          <form [formGroup]="replaceForm" (ngSubmit)="replaceEmail()">
-            <label for="replaceWhich">Replace an email</label>
-            <select id="replaceWhich" formControlName="currentAddress">
-              @for (email of me.emails; track email.address) {
-                <option [value]="email.address">{{ email.address }}{{ email.primary ? ' (primary)' : '' }}</option>
+            @if (me.pendingEmail) {
+              <form (ngSubmit)="verifyEmail()">
+                <p class="notice">
+                  Confirmation pending for <strong>{{ me.pendingEmail.address }}</strong>.
+                  @if (me.pendingEmail.replaces) {
+                    It replaces {{ me.pendingEmail.replaces }} once you enter the code. Your sign-in email stays the same until then.
+                  }
+                </p>
+                <label for="emailCode">6-digit code</label>
+                <input id="emailCode" inputmode="numeric" autocomplete="one-time-code" maxlength="6" [value]="emailCode()" (input)="emailCode.set(text($event))" />
+                @if (errors()['verify']) { <p class="error" role="alert">{{ errors()['verify'] }}</p> }
+                <div class="actions">
+                  <button type="submit" [disabled]="busy() !== null">Confirm email</button>
+                  <button type="button" class="secondary" [disabled]="busy() !== null" (click)="resendCode()">Resend code</button>
+                  <button type="button" class="secondary" [disabled]="busy() !== null" (click)="cancelEmail()">Cancel</button>
+                </div>
+              </form>
+            } @else {
+              <h3>Add an address</h3>
+              <form [formGroup]="addForm" (ngSubmit)="addEmail()">
+                <label for="addEmail">New email</label>
+                <input id="addEmail" type="email" formControlName="address" autocomplete="email" placeholder="you@example.com" />
+                @if (errors()['add']) { <p class="error" role="alert">{{ errors()['add'] }}</p> }
+                <button type="submit" [disabled]="busy() !== null || me.emails.length >= (options()?.limits?.maxEmails ?? 5)">Send confirmation code</button>
+              </form>
+
+              <h3>Change an address</h3>
+              <form [formGroup]="replaceForm" (ngSubmit)="replaceEmail()">
+                <label for="replaceWhich">Address to replace</label>
+                <select id="replaceWhich" formControlName="currentAddress">
+                  @for (email of me.emails; track email.address) {
+                    <option [value]="email.address">{{ email.address }}{{ email.primary ? ' (primary)' : '' }}</option>
+                  }
+                </select>
+                <label for="replaceNew">New email</label>
+                <input id="replaceNew" type="email" formControlName="newAddress" autocomplete="email" placeholder="you@example.com" />
+                @if (replacingPrimary()) {
+                  <label for="replacePwd">Current password</label>
+                  <div class="pwd">
+                    <input id="replacePwd" [type]="show()['replace'] ? 'text' : 'password'" formControlName="currentPassword" autocomplete="current-password" />
+                    <button type="button" class="toggle" (click)="toggleShow('replace')" [attr.aria-pressed]="!!show()['replace']">{{ show()['replace'] ? 'Hide' : 'Show' }}</button>
+                  </div>
+                  <p class="hint">Needed because this changes the address you sign in with.</p>
+                }
+                @if (errors()['replace']) { <p class="error" role="alert">{{ errors()['replace'] }}</p> }
+                <button type="submit" [disabled]="busy() !== null">Change email</button>
+              </form>
+            }
+          </section>
+
+          <section class="card">
+            <h2>Password</h2>
+            <p class="muted">At least 12 characters. A mix of upper and lower case, numbers and symbols makes it stronger.</p>
+            <form [formGroup]="passwordForm" (ngSubmit)="savePassword()">
+              <label for="curPwd">Current password</label>
+              <div class="pwd">
+                <input id="curPwd" [type]="show()['cur'] ? 'text' : 'password'" formControlName="current" autocomplete="current-password" />
+                <button type="button" class="toggle" (click)="toggleShow('cur')" [attr.aria-pressed]="!!show()['cur']">{{ show()['cur'] ? 'Hide' : 'Show' }}</button>
+              </div>
+              <div class="row-between">
+                <label for="newPwd">New password</label>
+                <button type="button" class="link" (click)="openReset()">Forgot password?</button>
+              </div>
+              <div class="pwd">
+                <input id="newPwd" [type]="show()['new'] ? 'text' : 'password'" formControlName="next" autocomplete="new-password" (input)="passwordText.set(text($event))" />
+                <button type="button" class="toggle" (click)="toggleShow('new')" [attr.aria-pressed]="!!show()['new']">{{ show()['new'] ? 'Hide' : 'Show' }}</button>
+              </div>
+              <div class="meter" [attr.data-level]="passwordLevel()" aria-hidden="true"><span></span><span></span><span></span><span></span></div>
+              <p class="hint" aria-live="polite">{{ passwordLabel() }}</p>
+              <label for="confPwd">Confirm new password</label>
+              <div class="pwd">
+                <input id="confPwd" [type]="show()['conf'] ? 'text' : 'password'" formControlName="confirm" autocomplete="new-password" />
+                <button type="button" class="toggle" (click)="toggleShow('conf')" [attr.aria-pressed]="!!show()['conf']">{{ show()['conf'] ? 'Hide' : 'Show' }}</button>
+              </div>
+              @if (errors()['password']) { <p class="error" role="alert">{{ errors()['password'] }}</p> }
+              <button type="submit" [disabled]="busy() !== null">Change password</button>
+            </form>
+          </section>
+        </div>
+
+        <div class="col">
+          <section class="card">
+            <div class="row-between">
+              <h2>Scholarship countries</h2>
+              <span class="badge">{{ draftCountries().length }} selected</span>
+            </div>
+            <p class="muted">Pick every country where you'd like to study. You can change this any time. Up to {{ options()?.limits?.maxCountriesOfInterest ?? 15 }}.</p>
+            <label for="interestSearch">Search countries</label>
+            <app-country-picker
+              inputId="interestSearch"
+              [headings]="true"
+              [showClear]="false"
+              [countries]="options()?.countries ?? []"
+              [popular]="options()?.popularCountries ?? []"
+              [selected]="draftCountries()"
+              [max]="options()?.limits?.maxCountriesOfInterest ?? 15"
+              (selectedChange)="draftCountries.set($event)"
+              (limitHit)="setStatus($event, true)"
+            />
+            @if (countriesDirty()) { <p class="hint">Not saved yet.</p> }
+            @if (errors()['countries']) { <p class="error" role="alert">{{ errors()['countries'] }}</p> }
+            <div class="row-between card-actions">
+              <button type="button" class="link" [disabled]="!draftCountries().length" (click)="draftCountries.set([])">Clear all</button>
+              <button type="button" [disabled]="busy() !== null" (click)="saveCountries()">Save countries</button>
+            </div>
+          </section>
+
+          <section class="card">
+            <h2>Citizenship and where you live</h2>
+            <p class="muted">
+              You count as a domestic applicant where you are a citizen or a permanent resident. A student visa or a short stay
+              does not. Add every citizenship you hold.
+            </p>
+            <label for="citizenshipSearch">Citizenship</label>
+            <app-country-picker
+              inputId="citizenshipSearch"
+              [countries]="options()?.countries ?? []"
+              [popular]="options()?.popularCountries ?? []"
+              [selected]="draftCitizenships()"
+              [max]="options()?.limits?.maxCitizenships ?? 4"
+              (selectedChange)="draftCitizenships.set($event)"
+              (limitHit)="setStatus($event, true)"
+            />
+
+            <label for="locationSearch">Country you live in now</label>
+            <app-country-picker
+              inputId="locationSearch"
+              [multiple]="false"
+              [countries]="options()?.countries ?? []"
+              [selected]="draftLocation() ? [draftLocation()!] : []"
+              (selectedChange)="draftLocation.set($event[0] ?? null)"
+            />
+
+            <form [formGroup]="background" (ngSubmit)="saveBackground()">
+              <label for="residency">Your status in that country</label>
+              <select id="residency" formControlName="residency">
+                <option value="">Choose one</option>
+                @for (item of options()?.residencyStatuses ?? []; track item.id) {
+                  <option [value]="item.id">{{ item.label }}</option>
+                }
+              </select>
+
+              @if (notInSchool()) {
+                <p class="hint">You are not currently in school, so a school country is not saved.</p>
+              } @else {
+                <label class="check">
+                  <input type="checkbox" formControlName="sameSchool" />
+                  <span>My current school is in the country where I live</span>
+                </label>
+                @if (!background.controls.sameSchool.value) {
+                  <label for="schoolSearch">Country of your current school</label>
+                  <app-country-picker
+                    inputId="schoolSearch"
+                    [multiple]="false"
+                    [countries]="options()?.countries ?? []"
+                    [selected]="draftSchool() ? [draftSchool()!] : []"
+                    (selectedChange)="draftSchool.set($event[0] ?? null)"
+                  />
+                }
+              }
+
+              <div class="summary">
+                @if (me.domesticCountries.length) {
+                  <p>You count as a domestic applicant in {{ join(me.domesticCountries) }}. Everywhere else, you count as an international applicant.</p>
+                } @else {
+                  <p>Add a citizenship, or say you are a citizen or permanent resident where you live. Until then we can't tell domestic and international scholarships apart.</p>
+                }
+                @if (me.schoolNote) { <p>{{ me.schoolNote }}</p> }
+                @for (hint of me.hints; track hint) { <p class="hint">{{ hint }}</p> }
+              </div>
+              @if (backgroundDirty()) { <p class="hint">Not saved yet. The summary above uses what is already saved.</p> }
+              @if (errors()['background']) { <p class="error" role="alert">{{ errors()['background'] }}</p> }
+              <button type="submit" [disabled]="busy() !== null">Save citizenship and location</button>
+            </form>
+          </section>
+        </div>
+      </div>
+
+      <div class="two-col">
+        <section class="card">
+          <h2>Education</h2>
+          <p class="muted">
+            Highest level is what you have finished. Enrollment is what you are doing now. Scholarships often check both,
+            plus GPA and field of study.
+          </p>
+          <form [formGroup]="education" (ngSubmit)="saveEducation()">
+            <label for="highestLevel">Highest level of education</label>
+            <select id="highestLevel" formControlName="highestLevel">
+              <option value="">Choose one</option>
+              @for (item of options()?.educationLevels ?? []; track item.id) {
+                <option [value]="item.id">{{ item.label }}</option>
               }
             </select>
-            <label for="replaceNew">New email</label>
-            <input id="replaceNew" type="email" formControlName="newAddress" autocomplete="email" />
-            @if (replacingPrimary()) {
-              <label for="replacePwd">Current password</label>
-              <input id="replacePwd" type="password" formControlName="currentPassword" autocomplete="current-password" />
-              <p class="hint">Required because this changes the address you sign in with.</p>
-            }
-            @if (errors()['replace']) { <p class="error" role="alert">{{ errors()['replace'] }}</p> }
-            <button type="submit" [disabled]="busy() !== null">Send confirmation code</button>
+            <label for="enrollment">Current enrollment</label>
+            <select id="enrollment" formControlName="enrollment">
+              <option value="">Choose one</option>
+              @for (item of options()?.enrollments ?? []; track item.id) {
+                <option [value]="item.id">{{ item.label }}</option>
+              }
+            </select>
+            <label for="fieldOfStudy">Field of study</label>
+            <input id="fieldOfStudy" formControlName="fieldOfStudy" maxlength="120" placeholder="Biology, engineering, fine arts" />
+            <div class="row">
+              <div>
+                <label for="gpa">GPA</label>
+                <input id="gpa" type="number" min="0" step="0.01" formControlName="gpa" />
+              </div>
+              <div>
+                <label for="gpaScale">Scale</label>
+                <select id="gpaScale" formControlName="gpaScale">
+                  <option value="">Choose one</option>
+                  @for (item of options()?.gpaScales ?? []; track item.id) {
+                    <option [value]="item.id">{{ item.label }}</option>
+                  }
+                </select>
+              </div>
+            </div>
+            <h3>Optional</h3>
+            <label for="expectedGraduation">Expected graduation month</label>
+            <input id="expectedGraduation" type="month" formControlName="expectedGraduation" />
+            <p class="hint">Some awards are only open to students graduating in a certain year.</p>
+            <label for="birthYear">Birth year</label>
+            <input id="birthYear" type="number" inputmode="numeric" [value]="birthYear()" (input)="birthYear.set(text($event))" />
+            <p class="hint">Some awards have an age cutoff. A year is enough. We don't ask for your full date of birth.</p>
+            <label for="languages">Languages you can study in</label>
+            <input id="languages" maxlength="120" [value]="languages()" (input)="languages.set(text($event))" placeholder="English, French" />
+            @if (errors()['education']) { <p class="error" role="alert">{{ errors()['education'] }}</p> }
+            <button type="submit" [disabled]="busy() !== null">Save education</button>
           </form>
-        }
-      </section>
+        </section>
 
-      <section class="card">
-        <h2>Password</h2>
-        <p class="hint">At least 12 characters, the same rule as sign-up.</p>
-        <form [formGroup]="passwordForm" (ngSubmit)="savePassword()">
-          <label for="curPwd">Current password</label>
-          <input id="curPwd" type="password" formControlName="current" autocomplete="current-password" />
-          <label for="newPwd">New password</label>
-          <input id="newPwd" type="password" formControlName="next" autocomplete="new-password" (input)="passwordText.set(text($event))" />
-          <div class="meter" aria-hidden="true"><span [style.width.%]="passwordMeter()"></span></div>
-          <p class="hint">{{ passwordLabel() }}</p>
-          <label for="confPwd">Confirm new password</label>
-          <input id="confPwd" type="password" formControlName="confirm" autocomplete="new-password" />
-          @if (errors()['password']) { <p class="error" role="alert">{{ errors()['password'] }}</p> }
-          <button type="submit" [disabled]="busy() !== null">Change password</button>
-        </form>
-        <a routerLink="/forgot-password">Forgot your current password?</a>
-      </section>
+        <div class="col">
+          <section class="card">
+            <h2>Deadlines and alerts</h2>
+            <p class="muted">
+              Deadline dates are converted with this time zone. Email alerts (14, 7, 3 and 1 days before) go to
+              <strong>{{ me.email }}</strong>. In-app alerts stay on.
+            </p>
+            <form [formGroup]="settings" (ngSubmit)="saveSettings()">
+              <label for="timezone">Time zone</label>
+              <input id="timezone" formControlName="timezone" list="timezones" autocomplete="off" required />
+              <datalist id="timezones">
+                @for (zone of timeZones; track zone) {
+                  <option [value]="zone"></option>
+                }
+              </datalist>
+              <label class="check">
+                <input type="checkbox" formControlName="emailAlerts" />
+                <span>Email me deadline alerts</span>
+              </label>
+              @if (errors()['settings']) { <p class="error" role="alert">{{ errors()['settings'] }}</p> }
+              <button type="submit" [disabled]="busy() !== null">Save deadline settings</button>
+            </form>
+          </section>
 
-      <section class="card">
-        <h2>Countries you want scholarships in</h2>
-        <p class="hint">Used later for recommendations. This does not change scholarships you already track. Up to 15.</p>
-        <app-country-picker
-          inputId="interestSearch"
-          [countries]="options()?.countries ?? []"
-          [popular]="options()?.popularCountries ?? []"
-          [selected]="draftCountries()"
-          [max]="options()?.limits?.maxCountriesOfInterest ?? 15"
-          (selectedChange)="draftCountries.set($event)"
-          (limitHit)="setStatus($event, true)"
-        />
-        @if (countriesDirty()) { <p class="hint">Not saved yet.</p> }
-        @if (errors()['countries']) { <p class="error" role="alert">{{ errors()['countries'] }}</p> }
-        <button type="button" [disabled]="busy() !== null" (click)="saveCountries()">Save countries</button>
-      </section>
+          <section class="card danger-zone">
+            <h2>Delete my data</h2>
+            <p class="muted">This asks for your scholarships, files and account to be erased. It cannot be undone.</p>
+            <form [formGroup]="deleteForm" (ngSubmit)="deleteAccount()">
+              <label for="deletePwd">Current password</label>
+              <div class="pwd">
+                <input id="deletePwd" [type]="show()['delete'] ? 'text' : 'password'" formControlName="currentPassword" autocomplete="current-password" />
+                <button type="button" class="toggle" (click)="toggleShow('delete')" [attr.aria-pressed]="!!show()['delete']">{{ show()['delete'] ? 'Hide' : 'Show' }}</button>
+              </div>
+              @if (errors()['delete']) { <p class="error" role="alert">{{ errors()['delete'] }}</p> }
+              <button type="submit" class="danger" [disabled]="busy() !== null">Delete my data</button>
+            </form>
+          </section>
+        </div>
+      </div>
 
-      <section class="card">
-        <h2>Citizenship and where you live</h2>
-        <p class="hint">
-          A scholarship treats you as a domestic applicant in a country where you are a citizen or a permanent resident.
-          A student visa or a short stay does not. Add every citizenship you hold.
-        </p>
-        <label for="citizenshipSearch">Citizenship</label>
-        <app-country-picker
-          inputId="citizenshipSearch"
-          [countries]="options()?.countries ?? []"
-          [popular]="options()?.popularCountries ?? []"
-          [selected]="draftCitizenships()"
-          [max]="options()?.limits?.maxCitizenships ?? 4"
-          (selectedChange)="draftCitizenships.set($event)"
-          (limitHit)="setStatus($event, true)"
-        />
-
-        <label for="locationSearch">Country you live in now</label>
-        <app-country-picker
-          inputId="locationSearch"
-          [multiple]="false"
-          [countries]="options()?.countries ?? []"
-          [popular]="options()?.popularCountries ?? []"
-          [selected]="draftLocation() ? [draftLocation()!] : []"
-          (selectedChange)="draftLocation.set($event[0] ?? null)"
-        />
-
-        <form [formGroup]="background" (ngSubmit)="saveBackground()">
-          <label for="residency">Your status in that country</label>
-          <select id="residency" formControlName="residency">
-            <option value="">Choose one</option>
-            @for (item of options()?.residencyStatuses ?? []; track item.id) {
-              <option [value]="item.id">{{ item.label }}</option>
-            }
-          </select>
-
-          @if (notInSchool()) {
-            <p class="hint">You are not currently in school, so a school country is not saved.</p>
-          } @else {
-            <label class="check">
-              <input type="checkbox" formControlName="sameSchool" />
-              <span>My current school is in the country where I live</span>
-            </label>
-            @if (!background.controls.sameSchool.value) {
-              <label for="schoolSearch">Country of your current school</label>
-              <app-country-picker
-                inputId="schoolSearch"
-                [multiple]="false"
-                [countries]="options()?.countries ?? []"
-                [popular]="[]"
-                [selected]="draftSchool() ? [draftSchool()!] : []"
-                (selectedChange)="draftSchool.set($event[0] ?? null)"
-              />
-            }
-          }
-
-          @if (me.domesticCountries.length) {
-            <p>You count as a domestic applicant in {{ join(me.domesticCountries) }}. Everywhere else, you count as an international applicant.</p>
-          } @else {
-            <p>Add a citizenship, or say you are a citizen or permanent resident where you live. Until then we can't tell domestic and international scholarships apart.</p>
-          }
-          @if (me.schoolNote) { <p>{{ me.schoolNote }}</p> }
-          @for (hint of me.hints; track hint) { <p class="hint">{{ hint }}</p> }
-          @if (backgroundDirty()) { <p class="hint">Not saved yet. The paragraph above uses what is already saved.</p> }
-          @if (errors()['background']) { <p class="error" role="alert">{{ errors()['background'] }}</p> }
-          <button type="submit" [disabled]="busy() !== null">Save citizenship and location</button>
-        </form>
-      </section>
-
-      <section class="card">
-        <h2>Education</h2>
-        <p class="hint">
-          Highest level is what you have finished. Enrollment is what you are doing now. Scholarships often check both,
-          plus GPA and field of study.
-        </p>
-        <form [formGroup]="education" (ngSubmit)="saveEducation()">
-          <label for="highestLevel">Highest level of education</label>
-          <select id="highestLevel" formControlName="highestLevel">
-            <option value="">Choose one</option>
-            @for (item of options()?.educationLevels ?? []; track item.id) {
-              <option [value]="item.id">{{ item.label }}</option>
-            }
-          </select>
-          <label for="enrollment">Current enrollment</label>
-          <select id="enrollment" formControlName="enrollment">
-            <option value="">Choose one</option>
-            @for (item of options()?.enrollments ?? []; track item.id) {
-              <option [value]="item.id">{{ item.label }}</option>
-            }
-          </select>
-          <label for="fieldOfStudy">Field of study</label>
-          <input id="fieldOfStudy" formControlName="fieldOfStudy" maxlength="120" placeholder="Biology, engineering, fine arts" />
-          <label for="gpa">GPA</label>
-          <input id="gpa" type="number" min="0" step="0.01" formControlName="gpa" />
-          <label for="gpaScale">GPA scale</label>
-          <select id="gpaScale" formControlName="gpaScale">
-            <option value="">Choose one</option>
-            @for (item of options()?.gpaScales ?? []; track item.id) {
-              <option [value]="item.id">{{ item.label }}</option>
-            }
-          </select>
-          <label for="expectedGraduation">Expected graduation month (optional)</label>
-          <input id="expectedGraduation" type="month" formControlName="expectedGraduation" />
-          <p class="hint">Some awards are only open to students graduating in a certain year.</p>
-          <label for="birthYear">Birth year (optional)</label>
-          <input id="birthYear" type="number" inputmode="numeric" [value]="birthYear()" (input)="birthYear.set(text($event))" />
-          <p class="hint">Some awards have an age cutoff. A year is enough. We don't ask for your full date of birth.</p>
-          <label for="languages">Languages you can study in (optional)</label>
-          <input id="languages" maxlength="120" [value]="languages()" (input)="languages.set(text($event))" placeholder="English, French" />
-          @if (errors()['education']) { <p class="error" role="alert">{{ errors()['education'] }}</p> }
-          <button type="submit" [disabled]="busy() !== null">Save education</button>
-        </form>
-      </section>
-
-      <section class="card">
-        <h2>Deadlines and alerts</h2>
-        <p class="hint">
-          Deadline dates are converted with this time zone. Email alerts (14, 7, 3 and 1 days before) go to
-          <strong>{{ me.email }}</strong>. In-app alerts stay on.
-        </p>
-        <form [formGroup]="settings" (ngSubmit)="saveSettings()">
-          <label for="timezone">Time zone</label>
-          <input id="timezone" formControlName="timezone" list="timezones" autocomplete="off" required />
-          <datalist id="timezones">
-            @for (zone of timeZones; track zone) {
-              <option [value]="zone"></option>
-            }
-          </datalist>
-          <label class="check">
-            <input type="checkbox" formControlName="emailAlerts" />
-            <span>Email me deadline alerts</span>
-          </label>
-          @if (errors()['settings']) { <p class="error" role="alert">{{ errors()['settings'] }}</p> }
-          <button type="submit" [disabled]="busy() !== null">Save deadline settings</button>
-        </form>
-      </section>
-
-      <section class="card">
-        <h2>Delete my data</h2>
-        <p>This asks for your scholarships, files and account to be erased. It cannot be undone.</p>
-        <form [formGroup]="deleteForm" (ngSubmit)="deleteAccount()">
-          <label for="deletePwd">Current password</label>
-          <input id="deletePwd" type="password" formControlName="currentPassword" autocomplete="current-password" />
-          @if (errors()['delete']) { <p class="error" role="alert">{{ errors()['delete'] }}</p> }
-          <button type="submit" class="danger" [disabled]="busy() !== null">Delete my data</button>
-        </form>
-      </section>
+      @if (resetOpen()) {
+        <div class="modal" (click)="resetOpen.set(false)">
+          <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="fpTitle" (click)="$event.stopPropagation()" (keydown.escape)="resetOpen.set(false)">
+            <h2 id="fpTitle">Reset your password</h2>
+            <p class="muted">We'll email a 6-digit reset code to <strong>{{ me.email }}</strong>. You enter it on the next page with your new password.</p>
+            <div class="row-end">
+              <button type="button" class="secondary" (click)="resetOpen.set(false)">Cancel</button>
+              <button type="button" id="fpSend" [disabled]="busy() !== null" (click)="sendReset()">Send reset code</button>
+            </div>
+          </div>
+        </div>
+      }
+    }
+  `,
+  styles: `
+    .profile-hero { display: grid; grid-template-columns: auto 1fr 280px; gap: 28px; align-items: center; }
+    .profile-hero h1 { margin: 0; }
+    .profile-hero .muted { margin: 2px 0 0; }
+    .avatar {
+      width: 104px; height: 104px; border-radius: 50%; background: var(--leaf);
+      border: 4px solid var(--surface); box-shadow: 0 0 0 1px var(--line);
+      display: grid; place-items: center; font-size: 40px; font-weight: 600; color: var(--green);
+    }
+    .complete { background: var(--surface-2); border-radius: 12px; padding: 16px; }
+    .complete-top { display: flex; justify-content: space-between; font-size: 14px; }
+    .summary { margin-top: 16px; padding: 12px 14px; background: var(--surface-2); border-radius: var(--radius-sm); }
+    .summary p { margin: 0 0 6px; }
+    .summary p:last-child { margin-bottom: 0; }
+    .danger-zone { border-color: var(--bad-bg); }
+    @media (max-width: 900px) {
+      .profile-hero { grid-template-columns: auto 1fr; }
+      .complete { grid-column: 1 / -1; }
+    }
+    @media (max-width: 520px) {
+      .profile-hero { grid-template-columns: 1fr; justify-items: center; text-align: center; }
+      .complete { width: 100%; text-align: left; }
     }
   `,
 })
@@ -340,14 +416,14 @@ export class ProfilePage implements OnInit {
   private readonly auth = inject(AuthService);
   private readonly router = inject(Router);
   private readonly fb = inject(FormBuilder);
+  private readonly toast = inject(ToastService);
 
   protected readonly timeZones = Intl.supportedValuesOf('timeZone');
   protected readonly profile = signal<Me | null>(null);
   protected readonly options = signal<ProfileOptions | null>(null);
   protected readonly loading = signal(true);
   protected readonly loadError = signal('');
-  protected readonly status = signal('');
-  protected readonly statusBad = signal(false);
+  protected readonly resetOpen = signal(false);
   protected readonly busy = signal<string | null>(null);
   protected readonly errors = signal<Record<string, string>>({});
   protected readonly show = signal<Record<string, boolean>>({});
@@ -428,9 +504,34 @@ export class ProfilePage implements OnInit {
     this.show.update((current) => ({ ...current, [id]: !current[id] }));
   }
 
+  /** Confirmations and general errors appear as toasts (team design); field errors stay under the field. */
   protected setStatus(message: string, bad = false) {
-    this.status.set(message);
-    this.statusBad.set(bad);
+    this.toast.show(message, bad);
+  }
+
+  protected initial(me: Me): string {
+    const source = (me.displayName || me.email || '?').trim();
+    return (source[0] ?? '?').toUpperCase();
+  }
+
+  protected openReset() {
+    this.resetOpen.set(true);
+    setTimeout(() => document.getElementById('fpSend')?.focus());
+  }
+
+  protected async sendReset() {
+    const email = this.profile()?.email;
+    if (!email) return;
+    await this.run('reset', async () => {
+      await this.api.requestPasswordReset(email);
+      this.resetOpen.set(false);
+      this.setStatus(`Reset code sent to ${email}.`);
+      await this.router.navigate(['/forgot-password'], { queryParams: { email, sent: '1' } });
+    });
+    if (this.errors()['reset']) {
+      this.resetOpen.set(false);
+      this.setStatus(this.errors()['reset'], true);
+    }
   }
 
   protected join(items: string[]): string {
@@ -468,15 +569,12 @@ export class ProfilePage implements OnInit {
     return enrollment === 'gap' || enrollment === 'graduated';
   }
 
-  protected passwordMeter(): number {
-    return Math.min(100, Math.round((this.passwordText().length / 12) * 100));
+  protected passwordLevel(): number {
+    return passwordLevel(this.passwordText());
   }
 
   protected passwordLabel(): string {
-    const value = this.passwordText();
-    if (!value) return 'At least 12 characters.';
-    if (value.length < 12) return `${12 - value.length} more characters to go.`;
-    return 'Long enough.';
+    return passwordHint(this.passwordText());
   }
 
   protected startPrimary(address: string) {
@@ -592,7 +690,7 @@ export class ProfilePage implements OnInit {
     const { current, next, confirm } = this.passwordForm.getRawValue();
     const email = this.profile()?.email;
     if (!current) return this.fail('password', 'Enter your current password.');
-    if (next.length < 12) return this.fail('password', 'Use a password with at least 12 characters.');
+    if (next.length < MIN_PASSWORD_LENGTH) return this.fail('password', `Use a password with at least ${MIN_PASSWORD_LENGTH} characters.`);
     if (next !== confirm) return this.fail('password', "Passwords don't match.");
     await this.run('password', async () => {
       const me = await this.api.changePassword(current, next);
@@ -698,7 +796,6 @@ export class ProfilePage implements OnInit {
     if (this.busy()) return;
     this.busy.set(key);
     this.clearError(key);
-    this.status.set('');
     try {
       await fn();
     } catch (err) {
@@ -710,7 +807,6 @@ export class ProfilePage implements OnInit {
 
   private fail(key: string, message: string) {
     this.errors.update((current) => ({ ...current, [key]: message }));
-    this.status.set('');
   }
 
   private clearError(key: string) {

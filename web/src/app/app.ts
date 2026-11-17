@@ -3,6 +3,7 @@ import { NavigationEnd, Router, RouterLink, RouterLinkActive, RouterOutlet } fro
 import { filter } from 'rxjs';
 import { AuthService } from './core/auth.service';
 import { AlertsStore } from './core/alerts.store';
+import { ToastService } from './core/toast.service';
 
 const ALERT_POLL_MS = 3 * 60 * 1000;
 
@@ -15,6 +16,7 @@ const ALERT_POLL_MS = 3 * 60 * 1000;
 export class App {
   protected readonly auth = inject(AuthService);
   protected readonly alerts = inject(AlertsStore);
+  protected readonly toasts = inject(ToastService);
 
   constructor() {
     const router = inject(Router);

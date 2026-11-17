@@ -71,6 +71,9 @@ import { ApiService, type Scholarship } from '../../core/api.service';
               }
               <span>{{ s.counts.open }} open</span> · <span>{{ s.readinessPct }}% ready</span>
             </p>
+            <div class="progress-track" role="progressbar" [attr.aria-label]="s.name + ' readiness'" [attr.aria-valuenow]="s.readinessPct" aria-valuemin="0" aria-valuemax="100">
+              <div class="progress-bar" [style.width.%]="s.readinessPct"></div>
+            </div>
             @if (s.recheck?.status === 'unreachable') {
               <p class="warning" role="status">We couldn't re-check this page. Check the official site.</p>
             }
