@@ -60,7 +60,7 @@ export async function handleScan(job: JobMessage): Promise<void> {
   const followUp = itemRef.parent.id === 'sources' ? 'extract' : 'check_document';
   const nextJobId = isDuplicate ? undefined : await enqueueJob(job.uid, followUp, versionRef.path);
   if (nextJobId && followUp === 'check_document') {
-    await itemRef.set({ check: { status: 'queued', versionId: versionRef.id, jobId: nextJobId } }, { merge: true });
+    await itemRef.set({ check: { status: 'queued', versionId: versionRef.id, jobId: nextJobId, updatedAt: FieldValue.serverTimestamp() } }, { merge: true });
   }
   await updateJob(job.uid, job.jobId, { status: 'done', progress: 100, nextJobId });
   log.info('upload_scanned', { target: job.target, mime: type.mime, duplicate: isDuplicate });

@@ -41,6 +41,15 @@ export type ScholarshipDocumentDto = StudentDocumentDto & { scholarshipFindings:
 const KNOWN = new Set<string>(STUDENT_DOCUMENT_TYPES.map((item) => item.id));
 const CHECK_STATUSES = new Set(['queued', 'running', 'done', 'paused', 'failed']);
 
+/** A check still "queued" or "running" after this long was lost (worker restarted, AI service down). */
+export const STALE_CHECK_MS = 15 * 60 * 1000;
+
+export function isStaleCheck(check: { status?: unknown; updatedAt?: unknown } | null | undefined, now = Date.now()): boolean {
+  if (!check || (check.status !== 'queued' && check.status !== 'running')) return false;
+  const at = (check.updatedAt as { toMillis?: () => number } | undefined)?.toMillis?.();
+  return at === undefined || now - at > STALE_CHECK_MS;
+}
+
 function asStrings(value: unknown): string[] {
   return Array.isArray(value) ? value.filter((item): item is string => typeof item === 'string') : [];
 }
@@ -56,6 +65,12 @@ function readFindings(value: unknown): DocumentFinding[] {
 function readCheck(raw: unknown): { dto: DocumentCheckDto | null; facts: DocumentFacts | null } {
   if (!raw || typeof raw !== 'object') return { dto: null, facts: null };
   const check = raw as Record<string, unknown>;
+  if (isStaleCheck(check)) {
+    return {
+      dto: { status: 'failed', reason: 'The check did not finish (the AI service may have been busy). Press Check again.', severity: null, findings: [], checkedAt: null },
+      facts: null,
+    };
+  }
   const status = typeof check.status === 'string' && CHECK_STATUSES.has(check.status) ? (check.status as DocumentCheckDto['status']) : 'failed';
   const findings = readFindings(check.findings);
   const checkedAt = (check.checkedAt as { toDate?: () => Date } | undefined)?.toDate?.().toISOString() ?? null;

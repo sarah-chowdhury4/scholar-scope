@@ -40,3 +40,31 @@ describe('verifyFacts', () => {
     expect(facts.typeConfidence).toBe(1);
   });
 });
+
+describe('verifyFacts evidence', () => {
+  it('marks evidence found only when its quote is in the file, and keeps the description', () => {
+    const facts = verifyFacts(
+      {
+        detectedType: 'transcript',
+        typeConfidence: 0.9,
+        description: 'a high school transcript',
+        evidence: [
+          { signal: 'document_title', quote: 'Official Transcript' },
+          { signal: 'course_grade_rows', quote: 'Chemistry A' },
+          { signal: 'made_up', quote: 'x' },
+        ],
+        hardToRead: false,
+      },
+      pages,
+    );
+    expect(facts.description).toBe('a high school transcript');
+    expect(facts.typeEvidence).toEqual([
+      { signal: 'document_title', quote: 'Official Transcript', page: 1, found: true },
+      { signal: 'course_grade_rows', quote: 'Chemistry A', page: null, found: false },
+    ]);
+  });
+
+  it('maps an unknown kind to "unknown"', () => {
+    expect(verifyFacts({ detectedType: 'spreadsheet', typeConfidence: 1, hardToRead: false }, pages).detectedType).toBe('unknown');
+  });
+});

@@ -13,6 +13,12 @@ import {
 const base: DocumentFacts = {
   detectedType: 'transcript',
   typeConfidence: 0.95,
+  description: 'a high school transcript',
+  typeEvidence: [
+    { signal: 'document_title', quote: 'Official Transcript', page: 1, found: true },
+    { signal: 'student_name', quote: 'Student: Ana Perez', page: 1, found: true },
+    { signal: 'course_grade_rows', quote: 'Algebra II A 1.0', page: 1, found: true },
+  ],
   holderName: null,
   issuer: null,
   issueDate: null,
@@ -135,5 +141,55 @@ describe('helpers', () => {
     expect(facts?.detectedType).toBe('unknown');
     expect(facts?.holderName).toBeNull();
     expect(facts?.hardToRead).toBe(true);
+  });
+});
+
+describe('document kind needs evidence from the file', () => {
+  const now = new Date('2026-11-14T00:00:00Z');
+
+  it('says a table of model results is not a transcript', () => {
+    const findings = checkDocument(
+      { ...base, detectedType: 'not_a_personal_document', description: 'a table comparing machine-learning model results', typeEvidence: [] },
+      { declaredType: 'transcript', profileName: null, now },
+    );
+    expect(codes(findings)).toEqual(['not_personal']);
+    expect(findings[0]!.severity).toBe('problem');
+    expect(findings[0]!.message).toContain('This is not a transcript. It looks like a table comparing machine-learning model results.');
+  });
+
+  it('does not confirm a transcript without course and grade rows', () => {
+    const findings = checkDocument(
+      { ...base, typeEvidence: base.typeEvidence.filter((e) => e.signal !== 'course_grade_rows') },
+      { declaredType: 'transcript', profileName: null, now },
+    );
+    expect(codes(findings)).toEqual(['type_unclear']);
+    expect(findings[0]!.message).toContain('courses or subjects with grades');
+  });
+
+  it('ignores evidence whose quote is not in the file', () => {
+    const invented = base.typeEvidence.map((e) => ({ ...e, found: false }));
+    const findings = checkDocument({ ...base, typeEvidence: invented }, { declaredType: 'transcript', profileName: null, now });
+    expect(codes(findings)).toEqual(['type_unclear']);
+  });
+
+  it('confirms a transcript that shows a name, grade rows and a title', () => {
+    expect(codes(checkDocument(base, { declaredType: 'transcript', profileName: null, now }))).toEqual(['type_matches']);
+  });
+
+  it('reads stored evidence back', () => {
+    const facts = readDocumentFacts({ detectedType: 'not_a_personal_document', description: ' a price list ', typeEvidence: [{ signal: 'document_title', quote: 'Prices', found: true }, { signal: 'nonsense', quote: 'x' }], hardToRead: false });
+    expect(facts?.detectedType).toBe('not_a_personal_document');
+    expect(facts?.description).toBe('a price list');
+    expect(facts?.typeEvidence).toEqual([{ signal: 'document_title', quote: 'Prices', page: null, found: true }]);
+  });
+});
+
+describe('mismatch wording', () => {
+  it('describes an "other" document in plain words instead of "an other"', () => {
+    const findings = checkDocument(
+      { ...base, detectedType: 'other', description: 'a student class timetable' },
+      { declaredType: 'transcript', profileName: null, now: new Date('2026-11-14T00:00:00Z') },
+    );
+    expect(findings[0]!.message).toBe('You saved this as a transcript, but it looks like a student class timetable.');
   });
 });

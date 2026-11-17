@@ -10,9 +10,55 @@
  */
 import { STUDENT_DOCUMENT_TYPES, studentDocumentLabel } from './documents';
 
-export const DOCUMENT_CHECK_PROMPT_VERSION = 'dc-1';
+export const DOCUMENT_CHECK_PROMPT_VERSION = 'dc-2';
 
-export type DetectedDocumentType = (typeof STUDENT_DOCUMENT_TYPES)[number]['id'] | 'unknown';
+export type DetectedDocumentType = (typeof STUDENT_DOCUMENT_TYPES)[number]['id'] | 'not_a_personal_document' | 'unknown';
+
+/** What a quote can show about a document's kind. Gemini picks one per quote; code checks the quote is in the file. */
+export const TYPE_SIGNALS = [
+  'document_title',
+  'issuing_institution',
+  'student_name',
+  'course_grade_rows',
+  'gpa_or_average',
+  'grading_scale',
+  'exam_board',
+  'registrar_signature_or_seal',
+  'dates_of_attendance',
+  'degree_awarded',
+] as const;
+export type TypeSignal = (typeof TYPE_SIGNALS)[number];
+
+/**
+ * Evidence a document of each kind must show before we say it "looks like" that kind.
+ * Each inner list is "one of these"; every inner list must be met. A table of numbers alone never makes a transcript.
+ */
+const REQUIRED_SIGNALS: Partial<Record<DetectedDocumentType, TypeSignal[][]>> = {
+  transcript: [['student_name'], ['course_grade_rows'], ['document_title', 'issuing_institution']],
+  school_certificate: [['student_name'], ['exam_board', 'issuing_institution'], ['document_title', 'course_grade_rows']],
+  university_certificate: [['student_name'], ['issuing_institution'], ['document_title', 'degree_awarded']],
+  passport: [['student_name'], ['document_title', 'issuing_institution']],
+  birth_certificate: [['student_name'], ['document_title', 'issuing_institution']],
+};
+
+const SIGNAL_WORDS: Record<TypeSignal, string> = {
+  document_title: 'a title naming the document',
+  issuing_institution: 'the school or office that issued it',
+  student_name: "the student's name",
+  course_grade_rows: 'courses or subjects with grades',
+  gpa_or_average: 'a GPA or average',
+  grading_scale: 'a grading scale',
+  exam_board: 'an exam board',
+  registrar_signature_or_seal: 'a registrar signature or seal',
+  dates_of_attendance: 'dates of attendance',
+  degree_awarded: 'the degree awarded',
+};
+
+/** Which required evidence is missing for a kind, given the signals whose quotes were found in the file. */
+export function missingEvidence(kind: DetectedDocumentType, verified: Set<TypeSignal>): string[] {
+  const rules = REQUIRED_SIGNALS[kind] ?? [];
+  return rules.filter((anyOf) => !anyOf.some((signal) => verified.has(signal))).map((anyOf) => anyOf.map((s) => SIGNAL_WORDS[s]).join(' or '));
+}
 
 /** One fact read from the file. `found` is false when the quote is not in the stored text. */
 export type DocumentFact<T> = {
@@ -25,6 +71,10 @@ export type DocumentFact<T> = {
 export type DocumentFacts = {
   detectedType: DetectedDocumentType;
   typeConfidence: number;
+  /** What the document is, in Gemini's plain words ("a table comparing machine-learning model results"). */
+  description: string | null;
+  /** Quotes that show the kind of document; `found` is false when the quote is not in the file. */
+  typeEvidence: { signal: TypeSignal; quote: string; page: number | null; found: boolean }[];
   holderName: DocumentFact<string> | null;
   issuer: DocumentFact<string> | null;
   issueDate: DocumentFact<string> | null;
@@ -45,6 +95,7 @@ export type DocumentFinding = {
     | 'type_matches'
     | 'type_mismatch'
     | 'type_unclear'
+    | 'not_personal'
     | 'hard_to_read'
     | 'name_matches'
     | 'name_mismatch'
@@ -134,25 +185,58 @@ export function checkDocument(
     });
   }
 
-  if (context.declaredType !== 'other') {
-    if (facts.detectedType === 'unknown' || facts.typeConfidence < 0.5) {
+  const verified = new Set(facts.typeEvidence.filter((e) => e.found).map((e) => e.signal));
+  if (facts.holderName?.found) verified.add('student_name');
+  const what = facts.description ? ` It looks like ${facts.description.replace(/\.$/, '')}.` : '';
+  const article = (word: string) => (/^[aeiou]/i.test(word) ? 'an' : 'a');
+  const named = `${article(declared)} ${declared.toLowerCase()}`;
+
+  if (!facts.hardToRead) {
+    if (facts.detectedType === 'not_a_personal_document') {
       findings.push({
-        code: 'type_unclear',
-        severity: 'warning',
-        message: `We could not tell whether this is a ${declared.toLowerCase()}. Open it and make sure it is the right file.`,
-        quote: null,
-        page: null,
-      });
-    } else if (facts.detectedType !== context.declaredType) {
-      findings.push({
-        code: 'type_mismatch',
+        code: 'not_personal',
         severity: 'problem',
-        message: `You saved this as a ${declared.toLowerCase()}, but it looks like a ${studentDocumentLabel(facts.detectedType).toLowerCase()}.`,
+        message: context.declaredType === 'other'
+          ? `This does not look like a document about you.${what} Check you uploaded the right file.`
+          : `This is not ${named}.${what} Upload your ${declared.toLowerCase()} instead.`,
         quote: null,
         page: null,
       });
-    } else {
-      findings.push({ code: 'type_matches', severity: 'ok', message: `Looks like a ${declared.toLowerCase()}.`, quote: null, page: null });
+    } else if (context.declaredType !== 'other') {
+      if (facts.detectedType === 'unknown' || facts.typeConfidence < 0.5) {
+        findings.push({
+          code: 'type_unclear',
+          severity: 'warning',
+          message: `We could not tell whether this is ${named}.${what} Open it and make sure it is the right file.`,
+          quote: null,
+          page: null,
+        });
+      } else if (facts.detectedType !== context.declaredType) {
+        const other =
+          facts.detectedType === 'other'
+            ? facts.description?.replace(/\.$/, '') || 'a different kind of document'
+            : `${article(studentDocumentLabel(facts.detectedType))} ${studentDocumentLabel(facts.detectedType).toLowerCase()}`;
+        findings.push({
+          code: 'type_mismatch',
+          severity: 'problem',
+          message: `You saved this as ${named}, but it looks like ${other}.`,
+          quote: null,
+          page: null,
+        });
+      } else {
+        const missing = missingEvidence(facts.detectedType, verified);
+        findings.push(
+          missing.length
+            ? {
+                code: 'type_unclear',
+                severity: 'warning',
+                message: `This may be ${named}, but we could not find ${missing.join(', ')} in it. Make sure it is the complete document.`,
+                quote: null,
+                page: null,
+              }
+            : { code: 'type_matches', severity: 'ok', message: `Looks like ${named}.`, quote: null, page: null },
+        );
+      }
     }
   }
 
@@ -340,11 +424,24 @@ export function readDocumentFacts(data: unknown): DocumentFacts | null {
   const isBool = (v: unknown): v is boolean => typeof v === 'boolean';
   const isGpa = (v: unknown): v is { value: number; scale: number | null } =>
     !!v && typeof v === 'object' && typeof (v as { value?: unknown }).value === 'number';
-  const known = new Set<string>([...STUDENT_DOCUMENT_TYPES.map((item) => item.id), 'unknown']);
+  const known = new Set<string>([...STUDENT_DOCUMENT_TYPES.map((item) => item.id), 'not_a_personal_document', 'unknown']);
+  const signals = new Set<string>(TYPE_SIGNALS);
+  const evidence = Array.isArray(d.typeEvidence)
+    ? d.typeEvidence
+        .filter((e): e is Record<string, unknown> => !!e && typeof e === 'object' && signals.has(String((e as Record<string, unknown>).signal)))
+        .map((e) => ({
+          signal: e.signal as TypeSignal,
+          quote: typeof e.quote === 'string' ? e.quote : '',
+          page: typeof e.page === 'number' ? e.page : null,
+          found: e.found === true,
+        }))
+    : [];
   const detected = typeof d.detectedType === 'string' && known.has(d.detectedType) ? (d.detectedType as DetectedDocumentType) : 'unknown';
   return {
     detectedType: detected,
     typeConfidence: typeof d.typeConfidence === 'number' ? d.typeConfidence : 0,
+    description: typeof d.description === 'string' && d.description.trim() ? d.description.trim() : null,
+    typeEvidence: evidence,
     holderName: fact(d.holderName, isString),
     issuer: fact(d.issuer, isString),
     issueDate: fact(d.issueDate, isString),

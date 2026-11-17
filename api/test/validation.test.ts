@@ -79,3 +79,14 @@ describe('createDraftSchema', () => {
     expect(ok.notes).toContain('robotics');
   });
 });
+
+describe('isStaleCheck', () => {
+  it('treats a check stuck in queued or running for over 15 minutes as lost', async () => {
+    const { isStaleCheck } = await import('../src/studentDocuments');
+    const at = (msAgo: number) => ({ toMillis: () => Date.now() - msAgo });
+    expect(isStaleCheck({ status: 'running', updatedAt: at(16 * 60 * 1000) })).toBe(true);
+    expect(isStaleCheck({ status: 'queued', updatedAt: at(60 * 1000) })).toBe(false);
+    expect(isStaleCheck({ status: 'running' })).toBe(true);
+    expect(isStaleCheck({ status: 'done', updatedAt: at(99 * 60 * 1000) })).toBe(false);
+  });
+});

@@ -168,6 +168,7 @@ services:
     volumes:
       - ./shared:/repo/shared
       - ./worker:/repo/worker
+      - ./samples:/repo/samples:ro    # fictional test documents for npm run check:documents
       # keep the container's Linux node_modules; never use ones installed on Windows
       - /repo/shared/node_modules
       - /repo/worker/node_modules

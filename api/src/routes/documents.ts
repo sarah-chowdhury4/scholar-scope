@@ -1,7 +1,8 @@
 import { Router } from 'express';
 import { db, userDoc, writeAudit, storage, buckets, isStudentDocumentType, enqueueJob } from '@scholarscope/shared';
 import { documentLinksSchema } from '../validation';
-import { listStudentDocuments } from '../studentDocuments';
+import { isStaleCheck, listStudentDocuments } from '../studentDocuments';
+import { FieldValue } from 'firebase-admin/firestore';
 
 export const documentsRouter = Router();
 
@@ -48,7 +49,7 @@ documentsRouter.post('/:id/check', async (req, res) => {
     return res.status(404).json({ error: 'Document not found' });
   }
   const status = snap.get('check.status') as string | undefined;
-  if (status === 'queued' || status === 'running') {
+  if ((status === 'queued' || status === 'running') && !isStaleCheck(snap.get('check'))) {
     return res.status(409).json({ error: 'This file is already being checked.' });
   }
   const versionRef = ref.collection('versions').doc(versionId);
@@ -56,7 +57,7 @@ documentsRouter.post('/:id/check', async (req, res) => {
     return res.status(409).json({ error: 'This file is not ready to check yet.' });
   }
   const jobId = await enqueueJob(req.uid!, 'check_document', versionRef.path);
-  await ref.set({ check: { status: 'queued', versionId, jobId } }, { merge: true });
+  await ref.set({ check: { status: 'queued', versionId, jobId, updatedAt: FieldValue.serverTimestamp() } }, { merge: true });
   await writeAudit({
     actor: { type: 'student', id: req.uid! },
     subjectUid: req.uid!,
