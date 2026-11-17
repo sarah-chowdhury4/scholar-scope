@@ -278,6 +278,7 @@ All ports listen on `127.0.0.1` only.
 | Failed jobs (dead-letter queue) | `docker compose exec localstack awslocal sqs get-queue-attributes --queue-url http://localhost:4566/000000000000/gemini-dlq --attribute-names ApproximateNumberOfMessages` |
 | Process "delete my data" requests | `docker compose run --rm deleter` |
 | Delete one student now | `docker compose run --rm deleter <uid>` |
+| Save accounts and data now (they are also saved on `docker compose stop`) | `docker compose exec firebase firebase emulators:export /data/export --project demo-scholarscope --force` (Git Bash: put `MSYS_NO_PATHCONV=1 ` in front) |
 | Reset all local data | `docker compose down -v` |
 
 ## Tests
@@ -315,6 +316,7 @@ In Windows PowerShell 5, use `;` instead of `&&`.
 | Upload stuck on "Reading the requirements…" | `docker compose logs --tail 30 worker`. Usually a wrong Gemini key or model id. Fix it, then `docker compose restart localstack worker`. |
 | Job status `paused_ai_off` | `config/app.aiEnabled` is `false` in the Emulator UI (Firestore); set it to `true`. |
 | AI calls return 429 | AI Studio free-tier limit. Wait for the daily reset or lower `GEMINI_RATE_PER_SEC`. |
+| Accounts gone after a restart | Data is saved only on a clean `docker compose stop`. Quitting Docker Desktop or shutting down with containers running skips the save; run the "Save accounts and data now" command first. |
 | Port already in use | Change the left-hand port in `docker-compose.yml`, e.g. `"127.0.0.1:3001:3000"`. |
 
 Before pasting logs into an issue or chat, check them for passwords and keys.
