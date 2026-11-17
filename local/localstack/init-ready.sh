@@ -31,6 +31,7 @@ put_secret() {  # $1=name  $2=value
 }
 put_secret scholarscope/gemini-api-key "${GEMINI_API_KEY:-}"
 put_secret scholarscope/nvidia-api-key "${NVIDIA_API_KEY:-}"
+put_secret scholarscope/jina-api-key   "${JINA_API_KEY:-}"
 put_secret scholarscope/brevo-api-key  "${BREVO_API_KEY:-}"
 
 echo "LocalStack ready: 3 queues + DLQs, secrets loaded."

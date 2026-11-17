@@ -74,6 +74,7 @@ cd scholar-scope
 | LocalStack auth token | app.localstack.cloud → *Auth Token* (free account) | `.env` → `LOCALSTACK_AUTH_TOKEN` |
 | Gemini API key | aistudio.google.com → *Get API key* | `.env.secrets` → `GEMINI_API_KEY` |
 | Gemini model id | AI Studio → model list (exact id of the current Flash model) | `.env` → `GEMINI_MODEL` |
+| Jina Reader key (optional) | jina.ai → *Get API key*. Without one, saved pages are still read at 20 requests a minute | `.env.secrets` → `JINA_API_KEY` |
 | NVIDIA NIM key (optional) | build.nvidia.com → *Get API Key*. No key? Set `NIM_ENABLED=false` in `.env` and NIM calls run on Gemini | `.env.secrets` → `NVIDIA_API_KEY` |
 
 > **Synthetic documents only.** Free-tier AI inputs may be kept or used by the provider. Never upload real student records to a local setup.
@@ -366,7 +367,7 @@ local/      emulator config, MinIO policies + tests, LocalStack init, dev Docker
 - **Least privilege for files.** Each service has its own MinIO user (`local/minio/policies/`): the API can only drop files into quarantine, the worker can add originals but never delete them, and only the deleter job can erase a student's files. Originals are versioned.
 - **Every API route checks the sign-in token**, and all data paths come from the token's user id, so one student can't reach another's data. Sessions end after 30 minutes of inactivity.
 - **Uploads are untrusted:** size limit, real file-type check from the file's bytes, then a ClamAV scan before anything reads them.
-- **Saved web pages are fetched safely:** robots.txt is honoured, and private or internal addresses are blocked.
+- **Saved web pages are fetched safely:** robots.txt is honoured, and private or internal addresses are blocked. Public scholarship pages are then read with Jina Reader (asked not to cache or log them), with a direct fetch as the fallback; set `READER_BACKEND=direct` to keep page addresses away from Jina. Student uploads are never sent to Jina.
 - **Document text is data, not instructions:** the AI is told to ignore instructions inside documents, and every extracted item must quote the source; quotes not found in the stored text become "Unverified".
 - **AI document checks never read out ID numbers:** the prompt and the response schema have no field for passport or ID numbers, and every fact must quote the file before a rule uses it.
 - **Firestore rules deny all direct client access.**

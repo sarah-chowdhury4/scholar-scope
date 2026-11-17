@@ -85,7 +85,7 @@ services:
       SERVICES: sqs,secretsmanager
       AWS_DEFAULT_REGION: us-east-1
     env_file:
-      - .env.secrets                 # GEMINI_API_KEY, NVIDIA_API_KEY, BREVO_API_KEY -> Secrets Manager
+      - .env.secrets                 # GEMINI_API_KEY, NVIDIA_API_KEY, JINA_API_KEY, BREVO_API_KEY -> Secrets Manager
     volumes:
       - ./local/localstack/init-ready.sh:/etc/localstack/init/ready.d/10-init.sh:ro
     ports:
@@ -195,6 +195,7 @@ services:
       GEMINI_MODEL: ${GEMINI_MODEL:?set GEMINI_MODEL in .env}
       NIM_ENABLED: ${NIM_ENABLED:-true}               # "false" = no NVIDIA key: NIM calls run on Gemini
       NIM_BASE_URL: https://integrate.api.nvidia.com/v1
+      READER_BACKEND: ${READER_BACKEND:-jina}           # "direct" = fetch saved pages ourselves, never via Jina Reader
       AI_REAL_STUDENT_DATA_ALLOWED: "false"          # synthetic documents only (NFR-1.5)
       MAIL_BACKEND: smtp                             # "brevo" to send real emails
       SMTP_HOST: mailpit

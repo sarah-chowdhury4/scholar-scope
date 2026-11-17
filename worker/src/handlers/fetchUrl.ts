@@ -2,15 +2,20 @@ import { createHash } from 'node:crypto';
 import { FieldValue, Timestamp } from 'firebase-admin/firestore';
 import { convert } from 'html-to-text';
 import robotsParser from 'robots-parser';
-import { safeFetch } from '../net/safeFetch';
-import { db, userDoc, storage, buckets, enqueueJob, updateJob, normalizeQuote, log, type JobMessage } from '@scholarscope/shared';
+import { assertPublicUrl, safeFetch } from '../net/safeFetch';
+import { markdownToText, readerEnabled, readWithJina } from '../net/jinaReader';
+import { extractText } from '../text/extractText';
+import { db, userDoc, storage, buckets, enqueueJob, updateJob, normalizeQuote, getAppConfig, log, type JobMessage } from '@scholarscope/shared';
 
-const USER_AGENT = 'ScholarScopeBot/0.1 (student scholarship tracker; checks pages the student saved)';
+const BOT_NAME = 'ScholarScopeBot';
+const USER_AGENT = `${BOT_NAME}/0.1 (student scholarship tracker; checks pages the student saved)`;
 const MAX_BYTES = 5 * 1024 * 1024;
 const DAY_MS = 24 * 60 * 60 * 1000;
 
 /**
  * Fetch a saved scholarship page (FR-2.1, FR-3.5), honouring robots.txt (NFR-9.2).
+ * The page is read with Jina Reader when it is on (JavaScript-built pages and PDF links come out as clean text),
+ * and fetched directly otherwise or when Jina fails. Our robots.txt and private-address checks always run first.
  * Unchanged text (same hash) costs nothing; changed text becomes a new immutable source version
  * and is re-extracted, which versions and flags any changed requirement.
  * A failed fetch is shown, never hidden (NFR-4.4).
@@ -47,16 +52,40 @@ export async function handleFetchUrl(job: JobMessage): Promise<void> {
     return;
   }
 
-  // Fetch
-  let html: string;
+  // Fetch: Jina Reader first, our own fetch as the fallback.
+  let text = '';
+  let raw: { name: string; body: Buffer; mime: string } | null = null;
+  let reader: 'jina' | 'direct' = 'direct';
+  let pageTitle: string | null = null;
   let httpStatus = 0;
   try {
-    const res = await safeFetch(url, { headers: { 'User-Agent': USER_AGENT }, signal: AbortSignal.timeout(20_000) });
-    httpStatus = res.status;
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    const body = Buffer.from(await res.arrayBuffer());
-    if (body.length > MAX_BYTES) throw new Error('Page too large');
-    html = body.toString('utf8');
+    await assertPublicUrl(url); // never hand an internal address to anyone, Jina included
+    const page = readerEnabled() ? await readWithJina(url) : null;
+    if (page) {
+      reader = 'jina';
+      httpStatus = 200;
+      pageTitle = page.title;
+      text = markdownToText(page.markdown);
+      raw = { name: 'page.md', body: Buffer.from(page.markdown, 'utf8'), mime: 'text/markdown' };
+    } else {
+      const res = await safeFetch(url, { headers: { 'User-Agent': USER_AGENT }, signal: AbortSignal.timeout(20_000) });
+      httpStatus = res.status;
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const body = Buffer.from(await res.arrayBuffer());
+      if (body.length > MAX_BYTES) throw new Error('Page too large');
+      const isPdf = (res.headers.get('content-type') ?? '').includes('application/pdf') || body.subarray(0, 5).toString('latin1') === '%PDF-';
+      if (isPdf) {
+        // A link to the guidelines PDF: read it page by page like an upload, instead of as garbled HTML.
+        const pdf = await extractText(body, 'application/pdf', (await getAppConfig()).maxUploadPages);
+        text = pdf.pages.map((p) => p.text).join('\n\n');
+        raw = { name: 'page.pdf', body, mime: 'application/pdf' };
+      } else {
+        const html = body.toString('utf8');
+        text = convert(html, { wordwrap: false, selectors: [{ selector: 'a', options: { ignoreHref: true } }, { selector: 'img', format: 'skip' }] });
+        raw = { name: 'page.html', body, mime: 'text/html' };
+      }
+    }
+    if (!text.trim()) throw new Error('The page had no readable text');
   } catch (err) {
     const failures = ((source.get('lastFetch.consecutiveFailures') as number | undefined) ?? 0) + 1;
     await sourceRef.update({ lastFetch: { at: FieldValue.serverTimestamp(), httpStatus, ok: false, error: String(err), consecutiveFailures: failures } });
@@ -66,10 +95,13 @@ export async function handleFetchUrl(job: JobMessage): Promise<void> {
     return;
   }
 
-  const text = convert(html, { wordwrap: false, selectors: [{ selector: 'a', options: { ignoreHref: true } }, { selector: 'img', format: 'skip' }] });
   const textHash = createHash('sha256').update(normalizeQuote(text)).digest('hex');
   const now = Timestamp.now();
-  await sourceRef.update({ lastFetch: { at: now, httpStatus, ok: true, error: null, consecutiveFailures: 0 } });
+  await sourceRef.update({
+    lastFetch: { at: now, httpStatus, ok: true, error: null, consecutiveFailures: 0, reader },
+    // Show the page's real title instead of its address once we know it.
+    ...(pageTitle && source.get('title') === url ? { title: pageTitle.slice(0, 200) } : {}),
+  });
   await markScholarships({ status: 'ok', lastCheckedAt: now, lastVerifiedAt: now, consecutiveFailures: 0, nextCheckAt: Timestamp.fromMillis(Date.now() + DAY_MS) });
 
   if (source.get('lastTextHash') === textHash) {
@@ -83,10 +115,11 @@ export async function handleFetchUrl(job: JobMessage): Promise<void> {
   const base = `${sourceRef.path.replace(/^users\//, 'u/')}/${versionRef.id}`;
   const store = await storage();
   const put = await store.put(buckets.originals(), `${base}/original.txt`, Buffer.from(text, 'utf8'), 'text/plain');
-  await store.put(buckets.originals(), `${base}/page.html`, Buffer.from(html, 'utf8'), 'text/html');
+  if (raw) await store.put(buckets.originals(), `${base}/${raw.name}`, raw.body, raw.mime);
   await versionRef.set({
     fetchedUrl: url,
     httpStatus,
+    reader,
     textHash,
     mimeType: 'text/plain',
     sizeBytes: Buffer.byteLength(text),
@@ -98,5 +131,5 @@ export async function handleFetchUrl(job: JobMessage): Promise<void> {
   await sourceRef.update({ currentVersionId: versionRef.id, lastTextHash: textHash, updatedAt: FieldValue.serverTimestamp() });
   const nextJobId = await enqueueJob(job.uid, 'extract', versionRef.path);
   await updateJob(job.uid, job.jobId, { status: 'done', progress: 100, nextJobId });
-  log.info('recheck_changed', { target: job.target });
+  log.info('recheck_changed', { target: job.target, reader });
 }
