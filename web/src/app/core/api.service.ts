@@ -177,7 +177,7 @@ export type Me = {
   notificationPrefs: { email: boolean; inApp: boolean };
   deletion: { requestedAt: string | null; completedAt: string | null } | null;
   emails: ProfileEmail[];
-  pendingEmail: { address: string; replaces: string | null } | null;
+  pendingEmail: { address: string; replaces: string | null; delivery: 'sending' | 'sent' | 'failed' } | null;
   countriesOfInterest: string[];
   citizenships: string[];
   currentLocation: string | null;

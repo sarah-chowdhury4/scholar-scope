@@ -1,4 +1,4 @@
-import { Component, OnInit, inject, signal } from '@angular/core';
+import { Component, OnDestroy, OnInit, inject, signal } from '@angular/core';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { Router } from '@angular/router';
 import { ApiService, apiMessage, type Me, type ProfileOptions } from '../../core/api.service';
@@ -84,7 +84,7 @@ import { CountryPicker } from './country-picker';
                 </div>
               </div>
               @if (primaryFor() === email.address) {
-                <form (ngSubmit)="makePrimary(email.address)">
+                <form (submit)="$event.preventDefault(); makePrimary(email.address)">
                   <label [attr.for]="'primaryPwd-' + email.address">Current password</label>
                   <div class="pwd">
                     <input [id]="'primaryPwd-' + email.address" [type]="show()['primary'] ? 'text' : 'password'" autocomplete="current-password" [value]="primaryPassword()" (input)="primaryPassword.set(text($event))" required />
@@ -103,13 +103,23 @@ import { CountryPicker } from './country-picker';
             }
 
             @if (me.pendingEmail) {
-              <form (ngSubmit)="verifyEmail()">
+              <form (submit)="$event.preventDefault(); verifyEmail()">
                 <p class="notice">
                   Confirmation pending for <strong>{{ me.pendingEmail.address }}</strong>.
                   @if (me.pendingEmail.replaces) {
                     It replaces {{ me.pendingEmail.replaces }} once you enter the code. Your sign-in email stays the same until then.
                   }
                 </p>
+                @if (me.pendingEmail.delivery === 'failed') {
+                  <p class="error" role="alert">We could not send the email. Check the address, then press Resend code.</p>
+                } @else if (me.pendingEmail.delivery === 'sending') {
+                  <p class="hint" role="status">
+                    Sending the code…
+                    <button type="button" class="link" (click)="load(true)">Refresh</button>
+                  </p>
+                } @else {
+                  <p class="hint">Code sent. It can take a minute to arrive; check your spam folder too.</p>
+                }
                 <label for="emailCode">6-digit code</label>
                 <input id="emailCode" inputmode="numeric" autocomplete="one-time-code" maxlength="6" [value]="emailCode()" (input)="emailCode.set(text($event))" />
                 @if (errors()['verify']) { <p class="error" role="alert">{{ errors()['verify'] }}</p> }
@@ -422,7 +432,7 @@ import { CountryPicker } from './country-picker';
     }
   `,
 })
-export class ProfilePage implements OnInit {
+export class ProfilePage implements OnInit, OnDestroy {
   private readonly api = inject(ApiService);
   private readonly auth = inject(AuthService);
   private readonly router = inject(Router);
@@ -478,6 +488,10 @@ export class ProfilePage implements OnInit {
     emailAlerts: [true],
   });
   protected readonly deleteForm = this.fb.nonNullable.group({ currentPassword: ['', Validators.required] });
+
+  ngOnDestroy() {
+    clearTimeout(this.deliveryTimer);
+  }
 
   async ngOnInit() {
     const [options, me] = await Promise.all([
@@ -857,6 +871,7 @@ export class ProfilePage implements OnInit {
   private remember(me: Me, section?: 'all' | 'name' | 'countries' | 'background' | 'education' | 'settings') {
     this.profile.set(me);
     this.tz.setFromProfile(me);
+    this.watchDelivery(me);
     this.syncEmailSelect(me);
     if (section === 'all' || section === 'name') this.nameForm.controls.displayName.setValue(me.displayName ?? '');
     if (section === 'all' || section === 'countries') this.draftCountries.set([...me.countriesOfInterest]);
@@ -887,6 +902,20 @@ export class ProfilePage implements OnInit {
     }
   }
 
+  private deliveryPolls = 0;
+  private deliveryTimer: ReturnType<typeof setTimeout> | undefined;
+
+  private watchDelivery(me: Me) {
+    clearTimeout(this.deliveryTimer);
+    if (me.pendingEmail?.delivery !== 'sending') {
+      this.deliveryPolls = 0;
+      return;
+    }
+    if (this.deliveryPolls >= DELIVERY_POLLS) return;
+    this.deliveryPolls++;
+    this.deliveryTimer = setTimeout(() => void this.load(true), 2000);
+  }
+
   private syncEmailSelect(me: Me) {
     const current = this.replaceForm.controls.currentAddress.value;
     if (!me.emails.some((email) => email.address === current)) {
@@ -897,6 +926,9 @@ export class ProfilePage implements OnInit {
     }
   }
 }
+
+/** While a code email is still being sent, re-check every 2 seconds (up to 30 seconds) so the page updates by itself. */
+const DELIVERY_POLLS = 15;
 
 function sameSet(a: string[], b: string[]): boolean {
   return a.length === b.length && a.every((item) => b.includes(item));

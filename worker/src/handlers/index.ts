@@ -1,11 +1,12 @@
 import { FieldValue } from 'firebase-admin/firestore';
-import { db, updateJob, log, errorMessage, type JobMessage, type JobType } from '@scholarscope/shared';
+import { db, updateJob, log, errorMessage, setDeliveryStatus, type JobMessage, type JobType } from '@scholarscope/shared';
 import { handleScan } from './scan';
 import { handleExtract } from './extract';
 import { handleFetchUrl } from './fetchUrl';
 import { handleCheckDocument } from './checkDocument';
 import { handleDiff } from './diff';
 import { handleDraft } from './draft';
+import { handleSendEmail } from './sendEmail';
 
 type Handler = (job: JobMessage) => Promise<void>;
 
@@ -20,6 +21,7 @@ const HANDLERS: Partial<Record<JobType, Handler>> = {
   check_document: handleCheckDocument,
   diff: handleDiff,
   draft: handleDraft,
+  send_email: handleSendEmail,
 };
 
 const MAX_ATTEMPTS = 3;
@@ -37,7 +39,7 @@ export async function runJob(job: JobMessage, attempt: number): Promise<void> {
   } catch (err) {
     const final = attempt >= MAX_ATTEMPTS;
     await updateJob(job.uid, job.jobId, { status: final ? 'failed' : 'queued', error: errorMessage(err) });
-    if (job.type === 'extract' || job.type === 'check_document' || job.type === 'draft') {
+    if (job.type === 'extract' || job.type === 'check_document' || job.type === 'draft' || job.type === 'send_email') {
       log.error(`${job.type}_failed`, { jobId: job.jobId, attempt, error: errorMessage(err) });
     }
     if (final) await markGivenUp(job, errorMessage(err));
@@ -54,6 +56,11 @@ async function markGivenUp(job: JobMessage, error: string): Promise<void> {
       await versionRef.set({ check }, { merge: true });
       const materialRef = versionRef.parent.parent!;
       if ((await materialRef.get()).get('currentVersionId') === versionRef.id) await materialRef.set({ check }, { merge: true });
+    }
+    if (job.type === 'send_email') {
+      const outbox = db().doc(job.target);
+      await setDeliveryStatus(job.uid, (await outbox.get()).get('statusField'), 'failed');
+      await outbox.delete(); // it holds a one-time code: do not keep it
     }
     if (job.type === 'draft') {
       await db().doc(job.target).set({ status: 'failed', error: 'The draft could not be written. Try again later.' }, { merge: true });

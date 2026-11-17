@@ -16,6 +16,7 @@ export * from './emailIndex';
 export * from './catalog';
 export * from './catalogStore';
 export * from './documents';
+export * from './outbox';
 export * from './documentChecks';
 export * from './requirements';
 export * from './diff';

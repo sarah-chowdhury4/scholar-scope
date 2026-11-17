@@ -55,6 +55,7 @@ export type JobType =
   | 'extract'
   | 'fetch_url'
   | 'check_document'
+  | 'send_email'
   | 'classify'
   | 'embed'
   | 'diff'

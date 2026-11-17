@@ -35,6 +35,7 @@ export const QUEUE_FOR_JOB: Record<JobMessage['type'], QueueName> = {
   diff: 'gemini',
   draft: 'gemini',
   check_document: 'gemini',
+  send_email: 'default',
   classify: 'nim',
   embed: 'nim',
 };

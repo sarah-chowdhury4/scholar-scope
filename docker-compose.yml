@@ -148,9 +148,7 @@ services:
       AWS_ACCESS_KEY_ID: test
       AWS_SECRET_ACCESS_KEY: test
       CORS_ORIGIN: http://localhost:4200
-      MAIL_BACKEND: smtp
-      SMTP_HOST: mailpit
-      SMTP_PORT: "1025"
+      # No mail settings: the API queues emails and the worker sends them (only the worker holds keys).
     ports:
       - "127.0.0.1:3000:3000"
     depends_on:
@@ -198,7 +196,8 @@ services:
       NIM_BASE_URL: https://integrate.api.nvidia.com/v1
       READER_BACKEND: ${READER_BACKEND:-jina}           # "direct" = fetch saved pages ourselves, never via Jina Reader
       AI_REAL_STUDENT_DATA_ALLOWED: "false"          # synthetic documents only (NFR-1.5)
-      MAIL_BACKEND: smtp                             # "brevo" to send real emails
+      MAIL_BACKEND: ${MAIL_BACKEND:-smtp}           # smtp = Mailpit test inbox; brevo = real inboxes (needs BREVO_API_KEY)
+      MAIL_FROM: ${MAIL_FROM:-ScholarScope <alerts@scholarscope.local>}  # with brevo: a sender verified in Brevo
       SMTP_HOST: mailpit
       SMTP_PORT: "1025"
       SCHEDULER: cron                                # Cloud Scheduler on Google Cloud

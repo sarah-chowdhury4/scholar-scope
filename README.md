@@ -74,6 +74,7 @@ cd scholar-scope
 | LocalStack auth token | app.localstack.cloud → *Auth Token* (free account) | `.env` → `LOCALSTACK_AUTH_TOKEN` |
 | Gemini API key | aistudio.google.com → *Get API key* | `.env.secrets` → `GEMINI_API_KEY` |
 | Gemini model id | AI Studio → model list (exact id of the current Flash model) | `.env` → `GEMINI_MODEL` |
+| Brevo key (optional: real emails) | brevo.com → free account → *Senders* (verify an address) → *SMTP & API* → *API keys*. Without one, every email goes to Mailpit | `.env.secrets` → `BREVO_API_KEY` |
 | Jina Reader key (optional) | jina.ai → *Get API key*. Without one, saved pages are still read at 20 requests a minute | `.env.secrets` → `JINA_API_KEY` |
 | NVIDIA NIM key (optional) | build.nvidia.com → *Get API Key*. No key? Set `NIM_ENABLED=false` in `.env` and NIM calls run on Gemini | `.env.secrets` → `NVIDIA_API_KEY` |
 
@@ -252,6 +253,18 @@ This loads the catalog and adds catalog scholarships (up to 15) to a demo accoun
 
 ---
 
+### Optional: send real emails (Brevo, free)
+
+Locally every email (confirmation codes, password resets, deadline and change alerts) goes to the Mailpit test inbox at http://localhost:8025. To deliver them to real inboxes instead:
+
+1. Create a free account at brevo.com (no card needed; the free plan sends about 300 emails a day).
+2. In Brevo, open **Senders, domains & dedicated IPs → Senders**, add the address emails should come from, and click the link Brevo emails you to verify it.
+3. Open **SMTP & API → API keys**, create a key, and put it in `.env.secrets` as `BREVO_API_KEY=...`.
+4. In `.env`, set `MAIL_BACKEND=brevo` and `MAIL_FROM=ScholarScope <the address you verified>`.
+5. Run `docker compose up -d --build localstack worker`.
+
+**Done when:** adding an email on your profile says *Code sent* and the code arrives (check spam the first time). If it says *We could not send the email*, `docker compose logs --tail 20 worker` shows Brevo's reason (most often an unverified sender). Remember that real addresses then get real emails, and the daily limit is shared by everyone using the key.
+
 ## Local URLs
 
 | What | URL |
@@ -363,6 +376,7 @@ local/      emulator config, MinIO policies + tests, LocalStack init, dev Docker
 
 ## Security model
 
+- **Only the worker sends email.** The API queues each email (with its one-time code) for the worker and never holds a mail key; the worker deletes the queued copy as soon as it is sent.
 - **API keys stay on the server.** `.env.secrets` is read only by LocalStack, which stores the keys in its Secrets Manager; only the worker fetches them. The API and the browser never see them.
 - **Least privilege for files.** Each service has its own MinIO user (`local/minio/policies/`): the API can only drop files into quarantine, the worker can add originals but never delete them, and only the deleter job can erase a student's files. Originals are versioned.
 - **Every API route checks the sign-in token**, and all data paths come from the token's user id, so one student can't reach another's data. Sessions end after 30 minutes of inactivity.

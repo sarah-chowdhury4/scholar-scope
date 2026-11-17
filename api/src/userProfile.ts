@@ -18,7 +18,7 @@ import {
   releaseEmail,
   removalBlock,
   schoolNote,
-  sendMail,
+  queueMail,
   userDoc,
   writeAudit,
   type ProfilePatch,
@@ -34,6 +34,8 @@ type PendingEmail = {
   expiresAtMs: number;
   attempts: number;
   sentAtMs: number;
+  /** Set by the worker once the email is sent, or if it could not be. */
+  delivery?: 'sending' | 'sent' | 'failed';
 };
 
 type PasswordReset = {
@@ -117,6 +119,7 @@ function readPending(value: unknown): PendingEmail | null {
     expiresAtMs: typeof pending.expiresAtMs === 'number' ? pending.expiresAtMs : 0,
     attempts: typeof pending.attempts === 'number' ? pending.attempts : 0,
     sentAtMs: typeof pending.sentAtMs === 'number' ? pending.sentAtMs : 0,
+    delivery: pending.delivery === 'sent' || pending.delivery === 'failed' ? pending.delivery : 'sending',
   };
 }
 
@@ -163,7 +166,7 @@ function toDto(uid: string, data: Record<string, unknown>) {
     notificationPrefs: record.notificationPrefs,
     deletion: requestedAt ? { requestedAt, completedAt: serializeWhen(deletion?.completedAt) } : null,
     emails,
-    pendingEmail: pending ? { address: pending.address, replaces: pending.replaces } : null,
+    pendingEmail: pending ? { address: pending.address, replaces: pending.replaces, delivery: pending.delivery ?? 'sending' } : null,
     countriesOfInterest: record.countriesOfInterest,
     citizenships: record.citizenships,
     currentLocation: record.currentLocation,
@@ -333,10 +336,14 @@ async function sendPending(uid: string, pending: { address: string; replaces: st
     expiresAtMs: Date.now() + LIMITS.codeTtlMs,
     attempts: 0,
     sentAtMs: Date.now(),
+    delivery: 'sending',
   };
   await userDoc(uid).set({ pendingEmail: stored }, { merge: true });
   try {
-    await sendMail({
+    // The worker sends it (Mailpit locally, Brevo for real inboxes) and records whether it went out.
+    await queueMail(uid, {
+      kind: 'confirm_email',
+      statusField: 'pendingEmail.delivery',
       to: pending.address,
       subject: 'Confirm your ScholarScope email',
       text: [
@@ -583,7 +590,8 @@ export async function requestPasswordReset(rawEmail: string): Promise<void> {
     { merge: true },
   );
   try {
-    await sendMail({
+    await queueMail(uid, {
+      kind: 'password_reset',
       to: address,
       subject: 'Reset your ScholarScope password',
       text: [
