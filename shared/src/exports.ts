@@ -10,7 +10,9 @@ export type CalendarDeadline = {
   description: string;
   url: string | null;
   due: Date;
+  /** All-day events use `date` (YYYY-MM-DD as written); timed events use `due`. */
   allDay: boolean;
+  date?: string | null;
 };
 
 function icsEscape(text: string): string {
@@ -59,8 +61,9 @@ export function buildIcs(deadlines: CalendarDeadline[], now = new Date()): strin
   for (const item of deadlines) {
     lines.push('BEGIN:VEVENT', `UID:${item.uid}@scholarscope`, `DTSTAMP:${utcStamp(now)}`);
     if (item.allDay) {
-      const next = new Date(item.due.getTime() + 24 * 60 * 60 * 1000);
-      lines.push(`DTSTART;VALUE=DATE:${dateOnly(item.due)}`, `DTEND;VALUE=DATE:${dateOnly(next)}`);
+      const day = item.date ? new Date(`${item.date}T00:00:00Z`) : item.due;
+      const next = new Date(day.getTime() + 24 * 60 * 60 * 1000);
+      lines.push(`DTSTART;VALUE=DATE:${dateOnly(day)}`, `DTEND;VALUE=DATE:${dateOnly(next)}`);
     } else {
       lines.push(`DTSTART:${utcStamp(item.due)}`, `DTEND:${utcStamp(item.due)}`);
     }

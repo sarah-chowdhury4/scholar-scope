@@ -20,7 +20,11 @@ export type Readiness = 'missing' | 'in_draft' | 'ready' | 'changed';
 
 export type DeadlineValue = {
   utc: Timestamp;
-  sourceTimezone: string;
+  /** The scholarship's time zone, or null when it is not known. */
+  sourceTimezone: string | null;
+  /** The deadline as written in that zone: YYYY-MM-DD and HH:MM (null = end of day). */
+  date: string;
+  time: string | null;
   sourceText: string;
   allDay: boolean;
 };

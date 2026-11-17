@@ -1,11 +1,12 @@
 import { Component, inject, input, output, signal } from '@angular/core';
-import { DatePipe } from '@angular/common';
+import { ZonedDatePipe } from '../../core/zoned-date.pipe';
+import { TimeZoneService } from '../../core/time-zone.service';
 import { ApiService, apiMessage, type Requirement, type RequirementVersion } from '../../core/api.service';
 
 /** One requirement on a scholarship page: its source quote, the student's review, and the checklist tick. */
 @Component({
   selector: 'li[appRequirementCard]',
-  imports: [DatePipe],
+  imports: [ZonedDatePipe],
   host: { class: 'card', '[class.changed]': 'requirement().changeFlag?.active' },
   template: `
     @let r = requirement();
@@ -45,7 +46,7 @@ import { ApiService, apiMessage, type Requirement, type RequirementVersion } fro
       }
 
       @if (r.review; as review) {
-        <p class="muted small">{{ reviewLabel(review.status) }}{{ review.at ? ' · ' + (review.at | date: 'mediumDate') : '' }}</p>
+        <p class="muted small">{{ reviewLabel(review.status) }}{{ review.at ? ' · ' + (review.at | zonedDate: tz.zone() : false) : '' }}</p>
       }
 
       @if (editing()) {
@@ -63,7 +64,9 @@ import { ApiService, apiMessage, type Requirement, type RequirementVersion } fro
           @if (r.kind === 'deadline') {
             <label [attr.for]="'date-' + r.id">Due date</label>
             <input [id]="'date-' + r.id" name="date" type="date" [value]="deadlineDate()" required />
-            <label [attr.for]="'tz-' + r.id">Time zone of the deadline</label>
+            <label [attr.for]="'time-' + r.id">Time (optional)</label>
+            <input [id]="'time-' + r.id" name="time" type="time" [value]="deadlineTime()" />
+            <label [attr.for]="'tz-' + r.id">The scholarship's time zone (blank if not stated)</label>
             <input [id]="'tz-' + r.id" name="timezone" [value]="deadlineZone()" placeholder="America/New_York" />
           }
           <p class="hint">The source quote stays attached. Your correction is saved as a new version; the old one is kept.</p>
@@ -87,7 +90,7 @@ import { ApiService, apiMessage, type Requirement, type RequirementVersion } fro
         <ol class="history small">
           @for (v of versions; track v.id) {
             <li>
-              <strong>Version {{ v.versionNo }}</strong> · {{ originLabel(v.origin) }}{{ v.createdAt ? ' · ' + (v.createdAt | date: 'medium') : '' }}
+              <strong>Version {{ v.versionNo }}</strong> · {{ originLabel(v.origin) }}{{ v.createdAt ? ' · ' + (v.createdAt | zonedDate: tz.zone()) : '' }}
               <div>{{ v.value['text'] ?? '' }}</div>
               @if (v.citation) {
                 <div class="muted">“{{ v.citation.quote }}”</div>
@@ -105,6 +108,7 @@ import { ApiService, apiMessage, type Requirement, type RequirementVersion } fro
 })
 export class RequirementCard {
   private readonly api = inject(ApiService);
+  protected readonly tz = inject(TimeZoneService);
   readonly requirement = input.required<Requirement>();
   readonly scholarshipId = input.required<string>();
   /** Fired after any change so the page reloads counts and the list. */
@@ -154,16 +158,28 @@ export class RequirementCard {
     return typeof gpa === 'number' ? gpa : null;
   }
 
+  private storedDeadline() {
+    return this.requirement().current.value['deadline'] as
+      | { utc?: string; date?: string | null; time?: string | null; sourceTimezone?: string | null }
+      | undefined;
+  }
+
+  /** The deadline as written, in the scholarship's own zone (not converted to the student's). */
   deadlineDate(): string {
-    const deadline = this.requirement().current.value['deadline'] as { utc?: { _seconds?: number } | string } | undefined;
-    const utc = deadline?.utc;
-    const date = typeof utc === 'string' ? new Date(utc) : typeof utc?._seconds === 'number' ? new Date(utc._seconds * 1000) : null;
-    return date && !Number.isNaN(date.getTime()) ? date.toISOString().slice(0, 10) : '';
+    const d = this.storedDeadline();
+    if (d?.date) return d.date;
+    if (!d?.utc) return '';
+    const moment = new Date(d.utc);
+    if (Number.isNaN(moment.getTime())) return '';
+    return new Intl.DateTimeFormat('en-CA', { timeZone: d.sourceTimezone || 'UTC', year: 'numeric', month: '2-digit', day: '2-digit' }).format(moment);
+  }
+
+  deadlineTime(): string {
+    return this.storedDeadline()?.time ?? '';
   }
 
   deadlineZone(): string {
-    const deadline = this.requirement().current.value['deadline'] as { sourceTimezone?: string } | undefined;
-    return deadline?.sourceTimezone ?? Intl.DateTimeFormat().resolvedOptions().timeZone ?? 'UTC';
+    return this.storedDeadline()?.sourceTimezone ?? '';
   }
 
   async toggleReady(event: Event) {
@@ -192,7 +208,11 @@ export class RequirementCard {
     const gpa = form.get('minGpa');
     if (gpa !== null) body['minGpa'] = String(gpa).trim() ? Number(gpa) : null;
     if (r.kind === 'deadline') {
-      body['deadline'] = { date: String(form.get('date') ?? ''), timezone: String(form.get('timezone') ?? '').trim() || 'UTC' };
+      body['deadline'] = {
+        date: String(form.get('date') ?? ''),
+        time: String(form.get('time') ?? '') || null,
+        timezone: String(form.get('timezone') ?? '').trim() || null,
+      };
     }
     const ok = await this.run(() => this.api.reviewRequirement(this.scholarshipId(), r.id, body));
     if (ok) {

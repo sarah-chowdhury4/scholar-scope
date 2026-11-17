@@ -18,7 +18,15 @@ export type Scholarship = {
   provider: string;
   url: string | null;
   status: string;
-  deadline: { utc: string; sourceText: string; allDay: boolean; verification: Verification } | null;
+  deadline: {
+    utc: string;
+    sourceTimezone: string | null;
+    date: string | null;
+    time: string | null;
+    sourceText: string;
+    allDay: boolean;
+    verification: Verification;
+  } | null;
   counts: { open: number; changed: number; unverified: number; needsReview: number; ready: number; total: number };
   readinessPct: number;
   recheck?: { status: string; lastVerifiedAt?: { _seconds: number } | null };
@@ -230,7 +238,8 @@ export type NewScholarship = {
   provider: string;
   url?: string | null;
   awardAmount?: { amount: number; currency: string } | null;
-  deadline?: { date: string; timezone: string } | null;
+  /** `timezone` is the scholarship's own zone; leave it out when unknown. */
+  deadline?: { date: string; time?: string | null; timezone?: string | null } | null;
 };
 
 export type CatalogTag = 'essay' | 'recommendation' | 'transcript' | 'video' | 'financial' | 'resume';

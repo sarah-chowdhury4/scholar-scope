@@ -4,6 +4,8 @@ import { filter } from 'rxjs';
 import { AuthService } from './core/auth.service';
 import { AlertsStore } from './core/alerts.store';
 import { ToastService } from './core/toast.service';
+import { TimeZoneService } from './core/time-zone.service';
+import { ApiService } from './core/api.service';
 
 const ALERT_POLL_MS = 3 * 60 * 1000;
 
@@ -26,9 +28,17 @@ export class App {
     const timer = setInterval(() => {
       if (this.auth.signedIn()) void this.alerts.refresh();
     }, ALERT_POLL_MS);
+    const tz = inject(TimeZoneService);
+    const api = inject(ApiService);
     effect(() => {
-      if (this.auth.signedIn()) void this.alerts.refresh();
-      else this.alerts.set(0);
+      if (this.auth.signedIn()) {
+        void this.alerts.refresh();
+        // Dates are shown in the zone saved on the profile (or this device's until one is saved).
+        api.me().then((me) => tz.setFromProfile(me)).catch(() => tz.reset());
+      } else {
+        this.alerts.set(0);
+        tz.reset();
+      }
     });
     inject(DestroyRef).onDestroy(() => {
       sub.unsubscribe();

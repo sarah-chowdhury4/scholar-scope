@@ -4,6 +4,7 @@ import { Router } from '@angular/router';
 import { ApiService, apiMessage, type Me, type ProfileOptions } from '../../core/api.service';
 import { AuthService } from '../../core/auth.service';
 import { ToastService } from '../../core/toast.service';
+import { TimeZoneService } from '../../core/time-zone.service';
 import { MIN_PASSWORD_LENGTH, passwordHint, passwordLevel } from '../../core/password-strength';
 import { CountryPicker } from './country-picker';
 
@@ -336,7 +337,8 @@ import { CountryPicker } from './country-picker';
           <section class="card">
             <h2>Deadlines and alerts</h2>
             <p class="muted">
-              Deadline dates are converted with this time zone. Email alerts (14, 7, 3 and 1 days before) go to
+              Deadlines across the site are shown in this time zone, with the scholarship's own time next to them when it differs.
+              Email alerts (14, 7, 3 and 1 days before) go to
               <strong>{{ me.email }}</strong>. In-app alerts stay on.
             </p>
             <form [formGroup]="settings" (ngSubmit)="saveSettings()">
@@ -426,6 +428,7 @@ export class ProfilePage implements OnInit {
   private readonly router = inject(Router);
   private readonly fb = inject(FormBuilder);
   private readonly toast = inject(ToastService);
+  private readonly tz = inject(TimeZoneService);
 
   protected readonly timeZones = Intl.supportedValuesOf('timeZone');
   protected readonly profile = signal<Me | null>(null);
@@ -853,6 +856,7 @@ export class ProfilePage implements OnInit {
   /** Updates the saved profile. Pass a section to copy that section back from the server without wiping unsaved edits elsewhere. */
   private remember(me: Me, section?: 'all' | 'name' | 'countries' | 'background' | 'education' | 'settings') {
     this.profile.set(me);
+    this.tz.setFromProfile(me);
     this.syncEmailSelect(me);
     if (section === 'all' || section === 'name') this.nameForm.controls.displayName.setValue(me.displayName ?? '');
     if (section === 'all' || section === 'countries') this.draftCountries.set([...me.countriesOfInterest]);

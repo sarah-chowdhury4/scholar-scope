@@ -82,3 +82,90 @@ function zonedTimeToUtc(local: string, timeZone: string): Date | null {
   utc = new Date(asUtc.getTime() - timeZoneOffsetMinutes(utc, timeZone) * 60_000);
   return utc;
 }
+
+/**
+ * A deadline as stored on a scholarship or a requirement.
+ * The deadline belongs to the scholarship's time zone, not the student's:
+ *   sourceTimezone  IANA zone the scholarship states ("America/New_York"), or null when nobody knows it
+ *   date / time     the deadline as written, in that zone ("2027-03-01", "23:59" or null for end of day)
+ *   utc             the exact moment, used for sorting, reminders and calendars
+ * With no known zone, `utc` is the EARLIEST moment the date could end anywhere (end of day at UTC+14),
+ * so reminders are never late; pages then show the date as written and say the time zone is not confirmed.
+ */
+export type DeadlineParts = {
+  utc: Date;
+  allDay: boolean;
+  sourceTimezone: string | null;
+  date: string;
+  time: string | null;
+};
+
+const EARLIEST_OFFSET_MS = 14 * 60 * 60 * 1000;
+
+function validZone(timeZone: string | null | undefined): string | null {
+  if (!timeZone) return null;
+  try {
+    new Intl.DateTimeFormat('en-US', { timeZone });
+    return timeZone;
+  } catch {
+    return null;
+  }
+}
+
+/** Date (YYYY-MM-DD), optional time (HH:MM) and optional zone → stored deadline. Null if the date is invalid. */
+export function deadlineFromParts(date: string, time: string | null | undefined, timeZone: string | null | undefined): DeadlineParts | null {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) return null;
+  const [y, m, d] = date.split('-').map(Number) as [number, number, number];
+  const check = new Date(Date.UTC(y, m - 1, d));
+  if (check.getUTCMonth() !== m - 1 || check.getUTCDate() !== d) return null;
+  const clock = time && /^\d{2}:\d{2}$/.test(time) ? time : null;
+  const zone = validZone(timeZone);
+  if (!zone) {
+    const utc = new Date(Date.UTC(y, m - 1, d, 23, 59, 59) - EARLIEST_OFFSET_MS);
+    return { utc, allDay: !clock, sourceTimezone: null, date, time: clock };
+  }
+  const parsed = parseSourceDeadline(clock ? `${date}T${clock}` : date, zone);
+  return parsed ? { utc: parsed.utc, allDay: parsed.allDay, sourceTimezone: zone, date, time: clock } : null;
+}
+
+/** A deadline read from a source ("2026-12-01", "2026-12-01T17:00", "2026-12-01T17:00:00-05:00") and the zone it states, if any. */
+export function deadlineFromSource(iso: string, timeZone: string | null | undefined): DeadlineParts | null {
+  const value = iso.trim();
+  const date = value.slice(0, 10);
+  const zone = validZone(timeZone);
+  if (/[zZ]$|[+-]\d{2}:?\d{2}$/.test(value) && value.length > 10) {
+    const utc = new Date(value);
+    if (Number.isNaN(utc.getTime())) return null;
+    // The text names its own offset: keep the wall-clock date and time as written.
+    return { utc, allDay: false, sourceTimezone: zone, date, time: value.slice(11, 16) };
+  }
+  const time = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}/.test(value) ? value.slice(11, 16) : null;
+  return deadlineFromParts(date, time, zone);
+}
+
+/** The calendar date of a moment in a time zone, as YYYY-MM-DD. */
+export function dateInZone(moment: Date, timeZone: string): string {
+  return new Intl.DateTimeFormat('en-CA', { timeZone, year: 'numeric', month: '2-digit', day: '2-digit' }).format(moment);
+}
+
+/**
+ * A deadline in words for emails, in the student's zone, with the scholarship's own time when it differs.
+ *   "Tuesday, March 2, 2027 at 10:59 AM (your time); that is Monday, March 1, 2027 at 11:59 PM in New York"
+ *   "Monday, March 1, 2027 (the scholarship's time zone is not confirmed)"
+ */
+export function deadlineSentence(
+  d: { utc: Date; sourceTimezone: string | null; date?: string | null; time?: string | null },
+  studentZone: string,
+): string {
+  if (!d.sourceTimezone) {
+    const date = d.date ?? d.utc.toISOString().slice(0, 10);
+    const written = new Intl.DateTimeFormat('en-US', { dateStyle: 'full', timeZone: 'UTC' }).format(new Date(`${date}T12:00:00Z`));
+    return `${written}${d.time ? ` at ${d.time}` : ''} (the scholarship's time zone is not confirmed)`;
+  }
+  const say = (zone: string) => new Intl.DateTimeFormat('en-US', { dateStyle: 'full', timeStyle: 'short', timeZone: zone }).format(d.utc);
+  const mine = say(studentZone);
+  const theirs = say(d.sourceTimezone);
+  if (mine === theirs) return mine;
+  const place = (d.sourceTimezone.split('/').pop() ?? d.sourceTimezone).replace(/_/g, ' ');
+  return `${mine} (your time); that is ${theirs} in ${place}`;
+}

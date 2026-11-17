@@ -1,11 +1,12 @@
 import { Component, OnChanges, inject, input, output, signal } from '@angular/core';
-import { DatePipe } from '@angular/common';
+import { ZonedDatePipe } from '../../core/zoned-date.pipe';
+import { TimeZoneService } from '../../core/time-zone.service';
 import { ApiService, apiMessage, type RequirementChange } from '../../core/api.service';
 
 /** Open changes for one scholarship: old and new wording side by side, an AI summary, and "I've seen this". */
 @Component({
   selector: 'app-change-review',
-  imports: [DatePipe],
+  imports: [ZonedDatePipe],
   template: `
     @if (items().length) {
       <section class="card changed" aria-labelledby="changes-title">
@@ -14,7 +15,7 @@ import { ApiService, apiMessage, type RequirementChange } from '../../core/api.s
         @for (c of items(); track c.id) {
           <article class="change">
             <h3>{{ c.label }}</h3>
-            <p class="muted small">Found {{ c.detectedAt | date: 'medium' }}</p>
+            <p class="muted small">Found {{ c.detectedAt | zonedDate: tz.zone() }}</p>
             @if (c.aiSummary; as ai) {
               <p class="notice small">
                 <strong>AI summary{{ ai.importance === 'important' ? ' · important' : '' }}:</strong> {{ ai.summary }}
@@ -72,6 +73,7 @@ import { ApiService, apiMessage, type RequirementChange } from '../../core/api.s
 })
 export class ChangeReview implements OnChanges {
   private readonly api = inject(ApiService);
+  protected readonly tz = inject(TimeZoneService);
   readonly scholarshipId = input.required<string>();
   /** Bump to reload (the page passes its requirement list so a reload follows every refresh). */
   readonly refreshKey = input<unknown>(null);

@@ -24,15 +24,21 @@ exportsRouter.get('/calendar.ics', async (req, res) => {
     if (!due) continue;
     const verification = String(doc.get('deadline.verification') ?? 'unverified');
     const name = String(doc.get('name') ?? 'Scholarship');
+    const zone = (doc.get('deadline.sourceTimezone') as string | null | undefined) ?? null;
+    const date = (doc.get('deadline.date') as string | null | undefined) ?? due.toISOString().slice(0, 10);
     events.push({
       uid: doc.id,
       title: `${name} due`,
       description:
         `${doc.get('provider') ?? ''}\n` +
-        (verification === 'verified' ? `Deadline from the official source: "${doc.get('deadline.sourceText') ?? ''}"` : 'This deadline is not confirmed from a source yet. Check the official page.'),
+        (verification === 'verified' ? `Deadline from the official source: "${doc.get('deadline.sourceText') ?? ''}"` : 'This deadline is not confirmed from a source yet. Check the official page.') +
+        (zone ? `\nTime zone of the deadline: ${zone}` : "\nThe scholarship's time zone is not confirmed; this is the date as written."),
       url: (doc.get('url') as string | null) ?? null,
       due,
-      allDay: doc.get('deadline.allDay') === true,
+      // With a known zone the event is the exact moment, so calendar apps show it in the student's own time.
+      // Without one, it is an all-day event on the date as written.
+      allDay: !zone,
+      date,
     });
   }
   await writeAudit({ actor: { type: 'student', id: req.uid! }, subjectUid: req.uid!, action: 'export.calendar', resource: `users/${req.uid}` });
@@ -45,11 +51,20 @@ exportsRouter.get('/calendar.ics', async (req, res) => {
 exportsRouter.get('/checklist.csv', async (req, res) => {
   const docs = await activeScholarships(req.uid!);
   const rows: unknown[][] = [
-    ['Scholarship', 'Provider', 'Status', 'Deadline (UTC)', 'Deadline badge', 'Requirement', 'Kind', 'Checklist', 'Badge', 'Source quote', 'Page', 'Page URL'],
+    ['Scholarship', 'Provider', 'Status', 'Deadline date', 'Deadline time', "Scholarship's time zone", 'Deadline (UTC)', 'Deadline badge', 'Requirement', 'Kind', 'Checklist', 'Badge', 'Source quote', 'Page', 'Page URL'],
   ];
   for (const doc of docs) {
     const due = (doc.get('deadline.utc') as Timestamp | undefined)?.toDate().toISOString() ?? '';
-    const base = [doc.get('name'), doc.get('provider'), doc.get('status'), due, VERIFICATION_TEXT[String(doc.get('deadline.verification'))] ?? ''];
+    const base = [
+      doc.get('name'),
+      doc.get('provider'),
+      doc.get('status'),
+      doc.get('deadline.date') ?? due.slice(0, 10),
+      doc.get('deadline.time') ?? (due ? 'end of day' : ''),
+      doc.get('deadline.sourceTimezone') ?? (due ? 'not confirmed' : ''),
+      due,
+      VERIFICATION_TEXT[String(doc.get('deadline.verification'))] ?? '',
+    ];
     const reqs = await doc.ref.collection('requirements').where('removedAt', '==', null).get();
     if (reqs.empty) rows.push([...base, '', '', '', '', '', '', doc.get('url') ?? '']);
     for (const r of reqs.docs) {

@@ -58,7 +58,9 @@ describe('reviewSchema', () => {
     expect(reviewSchema.parse({ action: 'confirm' })).toEqual({ action: 'confirm' });
     expect(reviewSchema.parse({ action: 'reject', reason: 'Not for this year' }).action).toBe('reject');
     const corrected = reviewSchema.parse({ action: 'correct', label: 'Essay, 650 words', wordLimit: 650, deadline: { date: '2027-01-15' } });
-    expect(corrected).toMatchObject({ action: 'correct', wordLimit: 650, deadline: { date: '2027-01-15', timezone: 'UTC' } });
+    expect(corrected).toMatchObject({ action: 'correct', wordLimit: 650, deadline: { date: '2027-01-15' } });
+    // No time zone given means "not known", never an assumed UTC.
+    expect((corrected as { deadline: { timezone?: string } }).deadline.timezone).toBeUndefined();
   });
 
   it('rejects an empty correction and unknown fields', async () => {

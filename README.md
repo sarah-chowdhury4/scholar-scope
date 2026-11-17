@@ -279,6 +279,7 @@ All ports listen on `127.0.0.1` only.
 | Process "delete my data" requests | `docker compose run --rm deleter` |
 | Delete one student now | `docker compose run --rm deleter <uid>` |
 | Save accounts and data now (they are also saved on `docker compose stop`) | `docker compose exec firebase firebase emulators:export /data/export --project demo-scholarscope --force` (Git Bash: put `MSYS_NO_PATHCONV=1 ` in front) |
+| Convert deadlines saved before time zones were stored (once; add `-- --apply` to write) | `docker compose exec api npm run migrate:deadlines` |
 | Reset all local data | `docker compose down -v` |
 
 ## Tests

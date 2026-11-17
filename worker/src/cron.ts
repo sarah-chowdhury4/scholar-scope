@@ -6,6 +6,7 @@ import {
   getAppConfig,
   sendMail,
   dueDeadlineAlert,
+  deadlineSentence,
   deadlineDedupeKey,
   log,
   errorMessage,
@@ -90,7 +91,15 @@ export async function runDeadlineAlerts(now = new Date()): Promise<{ sent: numbe
     const alertRef = userRef.collection('alerts').doc(createHash('sha256').update(dedupeKey).digest('hex').slice(0, 32));
     const verification = sch.get('deadline.verification') as string;
     const name = sch.get('name') as string;
-    const when = new Intl.DateTimeFormat('en-US', { dateStyle: 'full', timeZone }).format(deadline);
+    const when = deadlineSentence(
+      {
+        utc: deadline,
+        sourceTimezone: (sch.get('deadline.sourceTimezone') as string | null | undefined) ?? null,
+        date: (sch.get('deadline.date') as string | null | undefined) ?? null,
+        time: (sch.get('deadline.time') as string | null | undefined) ?? null,
+      },
+      timeZone,
+    );
     const caution = verification === 'verified' ? '' : '\n\nThis deadline has not been confirmed from a source document yet. Check the official page.';
     const title = `${name} is due in ${offset} day${offset === 1 ? '' : 's'}`;
     const body = `${name} (${sch.get('provider')}) is due on ${when}.${caution}`;

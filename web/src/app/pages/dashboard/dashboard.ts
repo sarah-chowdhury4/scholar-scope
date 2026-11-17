@@ -1,11 +1,11 @@
 import { Component, OnInit, inject, signal } from '@angular/core';
-import { DatePipe } from '@angular/common';
+import { DeadlineText } from '../../core/deadline-text';
 import { RouterLink } from '@angular/router';
 import { ApiService, type Scholarship } from '../../core/api.service';
 
 @Component({
   selector: 'app-dashboard',
-  imports: [RouterLink, DatePipe],
+  imports: [RouterLink, DeadlineText],
   template: `
     <div class="page-head">
       <div>
@@ -59,7 +59,7 @@ import { ApiService, type Scholarship } from '../../core/api.service';
             <p class="muted">{{ s.provider }}</p>
             @if (s.deadline) {
               <p>
-                Due <strong>{{ s.deadline.utc | date: 'mediumDate' }}</strong>
+                Due <app-deadline [deadline]="s.deadline" [withTime]="false" />
                 <span class="badge" [class]="s.deadline.verification">{{ label(s.deadline.verification) }}</span>
               </p>
             } @else {

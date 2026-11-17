@@ -9,7 +9,8 @@ import {
   geminiModel,
   findQuote,
   quoteHash,
-  parseSourceDeadline,
+  deadlineFromSource,
+  deadlineRecord,
   updateJob,
   enqueueJob,
   log,
@@ -103,12 +104,11 @@ export async function handleExtract(job: JobMessage): Promise<void> {
     if (!citation) stats.unverified++;
 
     const value: Record<string, unknown> = { text: item.label };
-    let deadline: ReturnType<typeof parseSourceDeadline> = null;
+    // The zone is the one the guidelines state; when they state none it stays unknown (never assumed UTC).
+    let deadline: ReturnType<typeof deadlineFromSource> = null;
     if (item.kind === 'deadline' && item.deadlineIso) {
-      deadline = parseSourceDeadline(item.deadlineIso, item.timezone || 'UTC');
-      if (deadline) {
-        value.deadline = { utc: Timestamp.fromDate(deadline.utc), sourceTimezone: item.timezone || 'UTC', sourceText: match?.quote ?? item.quote, allDay: deadline.allDay };
-      }
+      deadline = deadlineFromSource(item.deadlineIso, item.timezone || null);
+      if (deadline) value.deadline = deadlineRecord(deadline, match?.quote ?? item.quote);
     }
     if (item.wordLimit) value.wordLimit = { max: item.wordLimit, unit: 'words' };
     if (item.minGpa) value.minGpa = item.minGpa;
@@ -134,7 +134,7 @@ export async function handleExtract(job: JobMessage): Promise<void> {
       // A cited deadline replaces the student-typed one on the record (FR-1.5, FR-4.2)
       if (deadline && citation) {
         await schRef.update({
-          deadline: { utc: Timestamp.fromDate(deadline.utc), sourceTimezone: item.timezone || 'UTC', sourceText: citation.quote, allDay: deadline.allDay, requirementId: null, verification },
+          deadline: { ...deadlineRecord(deadline, citation.quote), requirementId: null, verification },
         });
       }
     }

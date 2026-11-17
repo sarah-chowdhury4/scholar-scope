@@ -8,7 +8,8 @@
     "start": "tsx src/index.ts",
     "seed": "tsx scripts/seed.ts",
     "seed:catalog": "tsx scripts/seed.ts --catalog-only",
-    "typecheck": "tsc -p tsconfig.json"
+    "typecheck": "tsc -p tsconfig.json",
+    "migrate:deadlines": "tsx scripts/migrate-deadlines.ts"
   },
   "dependencies": {
     "@scholarscope/shared": "*",

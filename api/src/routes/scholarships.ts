@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { FieldValue, Timestamp } from 'firebase-admin/firestore';
-import { db, userDoc, getAppConfig, writeAudit, minGpaFromRequirements } from '@scholarscope/shared';
+import { db, userDoc, getAppConfig, writeAudit, minGpaFromRequirements, deadlineFromParts, deadlineRecord, isTimeZone } from '@scholarscope/shared';
+import { HttpError } from '../http';
 import { createScholarshipSchema, updateScholarshipSchema } from '../validation';
 import { scholarshipDocuments } from '../studentDocuments';
 import { toPlain } from '../serialize';
@@ -17,17 +18,15 @@ export const scholarshipsRouter = Router();
 
 const ZERO_COUNTS = { open: 0, changed: 0, unverified: 0, needsReview: 0, ready: 0, total: 0 };
 
-function toDeadline(input: { date: string; timezone: string } | null | undefined) {
+/** A deadline typed by the student, in the scholarship's time zone (or with the zone unknown). */
+function toDeadline(input: { date: string; time?: string | null; timezone?: string | null } | null | undefined) {
   if (!input) return null;
-  // Date-only values (e.g. from the dataset) are stored as end of day UTC and flagged allDay.
-  return {
-    utc: Timestamp.fromDate(new Date(`${input.date}T23:59:59Z`)),
-    sourceTimezone: input.timezone,
-    sourceText: input.date,
-    allDay: true,
-    requirementId: null,
-    verification: 'unverified', // typed by the student, not yet backed by a source (FR-4.2)
-  };
+  if (input.timezone && !isTimeZone(input.timezone)) throw new HttpError(400, 'Unknown time zone. Use a name like America/New_York.');
+  const parts = deadlineFromParts(input.date, input.time ?? null, input.timezone ?? null);
+  if (!parts) throw new HttpError(400, 'That date is not valid.');
+  const written = input.time ? `${input.date} ${input.time}` : input.date;
+  // Typed by the student, not yet backed by a source (FR-4.2).
+  return { ...deadlineRecord(parts, written), requirementId: null, verification: 'unverified' };
 }
 
 function serialize(id: string, data: FirebaseFirestore.DocumentData) {

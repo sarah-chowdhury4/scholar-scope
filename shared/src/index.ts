@@ -7,6 +7,8 @@ export * from './config';
 export * from './audit';
 export * from './citations';
 export * from './deadlines';
+export * from './deadlineRecord';
+export * from './deadlineMigration';
 export * from './jobs';
 export * from './countries';
 export * from './profile';

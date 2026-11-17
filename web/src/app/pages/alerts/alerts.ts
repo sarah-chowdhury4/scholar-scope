@@ -1,5 +1,6 @@
 import { Component, OnInit, inject, signal } from '@angular/core';
-import { DatePipe } from '@angular/common';
+import { ZonedDatePipe } from '../../core/zoned-date.pipe';
+import { TimeZoneService } from '../../core/time-zone.service';
 import { Router, RouterLink } from '@angular/router';
 import { ApiService, apiMessage, type AlertItem } from '../../core/api.service';
 import { AlertsStore } from '../../core/alerts.store';
@@ -7,7 +8,7 @@ import { AlertsStore } from '../../core/alerts.store';
 /** Deadline reminders and requirement changes (FR-7.1, FR-7.2). Emails go out too, unless turned off in Profile. */
 @Component({
   selector: 'app-alerts',
-  imports: [DatePipe, RouterLink],
+  imports: [ZonedDatePipe, RouterLink],
   template: `
     <div class="page-head">
       <div>
@@ -37,7 +38,7 @@ import { AlertsStore } from '../../core/alerts.store';
               @if (!a.read) {
                 <span class="badge unverified">New</span>
               }
-              <span class="muted small">{{ a.createdAt | date: 'medium' }}</span>
+              <span class="muted small">{{ a.createdAt | zonedDate: tz.zone() }}</span>
             </p>
             <h2>{{ a.title }}</h2>
             <p>{{ a.body }}</p>
@@ -59,6 +60,7 @@ export class AlertsPage implements OnInit {
   private readonly api = inject(ApiService);
   private readonly store = inject(AlertsStore);
   private readonly router = inject(Router);
+  protected readonly tz = inject(TimeZoneService);
   protected readonly items = signal<AlertItem[]>([]);
   protected readonly unread = signal(0);
   protected readonly loading = signal(true);

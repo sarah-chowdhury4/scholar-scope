@@ -4,6 +4,7 @@ import { signal } from '@angular/core';
 import { App } from './app';
 import { AuthService } from './core/auth.service';
 import { AlertsStore } from './core/alerts.store';
+import { ApiService } from './core/api.service';
 
 describe('App', () => {
   beforeEach(async () => {
@@ -13,6 +14,7 @@ describe('App', () => {
         provideRouter([]),
         { provide: AuthService, useValue: { signedIn: signal(false), user: signal(null), signOut: () => Promise.resolve() } },
         { provide: AlertsStore, useValue: { unread: signal(0), refresh: async () => undefined, set: () => undefined } },
+        { provide: ApiService, useValue: { me: async () => ({ timezone: 'UTC', timezoneChosen: false }) } },
       ],
     }).compileComponents();
   });

@@ -1,4 +1,6 @@
 import { FieldValue, Timestamp } from 'firebase-admin/firestore';
+import { deadlineFromParts } from './deadlines';
+import { deadlineRecord } from './deadlineRecord';
 import { db, userDoc } from './firebase';
 import { requirementsFromCatalog, tagsFor, type CatalogEntry } from './catalog';
 
@@ -78,21 +80,16 @@ export async function addFromCatalog(uid: string, catalogId: string, limit: numb
       });
       return { status: 'added', scholarshipId: schRef.id } as const;
     }
+    const catalogDeadline = entry.deadline ? deadlineFromParts(entry.deadline, null, null) : null;
     tx.set(schRef, {
       name: entry.name,
       provider: entry.organization,
       url: entry.sourceUrl,
       catalogId,
       awardAmount: null,
-      deadline: entry.deadline
-        ? {
-            utc: Timestamp.fromDate(new Date(`${entry.deadline}T23:59:59Z`)),
-            sourceTimezone: 'UTC',
-            sourceText: entry.deadline,
-            allDay: true,
-            requirementId: null,
-            verification: 'unverified',
-          }
+      // The dataset gives a date but no time zone: keep the zone unknown rather than guess UTC.
+      deadline: catalogDeadline
+        ? { ...deadlineRecord(catalogDeadline, entry.deadline!), requirementId: null, verification: 'unverified' }
         : null,
       status: 'researching',
       counts: { open: requirements.length, changed: 0, unverified: requirements.length, needsReview: 0, ready: 0, total: requirements.length },

@@ -15,11 +15,15 @@ export const createScholarshipSchema = z.object({
     .object({ amount: z.number().nonnegative().max(10_000_000), currency: z.string().length(3).toUpperCase() })
     .nullable()
     .optional(),
-  /** A deadline typed by the student is stored as "unverified" until a source confirms it. */
+  /**
+   * A deadline typed by the student, stored as "unverified" until a source confirms it.
+   * `timezone` is the SCHOLARSHIP's time zone; leave it out when the student does not know it.
+   */
   deadline: z
     .object({
       date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Use YYYY-MM-DD'),
-      timezone: z.string().min(1).max(64).default('UTC'),
+      time: z.string().regex(/^\d{2}:\d{2}$/, 'Use HH:MM').nullable().optional(),
+      timezone: z.string().min(1).max(64).nullable().optional(),
     })
     .nullable()
     .optional(),
@@ -78,8 +82,8 @@ export const reviewSchema = z.discriminatedUnion('action', [
       deadline: z
         .object({
           date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Use YYYY-MM-DD'),
-          time: z.string().regex(/^\d{2}:\d{2}$/, 'Use HH:MM').optional(),
-          timezone: z.string().min(1).max(64).default('UTC'),
+          time: z.string().regex(/^\d{2}:\d{2}$/, 'Use HH:MM').nullable().optional(),
+          timezone: z.string().min(1).max(64).nullable().optional(),
         })
         .nullable()
         .optional(),

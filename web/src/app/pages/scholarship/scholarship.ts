@@ -1,5 +1,4 @@
 import { Component, OnInit, inject, input, signal } from '@angular/core';
-import { DatePipe } from '@angular/common';
 import { RouterLink } from '@angular/router';
 import {
   ApiService,
@@ -11,13 +10,14 @@ import {
   type SourceSummary,
 } from '../../core/api.service';
 import { DocumentCheckView } from '../documents/document-check';
+import { DeadlineText } from '../../core/deadline-text';
 import { RequirementCard } from './requirement-card';
 import { ChangeReview } from './change-review';
 import { EssayDraft } from './essay-draft';
 
 @Component({
   selector: 'app-scholarship',
-  imports: [RouterLink, DatePipe, DocumentCheckView, RequirementCard, ChangeReview, EssayDraft],
+  imports: [RouterLink, DocumentCheckView, RequirementCard, ChangeReview, EssayDraft, DeadlineText],
   template: `
     <p><a routerLink="/">← All scholarships</a></p>
     @if (data(); as s) {
@@ -25,7 +25,7 @@ import { EssayDraft } from './essay-draft';
       <p class="muted">{{ s.provider }}</p>
       @if (s.deadline) {
         <p>
-          Due <strong>{{ s.deadline.utc | date: 'medium' }}</strong>
+          Due <app-deadline [deadline]="s.deadline" />
           <span class="badge" [class]="s.deadline.verification">{{ label(s.deadline.verification) }}</span>
         </p>
       }

@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { FieldValue, Timestamp } from 'firebase-admin/firestore';
-import { db, userDoc, writeAudit, recomputeCounts, parseSourceDeadline, verificationAfterReview } from '@scholarscope/shared';
+import { db, userDoc, writeAudit, recomputeCounts, deadlineFromParts, deadlineRecord, isTimeZone, verificationAfterReview } from '@scholarscope/shared';
 import { readinessSchema, reviewSchema } from '../validation';
 import { HttpError } from '../http';
 
@@ -103,19 +103,15 @@ requirementsRouter.post('/:rid/review', async (req, res) => {
     if (body.details !== undefined) value.details = body.details || null;
     if (body.wordLimit !== undefined) value.wordLimit = body.wordLimit == null ? null : { max: body.wordLimit, unit: 'words' };
     if (body.minGpa !== undefined) value.minGpa = body.minGpa;
-    let deadline: { utc: Timestamp; sourceTimezone: string; sourceText: string; allDay: boolean } | null | undefined;
+    let deadline: ReturnType<typeof deadlineRecord> | null | undefined;
     if (body.deadline !== undefined) {
       if (body.deadline === null) {
         deadline = null;
       } else {
-        const parsed = parseSourceDeadline(body.deadline.time ? `${body.deadline.date}T${body.deadline.time}` : body.deadline.date, body.deadline.timezone);
-        if (!parsed) throw new HttpError(400, 'That date or time zone is not valid.');
-        deadline = {
-          utc: Timestamp.fromDate(parsed.utc),
-          sourceTimezone: body.deadline.timezone,
-          sourceText: (citation?.quote as string | undefined) ?? body.deadline.date,
-          allDay: parsed.allDay,
-        };
+        if (body.deadline.timezone && !isTimeZone(body.deadline.timezone)) throw new HttpError(400, 'Unknown time zone. Use a name like America/New_York.');
+        const parts = deadlineFromParts(body.deadline.date, body.deadline.time ?? null, body.deadline.timezone ?? null);
+        if (!parts) throw new HttpError(400, 'That date is not valid.');
+        deadline = deadlineRecord(parts, (citation?.quote as string | undefined) ?? body.deadline.date);
       }
       value.deadline = deadline;
     }
