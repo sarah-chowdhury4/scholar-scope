@@ -12,7 +12,13 @@ import { getSecret, sendMail } from '@scholarscope/shared';
 const backend = process.env.MAIL_BACKEND || 'smtp';
 const from = process.env.MAIL_FROM?.trim() || '';
 const fromAddress = (/<(.+)>/.exec(from)?.[1] ?? from).trim().toLowerCase();
-const to = process.argv.slice(2).find((a) => a.includes('@'));
+const args = process.argv.slice(2).filter((a) => a !== '--');
+// Exactly one plain address: a command pasted twice ("...@gmail.comdocker compose exec ...") must not send anywhere.
+if (args.length > 1 || (args[0] && !/^[^\s@]+@[^\s@]+\.[a-z]{2,24}$/i.test(args[0]))) {
+  console.error(`Give one email address, e.g.: npm run mail:test -- you@example.com\nGot: ${args.join(' ')}`);
+  process.exit(1);
+}
+const to = args[0];
 let ok = true;
 const fail = (message: string) => {
   ok = false;
