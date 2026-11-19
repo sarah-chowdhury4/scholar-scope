@@ -267,6 +267,8 @@ Locally every email (confirmation codes, password resets, deadline and change al
 
 **Brevo** (about 300 a day; the sign-up asks for company details): create a free account at brevo.com, verify a sender under **Senders**, create a key under **SMTP & API → API keys**, put it in `.env.secrets` as `BREVO_API_KEY`, and set `MAIL_BACKEND=brevo` and `MAIL_FROM=ScholarScope <the verified address>` in `.env`. Then run the same command as step 5.
 
+**Check it:** `docker compose exec worker npm run mail:test -- you@example.com` checks the settings (for Brevo: the key, and that `MAIL_FROM` is a verified sender), sends one test email, and says exactly what is missing if anything is.
+
 **Done when:** adding an email on your profile says *Code sent* and the code arrives (check spam the first time). If it says *We could not send the email*, `docker compose logs --tail 20 worker` says why (for Gmail, usually a normal password used instead of an app password). Real addresses then get real emails, and the daily limit is shared by everyone using the account or key.
 
 ## Local URLs
