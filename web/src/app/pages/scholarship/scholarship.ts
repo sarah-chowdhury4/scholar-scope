@@ -11,13 +11,14 @@ import {
 } from '../../core/api.service';
 import { DocumentCheckView } from '../documents/document-check';
 import { DeadlineText } from '../../core/deadline-text';
+import { DaysLeft } from '../../core/days-left';
 import { RequirementCard } from './requirement-card';
 import { ChangeReview } from './change-review';
 import { EssayDraft } from './essay-draft';
 
 @Component({
   selector: 'app-scholarship',
-  imports: [RouterLink, DocumentCheckView, RequirementCard, ChangeReview, EssayDraft, DeadlineText],
+  imports: [RouterLink, DocumentCheckView, RequirementCard, ChangeReview, EssayDraft, DeadlineText, DaysLeft],
   template: `
     <p><a routerLink="/">← All scholarships</a></p>
     @if (data(); as s) {
@@ -30,6 +31,7 @@ import { EssayDraft } from './essay-draft';
               <span class="badge" [class]="s.deadline.verification">{{ label(s.deadline.verification, s.deadline.verifiedBy) }}</span>
               Due <app-deadline [deadline]="s.deadline" />
             </p>
+            <p><app-days-left [deadline]="s.deadline" /></p>
           }
         </div>
         <div class="actions sch-actions">

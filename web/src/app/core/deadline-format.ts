@@ -66,3 +66,50 @@ export function formatMoment(value: string | Date | null | undefined, userZone: 
   if (Number.isNaN(moment.getTime())) return '';
   return fmt(moment, userZone, withTime);
 }
+
+export type DaysLeft = {
+  /** Whole calendar days from today to the deadline day, in the student's zone. Negative once it has passed. */
+  days: number;
+  passed: boolean;
+  /** "12 days left", "Due tomorrow", "Due today", "Closed 3 days ago". */
+  text: string;
+  /** "soon" within a week, "urgent" within two days or past. */
+  level: 'ok' | 'soon' | 'urgent' | 'passed';
+};
+
+/** The calendar date ("2026-12-01") of a moment in a time zone. */
+function dayIn(moment: Date, timeZone: string): string {
+  return new Intl.DateTimeFormat('en-CA', { timeZone, year: 'numeric', month: '2-digit', day: '2-digit' }).format(moment);
+}
+
+function dayNumber(isoDate: string): number {
+  return Math.round(Date.parse(`${isoDate}T00:00:00Z`) / 86_400_000);
+}
+
+/**
+ * How many days a student has left, counted in calendar days in their own time zone.
+ * With a known zone the real cut-off decides both the day and whether it has passed. With no known zone
+ * the date as written is used, and it counts as passed only once that date is over for the student.
+ */
+export function daysLeft(d: DeadlineInput, userZone: string, now: Date = new Date()): DaysLeft {
+  const today = dayNumber(dayIn(now, userZone));
+  let due: number;
+  let passed: boolean;
+  if (d.sourceTimezone) {
+    const moment = new Date(d.utc);
+    due = dayNumber(dayIn(moment, userZone));
+    passed = moment.getTime() <= now.getTime();
+  } else {
+    due = dayNumber(d.date ?? d.utc.slice(0, 10));
+    passed = due < today;
+  }
+  const days = due - today;
+  const plural = (n: number) => `${n} day${n === 1 ? '' : 's'}`;
+  if (passed) {
+    const ago = Math.max(0, -days);
+    return { days, passed, text: ago === 0 ? 'Closed today' : `Closed ${plural(ago)} ago`, level: 'passed' };
+  }
+  const text = days <= 0 ? 'Due today' : days === 1 ? 'Due tomorrow' : `${plural(days)} left`;
+  const level = days <= 2 ? 'urgent' : days <= 7 ? 'soon' : 'ok';
+  return { days: Math.max(0, days), passed, text, level };
+}
