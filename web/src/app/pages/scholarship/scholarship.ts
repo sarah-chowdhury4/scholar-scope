@@ -1,4 +1,4 @@
-import { Component, OnInit, inject, input, signal } from '@angular/core';
+import { Component, ElementRef, OnInit, inject, input, signal, viewChild } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import {
   ApiService,
@@ -21,37 +21,53 @@ import { EssayDraft } from './essay-draft';
   template: `
     <p><a routerLink="/">← All scholarships</a></p>
     @if (data(); as s) {
-      <h1>{{ s.name }}</h1>
-      <p class="muted">{{ s.provider }}</p>
-      @if (s.deadline) {
-        <p>
-          Due <app-deadline [deadline]="s.deadline" />
-          <span class="badge" [class]="s.deadline.verification">{{ label(s.deadline.verification, s.deadline.verifiedBy) }}</span>
-        </p>
+      <header class="sch-head">
+        <div>
+          <h1>{{ s.name }}</h1>
+          <p class="muted">{{ s.provider }}</p>
+          @if (s.deadline) {
+            <p>
+              <span class="badge" [class]="s.deadline.verification">{{ label(s.deadline.verification, s.deadline.verifiedBy) }}</span>
+              Due <app-deadline [deadline]="s.deadline" />
+            </p>
+          }
+        </div>
+        <div class="actions sch-actions">
+          @if (s.url) {
+            <a class="button" [href]="s.url" target="_blank" rel="noopener noreferrer">Open scholarship page</a>
+          }
+          <button type="button" class="secondary" (click)="openGuidelines()" aria-haspopup="dialog">
+            Add guidelines{{ sources().length ? ' (' + sources().length + ' saved)' : '' }}
+          </button>
+        </div>
+      </header>
+      @if (status()) {
+        <p class="notice" role="status">{{ status() }}</p>
       }
 
-      <section class="card">
-        <h2>Add the official guidelines</h2>
-        <p class="hint">PDF, Word, image or text file, up to 25 MB. Files are virus-scanned before anything reads them.</p>
-        <label for="file">Choose a file</label>
+      <dialog #guidelines class="sheet" aria-labelledby="glTitle" (close)="guidelinesOpen.set(false)" (click)="closeOnBackdrop($event)">
+        <div class="sheet-head">
+          <h2 id="glTitle">Add guidelines</h2>
+          <button type="button" class="link" (click)="guidelines.close()" aria-label="Close">✕</button>
+        </div>
+        <p class="hint">Requirements are read from what you add here and quoted back to you. Files are virus-scanned before anything reads them.</p>
+        <label for="file">Upload a file</label>
+        <p class="hint">PDF, Word, image or text file, up to 25 MB.</p>
         <input id="file" type="file" accept=".pdf,.docx,.txt,.png,.jpg,.jpeg" (change)="upload($event)" [disabled]="busy()" />
         <form class="url-form" (submit)="addUrl($event)">
-          <label for="page-url">Or paste the scholarship's web page</label>
-          <p class="hint">We save a copy, read the requirements from it, and re-check the page every day for changes. Sites that ask robots to stay away are skipped.</p>
+          <label for="page-url">Or save the scholarship's web page</label>
+          <p class="hint">We keep a copy and re-check it every day for changes. Sites that ask robots to stay away are skipped.</p>
           <div class="actions">
             <input id="page-url" name="url" type="url" placeholder="https://…" [value]="s.url ?? ''" required [disabled]="busy()" />
             <button type="submit" [disabled]="busy()">Save page</button>
           </div>
         </form>
-        @if (status()) {
-          <p role="status">{{ status() }}</p>
-        }
         @if (sources().length) {
-          <h3>Sources</h3>
+          <h3>Saved so far</h3>
           @for (src of sources(); track src.id) {
             <div class="email-row">
               <div>
-                <strong>{{ src.kind === 'url' ? 'Web page' : 'File' }}:</strong> {{ src.title }}
+                <strong>{{ src.kind === 'url' ? 'Web page' : 'File' }}:</strong> <span class="src-title">{{ src.title }}</span>
                 <p class="muted small">{{ sourceNote(src) }}</p>
               </div>
               @if (src.currentVersionId) {
@@ -60,7 +76,7 @@ import { EssayDraft } from './essay-draft';
             </div>
           }
         }
-      </section>
+      </dialog>
 
       <section class="card">
         <h2>Your documents for this application</h2>
@@ -118,7 +134,7 @@ import { EssayDraft } from './essay-draft';
 
       <h2>Requirements</h2>
       @if (requirements().length === 0) {
-        <p class="card">No requirements yet. Upload the guidelines to extract them.</p>
+        <p class="card">No requirements yet. Use <strong>Add guidelines</strong> to read them from the official page or a file.</p>
       }
       <ul class="cards">
         @for (r of requirements(); track r.id) {
@@ -147,6 +163,18 @@ import { EssayDraft } from './essay-draft';
       <p>Loading…</p>
     }
   `,
+  styles: `
+    .sch-head { display: flex; flex-wrap: wrap; gap: 12px 24px; align-items: flex-start; justify-content: space-between; margin-bottom: 8px; }
+    .sch-head h1 { margin-bottom: 4px; }
+    .sch-head p { margin: 2px 0; }
+    .sch-actions { flex-wrap: wrap; }
+    .sheet { border: none; border-radius: var(--radius); padding: 24px 28px; width: min(640px, calc(100vw - 32px)); max-height: calc(100vh - 48px); background: var(--surface); color: var(--ink); }
+    .sheet::backdrop { background: rgba(29, 58, 43, 0.35); }
+    .sheet-head { display: flex; justify-content: space-between; align-items: center; gap: 12px; }
+    .sheet-head h2 { margin: 0; }
+    .src-title { overflow-wrap: anywhere; }
+    @media (max-width: 520px) { .sheet { padding: 18px; } }
+  `,
 })
 export class ScholarshipPage implements OnInit {
   /** Route parameter (component input binding). */
@@ -158,6 +186,23 @@ export class ScholarshipPage implements OnInit {
   protected readonly status = signal('');
   protected readonly removed = signal<RemovedRequirement[] | null>(null);
   protected readonly sources = signal<SourceSummary[]>([]);
+  protected readonly guidelinesOpen = signal(false);
+  private readonly guidelines = viewChild<ElementRef<HTMLDialogElement>>('guidelines');
+
+  /** A native modal dialog: keeps focus inside, closes on Escape, and returns focus to the button. */
+  openGuidelines() {
+    this.guidelines()?.nativeElement.showModal();
+    this.guidelinesOpen.set(true);
+  }
+
+  closeOnBackdrop(event: MouseEvent) {
+    if (event.target === this.guidelines()?.nativeElement) this.guidelines()?.nativeElement.close();
+  }
+
+  /** Close the dialog once work starts so the progress message on the page is visible. */
+  private closeGuidelines() {
+    this.guidelines()?.nativeElement.close();
+  }
 
   async ngOnInit() {
     await this.load();
@@ -201,6 +246,7 @@ export class ScholarshipPage implements OnInit {
       return;
     }
     this.busy.set(true);
+    this.closeGuidelines();
     this.status.set('Fetching the page…');
     try {
       const { jobId } = await this.api.addSourceUrl(this.id(), url);
@@ -269,6 +315,7 @@ export class ScholarshipPage implements OnInit {
     const file = (event.target as HTMLInputElement).files?.[0];
     if (!file) return;
     this.busy.set(true);
+    this.closeGuidelines();
     this.status.set('Uploading…');
     try {
       const jobId = await this.api.uploadSource(this.id(), file);
