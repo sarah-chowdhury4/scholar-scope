@@ -7,6 +7,7 @@ import { handleCheckDocument } from './checkDocument';
 import { handleDiff } from './diff';
 import { handleDraft } from './draft';
 import { handleSendEmail } from './sendEmail';
+import { handleSearchSources } from './searchSources';
 
 type Handler = (job: JobMessage) => Promise<void>;
 
@@ -22,6 +23,7 @@ const HANDLERS: Partial<Record<JobType, Handler>> = {
   diff: handleDiff,
   draft: handleDraft,
   send_email: handleSendEmail,
+  search_sources: handleSearchSources,
 };
 
 const MAX_ATTEMPTS = 3;
@@ -61,6 +63,9 @@ async function markGivenUp(job: JobMessage, error: string): Promise<void> {
       const outbox = db().doc(job.target);
       await setDeliveryStatus(job.uid, (await outbox.get()).get('statusField'), 'failed');
       await outbox.delete(); // it holds a one-time code: do not keep it
+    }
+    if (job.type === 'search_sources') {
+      await db().doc(job.target).set({ search: { status: 'failed', error: 'The search could not finish.', jobId: job.jobId, at: FieldValue.serverTimestamp() } }, { merge: true });
     }
     if (job.type === 'draft') {
       await db().doc(job.target).set({ status: 'failed', error: 'The draft could not be written. Try again later.' }, { merge: true });

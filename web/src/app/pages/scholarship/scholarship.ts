@@ -53,6 +53,11 @@ import { EssayDraft } from './essay-draft';
           <button type="button" class="link" (click)="guidelines.close()" aria-label="Close">✕</button>
         </div>
         <p class="hint">Requirements are read from what you add here and quoted back to you. Files are virus-scanned before anything reads them.</p>
+        <p class="hint">
+          When you save a page, we also read the pages it links to on the same site that look like its rules, such as
+          eligibility, FAQ or the guidelines PDF. If that still gives only a few requirements, we search the web once for
+          the official pages. Every requirement shows the page it was quoted from.
+        </p>
         <label for="file">Upload a file</label>
         <p class="hint">PDF, Word, image or text file, up to 25 MB.</p>
         <input id="file" type="file" accept=".pdf,.docx,.txt,.png,.jpg,.jpeg" (change)="upload($event)" [disabled]="busy()" />
@@ -64,12 +69,18 @@ import { EssayDraft } from './essay-draft';
             <button type="submit" [disabled]="busy()">Save page</button>
           </div>
         </form>
+        @if (s.search; as search) {
+          <p class="muted small" role="status">{{ searchNote(search) }}</p>
+        }
         @if (sources().length) {
           <h3>Saved so far</h3>
           @for (src of sources(); track src.id) {
             <div class="email-row">
               <div>
-                <strong>{{ src.kind === 'url' ? 'Web page' : 'File' }}:</strong> <span class="src-title">{{ src.title }}</span>
+                <strong>{{ sourceKind(src) + ': ' }}</strong><span class="src-title">{{ src.title }}</span>
+                @if (src.url && src.origin && src.origin !== 'student') {
+                  <a class="small" [href]="src.url" target="_blank" rel="noopener noreferrer">Visit</a>
+                }
                 <p class="muted small">{{ sourceNote(src) }}</p>
               </div>
               @if (src.currentVersionId) {
@@ -224,6 +235,22 @@ export class ScholarshipPage implements OnInit {
     } catch {
       this.sources.set([]);
     }
+  }
+
+  sourceKind(src: SourceSummary): string {
+    if (src.kind !== 'url') return 'File';
+    if (src.origin === 'linked') return 'Linked page';
+    if (src.origin === 'search') return 'Found by search';
+    return 'Web page';
+  }
+
+  searchNote(search: NonNullable<Scholarship['search']>): string {
+    if (search.status === 'queued') return 'Few requirements so far: searching the web for the official pages…';
+    if (search.status === 'paused') return 'The web search is paused (daily AI limit). Add the guidelines yourself in the meantime.';
+    if (search.status === 'failed') return 'The web search could not finish. Add the guidelines yourself.';
+    const n = search.pagesFound ?? 0;
+    if (!n) return 'We searched the web for more official pages but found none we could trust. Add the guidelines file if you have it.';
+    return `We searched the web and added ${n} official page${n === 1 ? '' : 's'}.`;
   }
 
   sourceNote(src: SourceSummary): string {

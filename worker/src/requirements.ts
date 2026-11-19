@@ -19,6 +19,8 @@ export type NewRequirementVersion = {
   citation: Citation | null;
   verification: Verification;
   origin: 'extraction' | 'refetch';
+  /** Where the source came from. Pages we found only add rules; they never overrule a rule from another source. */
+  sourceOrigin?: 'student' | 'linked' | 'search';
   extraction: { model: string; promptVersion: string; confidence: number; jobId: string; ocrDerived: boolean };
   createdBy: Actor;
 };
@@ -42,6 +44,12 @@ export async function upsertRequirement(scholarshipRef: DocumentReference, item:
     const newHash = item.citation?.quoteHash ?? null;
 
     if (current && prevHash && prevHash === newHash) return { outcome: 'unchanged', requirementId: reqRef.id, changeId: null };
+    // The same rule worded differently on a page we found (an FAQ, a search result) is not a change: the
+    // existing source keeps the rule, so two pages never flag each other back and forth.
+    const prevCitation = current?.get('current.citation') as { sourceId?: string } | null | undefined;
+    if (current && prevCitation && item.sourceOrigin && item.sourceOrigin !== 'student' && prevCitation.sourceId !== item.citation?.sourceId) {
+      return { outcome: 'unchanged', requirementId: reqRef.id, changeId: null };
+    }
 
     const versionNo = ((current?.get('currentVersionNo') as number | undefined) ?? 0) + 1;
     const verRef = reqRef.collection('versions').doc();

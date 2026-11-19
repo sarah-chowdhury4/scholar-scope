@@ -5,7 +5,22 @@ import robotsParser from 'robots-parser';
 import { assertPublicUrl, safeFetch } from '../net/safeFetch';
 import { markdownToText, readerEnabled, readWithJina } from '../net/jinaReader';
 import { extractText } from '../text/extractText';
-import { db, userDoc, storage, buckets, enqueueJob, updateJob, normalizeQuote, getAppConfig, log, type JobMessage } from '@scholarscope/shared';
+import {
+  db,
+  userDoc,
+  storage,
+  buckets,
+  enqueueJob,
+  updateJob,
+  normalizeQuote,
+  getAppConfig,
+  log,
+  linksFromHtml,
+  linksFromMarkdown,
+  type JobMessage,
+  type PageLink,
+} from '@scholarscope/shared';
+import { maybeSearch, syncRelatedPages } from '../discovery';
 
 const BOT_NAME = 'ScholarScopeBot';
 const USER_AGENT = `${BOT_NAME}/0.1 (student scholarship tracker; checks pages the student saved)`;
@@ -19,6 +34,8 @@ const DAY_MS = 24 * 60 * 60 * 1000;
  * Unchanged text (same hash) costs nothing; changed text becomes a new immutable source version
  * and is re-extracted, which versions and flags any changed requirement.
  * A failed fetch is shown, never hidden (NFR-4.4).
+ * A page the student saved also has its rule pages on the same site read (eligibility, FAQ, guidelines PDF);
+ * those "discovered" pages are not followed further and never change the scholarship's re-check status.
  * target = users/{uid}/sources/{sourceId}
  */
 export async function handleFetchUrl(job: JobMessage): Promise<void> {
@@ -27,9 +44,12 @@ export async function handleFetchUrl(job: JobMessage): Promise<void> {
   const url = source.get('url') as string | undefined;
   if (!source.exists || !url) throw new Error(`Missing URL source ${job.target}`);
   const scholarshipIds = (source.get('scholarshipIds') as string[] | undefined) ?? [];
+  // Pages found for the student (linked or by search) never speak for the scholarship's own page.
+  const discovered = Boolean(source.get('origin')) && source.get('origin') !== 'student';
   await updateJob(job.uid, job.jobId, { status: 'running', progress: 10 });
 
   const markScholarships = async (fields: Record<string, unknown>) => {
+    if (discovered) return;
     for (const sid of scholarshipIds) {
       await userDoc(job.uid).collection('scholarships').doc(sid).set({ recheck: fields }, { merge: true });
     }
@@ -49,6 +69,7 @@ export async function handleFetchUrl(job: JobMessage): Promise<void> {
     await markScholarships({ status: 'robots_blocked', lastCheckedAt: Timestamp.now(), enabled: false });
     await updateJob(job.uid, job.jobId, { status: 'failed', error: 'robots_blocked' });
     log.warn('recheck_failed', { target: job.target, reason: 'robots_blocked' });
+    await maybeSearch(job.uid, scholarshipIds);
     return;
   }
 
@@ -58,6 +79,7 @@ export async function handleFetchUrl(job: JobMessage): Promise<void> {
   let reader: 'jina' | 'direct' = 'direct';
   let pageTitle: string | null = null;
   let httpStatus = 0;
+  let links: PageLink[] = [];
   try {
     await assertPublicUrl(url); // never hand an internal address to anyone, Jina included
     const page = readerEnabled() ? await readWithJina(url) : null;
@@ -67,6 +89,7 @@ export async function handleFetchUrl(job: JobMessage): Promise<void> {
       pageTitle = page.title;
       text = markdownToText(page.markdown);
       raw = { name: 'page.md', body: Buffer.from(page.markdown, 'utf8'), mime: 'text/markdown' };
+      links = linksFromMarkdown(page.markdown, url);
     } else {
       const res = await safeFetch(url, { headers: { 'User-Agent': USER_AGENT }, signal: AbortSignal.timeout(20_000) });
       httpStatus = res.status;
@@ -81,6 +104,7 @@ export async function handleFetchUrl(job: JobMessage): Promise<void> {
         raw = { name: 'page.pdf', body, mime: 'application/pdf' };
       } else {
         const html = body.toString('utf8');
+        links = linksFromHtml(html, res.url || url);
         text = convert(html, { wordwrap: false, selectors: [{ selector: 'a', options: { ignoreHref: true } }, { selector: 'img', format: 'skip' }] });
         raw = { name: 'page.html', body, mime: 'text/html' };
       }
@@ -92,6 +116,7 @@ export async function handleFetchUrl(job: JobMessage): Promise<void> {
     await markScholarships({ status: 'unreachable', lastCheckedAt: Timestamp.now(), consecutiveFailures: failures, nextCheckAt: Timestamp.fromMillis(Date.now() + DAY_MS) });
     await updateJob(job.uid, job.jobId, { status: 'failed', error: 'unreachable' });
     log.warn('recheck_failed', { target: job.target, httpStatus });
+    await maybeSearch(job.uid, scholarshipIds);
     return;
   }
 
@@ -103,10 +128,13 @@ export async function handleFetchUrl(job: JobMessage): Promise<void> {
     ...(pageTitle && source.get('title') === url ? { title: pageTitle.slice(0, 200) } : {}),
   });
   await markScholarships({ status: 'ok', lastCheckedAt: now, lastVerifiedAt: now, consecutiveFailures: 0, nextCheckAt: Timestamp.fromMillis(Date.now() + DAY_MS) });
+  // One level deep: only the student's own pages have their links followed.
+  if (!discovered) await syncRelatedPages(job.uid, source, links, scholarshipIds);
 
   if (source.get('lastTextHash') === textHash) {
     await updateJob(job.uid, job.jobId, { status: 'done', progress: 100 });
     log.info('recheck_unchanged', { target: job.target });
+    await maybeSearch(job.uid, scholarshipIds);
     return;
   }
 

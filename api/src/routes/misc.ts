@@ -32,6 +32,8 @@ sourcesRouter.get('/', async (req, res) => {
         kind: doc.get('kind') as 'upload' | 'url',
         title: (doc.get('title') as string | undefined) ?? 'Source',
         url: (doc.get('url') as string | null) ?? null,
+        // "linked": read from a link on the student's page; "search": found by the web search.
+        origin: ((doc.get('origin') as string | undefined) ?? 'student') as 'student' | 'linked' | 'search',
         currentVersionId: versionId,
         robotsAllowed: doc.get('robots.allowed') ?? null,
         lastFetch: doc.get('lastFetch')

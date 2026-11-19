@@ -54,6 +54,7 @@ export type JobType =
   | 'scan'
   | 'extract'
   | 'fetch_url'
+  | 'search_sources'
   | 'check_document'
   | 'send_email'
   | 'classify'

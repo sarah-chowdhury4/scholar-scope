@@ -36,6 +36,8 @@ export type Scholarship = {
   counts: { open: number; changed: number; unverified: number; needsReview: number; ready: number; total: number };
   readinessPct: number;
   recheck?: { status: string; lastVerifiedAt?: { _seconds: number } | null };
+  /** The one-time web search for official pages, when the saved pages gave few requirements. */
+  search?: { status: 'queued' | 'done' | 'paused' | 'failed'; pagesFound?: number; officialSite?: string | null } | null;
 };
 
 export type StudentDocument = {
@@ -114,6 +116,8 @@ export type SourceSummary = {
   kind: 'upload' | 'url';
   title: string;
   url: string | null;
+  /** "linked": read from a link on a page the student saved; "search": found by the web search. */
+  origin?: 'student' | 'linked' | 'search';
   currentVersionId: string | null;
   robotsAllowed: boolean | null;
   lastFetch: { ok: boolean; at: string | null } | null;

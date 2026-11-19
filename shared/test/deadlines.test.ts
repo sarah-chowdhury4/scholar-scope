@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { daysUntil, dueDeadlineAlert, deadlineDedupeKey, parseSourceDeadline, timeZoneOffsetMinutes } from '../src/deadlines';
+import { daysUntil, dueDeadlineAlert, deadlineDedupeKey, parseSourceDeadline, timeZoneOffsetMinutes, deadlineFromSource, isApplicationDeadline, pickApplicationDeadline } from '../src/deadlines';
 
 describe('daysUntil / dueDeadlineAlert', () => {
   const offsets = [14, 7, 3, 1];
@@ -43,5 +43,26 @@ describe('parseSourceDeadline', () => {
   });
   it('reads zone offsets', () => {
     expect(timeZoneOffsetMinutes(new Date('2026-01-15T12:00:00Z'), 'Asia/Dhaka')).toBe(360);
+  });
+});
+
+describe('application deadline choice', () => {
+  const at = (label: string, iso: string) => ({ label, deadline: deadlineFromSource(iso, 'America/New_York')! });
+
+  it('tells the application deadline apart from other dates on the page', () => {
+    expect(isApplicationDeadline('Application Deadline')).toBe(true);
+    expect(isApplicationDeadline('Applications close')).toBe(true);
+    expect(isApplicationDeadline('Essay due')).toBe(true);
+    expect(isApplicationDeadline('Finalist College Choice & Award Letter Due')).toBe(false);
+    expect(isApplicationDeadline('Interview day')).toBe(false);
+    expect(isApplicationDeadline('Results announced')).toBe(false);
+    expect(isApplicationDeadline('Application opens')).toBe(false);
+  });
+
+  it('picks the next application deadline still ahead, or the last one once all have passed', () => {
+    const items = [at('Finalist award letter due', '2027-05-06'), at('Round 2 application deadline', '2027-02-01'), at('Round 1 application deadline', '2026-10-01')];
+    expect(pickApplicationDeadline(items, new Date('2026-11-20T00:00:00Z'))?.label).toBe('Round 2 application deadline');
+    expect(pickApplicationDeadline(items, new Date('2027-03-01T00:00:00Z'))?.label).toBe('Round 2 application deadline');
+    expect(pickApplicationDeadline([at('Finalist award letter due', '2027-05-06')])).toBeNull();
   });
 });

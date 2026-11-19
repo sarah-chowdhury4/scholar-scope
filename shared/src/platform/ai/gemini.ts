@@ -100,6 +100,44 @@ export async function generateJson<T>(options: {
   };
 }
 
+export type SearchResult = { url: string; title: string | null };
+
+/**
+ * One Google-grounded Gemini answer ("Grounding with Google Search"). Returns the answer text and the web pages
+ * Google's search used. Those addresses are usually Google redirect links; the caller resolves them.
+ * Structured JSON output can't be combined with the search tool, so the answer is plain text.
+ */
+export async function geminiSearch(system: string, prompt: string): Promise<{ text: string; results: SearchResult[]; inputTokens?: number; outputTokens?: number }> {
+  const ai = await gemini();
+  const response = await withBusyRetry(() =>
+    ai.models.generateContent({
+      model: geminiModel(),
+      contents: [{ role: 'user', parts: [{ text: prompt }] }],
+      config: {
+        systemInstruction: system,
+        temperature: 0,
+        tools: [{ googleSearch: {} }],
+        abortSignal: AbortSignal.timeout(GEMINI_TIMEOUT_MS),
+      },
+    }),
+  );
+  const chunks = response.candidates?.[0]?.groundingMetadata?.groundingChunks ?? [];
+  const seen = new Set<string>();
+  const results: SearchResult[] = [];
+  for (const chunk of chunks) {
+    const url = chunk.web?.uri;
+    if (!url || seen.has(url)) continue;
+    seen.add(url);
+    results.push({ url, title: chunk.web?.title ?? null });
+  }
+  return {
+    text: response.text ?? '',
+    results,
+    inputTokens: response.usageMetadata?.promptTokenCount,
+    outputTokens: response.usageMetadata?.candidatesTokenCount,
+  };
+}
+
 /** Plain-text answer (used for NIM chat calls when NIM_ENABLED=false). */
 export async function geminiText(system: string, user: string, maxOutputTokens = 400): Promise<string> {
   const ai = await gemini();

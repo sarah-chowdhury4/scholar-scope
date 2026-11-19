@@ -10,6 +10,7 @@ import {
   findQuote,
   quoteHash,
   deadlineFromSource,
+  pickApplicationDeadline,
   deadlineRecord,
   syncAutoReadiness,
   updateJob,
@@ -17,13 +18,15 @@ import {
   log,
   type Citation,
   type JobMessage,
+  type SourceOrigin,
   type Verification,
 } from '@scholarscope/shared';
 import { extractText } from '../text/extractText';
-import { EXTRACT_PROMPT_VERSION, EXTRACT_SCHEMA, EXTRACT_SYSTEM, EXTRACT_TASK, type ExtractedItem } from '../prompts/extract';
+import { EXTRACT_PROMPT_VERSION, EXTRACT_SCHEMA, EXTRACT_SYSTEM, EXTRACT_TASK, forScholarship, type ExtractedItem } from '../prompts/extract';
 import { recomputeCounts, upsertRequirement } from '../requirements';
 import { consumePages, recordTokens } from '../usage';
 import { createChangeAlert } from '../alerts';
+import { maybeSearch } from '../discovery';
 
 /**
  * Extract requirements from one stored source version (FR-2.2–2.4, FR-2.6).
@@ -70,9 +73,17 @@ export async function handleExtract(job: JobMessage): Promise<void> {
 
   // 3. Ask Gemini (document text is data only)
   const documentText = text.pages.map((p) => `[Page ${p.page ?? 1}]\n${p.text}`).join('\n\n');
+  const scholarshipIds = (source.get('scholarshipIds') as string[] | undefined) ?? [];
+  const origin = (source.get('origin') as SourceOrigin | undefined) ?? 'student';
+  let task = EXTRACT_TASK;
+  if (origin !== 'student' && scholarshipIds[0]) {
+    // A page we found (linked or by search) may cover other programmes too: keep to this scholarship.
+    const sch = await userDoc(job.uid).collection('scholarships').doc(scholarshipIds[0]).get();
+    task += forScholarship(String(sch.get('name') ?? ''), String(sch.get('provider') ?? ''));
+  }
   const { data: result, inputTokens, outputTokens } = await generateJson<{ items: ExtractedItem[] }>({
     system: EXTRACT_SYSTEM,
-    task: EXTRACT_TASK,
+    task,
     documentText,
     schema: EXTRACT_SCHEMA,
   });
@@ -80,8 +91,8 @@ export async function handleExtract(job: JobMessage): Promise<void> {
   await updateJob(job.uid, job.jobId, { progress: 75 });
 
   // 4. Verify each quote against the stored text, then version the requirements
-  const scholarshipIds = (source.get('scholarshipIds') as string[] | undefined) ?? [];
   const stats = { created: 0, changed: 0, unchanged: 0, unverified: 0 };
+  const datedItems: { label: string; deadline: NonNullable<ReturnType<typeof deadlineFromSource>>; citation: Citation; verification: Verification }[] = [];
   for (const item of result.items ?? []) {
     const match = findQuote(text.pages, item.quote);
     const citation: Citation | null = match
@@ -123,6 +134,7 @@ export async function handleExtract(job: JobMessage): Promise<void> {
         citation,
         verification,
         origin: source.get('kind') === 'url' ? 'refetch' : 'extraction',
+        sourceOrigin: origin,
         extraction: { model: geminiModel(), promptVersion: EXTRACT_PROMPT_VERSION, confidence: item.confidence, jobId: job.jobId, ocrDerived: text.ocrUsed },
         createdBy: { type: 'ai', id: geminiModel() },
       });
@@ -131,13 +143,24 @@ export async function handleExtract(job: JobMessage): Promise<void> {
         await createChangeAlert(job.uid, schRef, changeId, item.label);
         await enqueueJob(job.uid, 'diff', schRef.collection('changes').doc(changeId).path);
       }
+    }
+    if (deadline && citation) datedItems.push({ label: item.label, deadline, citation, verification });
+  }
 
-      // A cited deadline replaces the student-typed one on the record (FR-1.5, FR-4.2)
-      if (deadline && citation) {
-        await schRef.update({
-          deadline: { ...deadlineRecord(deadline, citation.quote), requirementId: null, verification },
-        });
+  // A cited application deadline replaces the student-typed one on the record (FR-1.5, FR-4.2). Other dates on
+  // the page (finalist steps, award letters, results) stay as requirements but never become "the" deadline.
+  // Pages we found ourselves only fill in a deadline that no source has given yet.
+  const appDeadline = pickApplicationDeadline(datedItems);
+  if (appDeadline) {
+    for (const sid of scholarshipIds) {
+      const schRef = userDoc(job.uid).collection('scholarships').doc(sid);
+      if (origin !== 'student') {
+        const current = (await schRef.get()).get('deadline');
+        if (current && current.verification && current.verification !== 'unverified') continue;
       }
+      await schRef.update({
+        deadline: { ...deadlineRecord(appDeadline.deadline, appDeadline.citation.quote), requirementId: null, verification: appDeadline.verification },
+      });
     }
   }
 
@@ -149,6 +172,8 @@ export async function handleExtract(job: JobMessage): Promise<void> {
     extraction: { status: 'done', jobId: job.jobId, itemsFound: result.items?.length ?? 0, ...stats, finishedAt: FieldValue.serverTimestamp() },
   });
   await updateJob(job.uid, job.jobId, { status: 'done', progress: 100 });
+  // Every page read and still few requirements: look for the official pages on the web (once).
+  await maybeSearch(job.uid, scholarshipIds);
   log.info('extraction_done', { target: job.target, ...stats, ocr: text.ocrUsed, pages: text.pageCount });
 }
 

@@ -30,6 +30,7 @@ export function queue(): Promise<Queue> {
 export const QUEUE_FOR_JOB: Record<JobMessage['type'], QueueName> = {
   scan: 'default',
   fetch_url: 'default',
+  search_sources: 'gemini',
   alert_email: 'default',
   extract: 'gemini',
   diff: 'gemini',

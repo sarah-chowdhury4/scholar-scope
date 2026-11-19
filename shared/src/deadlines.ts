@@ -169,3 +169,24 @@ export function deadlineSentence(
   const place = (d.sourceTimezone.split('/').pop() ?? d.sourceTimezone).replace(/_/g, ' ');
   return `${mine} (your time); that is ${theirs} in ${place}`;
 }
+
+/**
+ * Whether an extracted deadline is the application deadline (the one the scholarship's date should show),
+ * rather than another date on the page: finalist steps, interviews, award letters, results, info sessions.
+ */
+export function isApplicationDeadline(label: string): boolean {
+  const text = label.toLowerCase();
+  if (/finalist|semi-?final|interview|award letter|notif|announce|result|decision|selection|winner|recipient|webinar|info(rmation)? session|opens?\b|open date|start|orientation|disburse|enrol|college choice|acceptance|confirm/.test(text)) {
+    return false;
+  }
+  return /application|apply|submi|due|deadline|closes?|closing/.test(text);
+}
+
+/**
+ * Pick the scholarship's deadline from the dates read off a page: application deadlines only, the next one
+ * still ahead (a page may list rounds), or the last one when all have passed.
+ */
+export function pickApplicationDeadline<T extends { label: string; deadline: DeadlineParts }>(items: T[], now = new Date()): T | null {
+  const candidates = items.filter((i) => isApplicationDeadline(i.label)).sort((a, b) => a.deadline.utc.getTime() - b.deadline.utc.getTime());
+  return candidates.find((i) => i.deadline.utc.getTime() >= now.getTime()) ?? candidates[candidates.length - 1] ?? null;
+}
