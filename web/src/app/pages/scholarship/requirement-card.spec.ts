@@ -1,5 +1,6 @@
 import { Component, signal } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
+import { provideRouter } from '@angular/router';
 import { RequirementCard } from './requirement-card';
 import { ApiService, type Requirement } from '../../core/api.service';
 
@@ -64,5 +65,31 @@ describe('RequirementCard', () => {
     fixture.detectChanges();
     const box = (fixture.nativeElement as HTMLElement).querySelector('input[type=checkbox]') as HTMLInputElement;
     expect(box.disabled).toBe(true);
+  });
+
+  it('shows the result from the transcript instead of a tick box, without repeating the label', async () => {
+    await TestBed.configureTestingModule({ imports: [Host], providers: [{ provide: ApiService, useValue: {} }, provideRouter([])] }).compileComponents();
+    const fixture = TestBed.createComponent(Host);
+    fixture.componentInstance.req.set({
+      ...essay,
+      kind: 'eligibility',
+      label: 'Minimum GPA 3.20',
+      verification: 'unverified',
+      current: { value: { minGpa: 3.2 }, citation: null },
+      assessment: {
+        status: 'met',
+        message: 'You meet this: your high school transcript shows a GPA of 3.62.',
+        quote: 'Cumulative GPA: 3.62 / 4.00',
+        page: 1,
+        documentTitle: 'High school transcript',
+      },
+    });
+    fixture.detectChanges();
+    const el = fixture.nativeElement as HTMLElement;
+    expect(el.querySelector('input[type=checkbox]')).toBeNull();
+    expect(el.textContent).toContain('Met. You meet this');
+    expect(el.textContent).toContain('From your high school transcript: “Cumulative GPA: 3.62 / 4.00” (page 1)');
+    expect(el.textContent).not.toContain('Minimum GPA 3.2 ');
+    expect(el.textContent).toContain('Is this rule right?');
   });
 });

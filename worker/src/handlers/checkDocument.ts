@@ -6,6 +6,7 @@ import {
   getAppConfig,
   generateJson,
   isQuotaError,
+  syncAutoReadiness,
   geminiModel,
   findQuote,
   readProfileRecord,
@@ -117,6 +118,8 @@ export async function handleCheckDocument(job: JobMessage): Promise<void> {
     ocrUsed: text.ocrUsed,
     checkedAt: FieldValue.serverTimestamp(),
   });
+  // Scholarships that ask for this kind of file, or a minimum GPA, are judged again from the new result.
+  await syncAutoReadiness(job.uid);
   await updateJob(job.uid, job.jobId, { status: 'done', progress: 100 });
   log.info('document_checked', { target: job.target, severity: worstSeverity(findings), findings: findings.length, ocr: text.ocrUsed });
 }

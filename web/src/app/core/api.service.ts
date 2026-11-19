@@ -80,6 +80,16 @@ export type Requirement = {
   current: { value: Record<string, unknown>; citation: Citation | null };
   review?: { status: 'confirmed' | 'corrected' | 'rejected' | 'restored'; at: string | null } | null;
   currentVersionNo?: number;
+  /** Set when the platform judges this requirement from the student's checked documents (GPA, required files). */
+  assessment?: RequirementAssessment | null;
+};
+
+export type RequirementAssessment = {
+  status: 'met' | 'not_met' | 'check' | 'missing';
+  message: string;
+  quote: string | null;
+  page: number | null;
+  documentTitle: string | null;
 };
 
 export type RequirementVersion = {

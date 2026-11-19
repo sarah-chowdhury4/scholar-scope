@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { db, userDoc, writeAudit, storage, buckets, isStudentDocumentType, enqueueJob } from '@scholarscope/shared';
+import { db, userDoc, writeAudit, storage, buckets, isStudentDocumentType, enqueueJob, syncAutoReadiness } from '@scholarscope/shared';
 import { documentLinksSchema } from '../validation';
 import { isStaleCheck, listStudentDocuments } from '../studentDocuments';
 import { FieldValue } from 'firebase-admin/firestore';
@@ -72,6 +72,7 @@ documentsRouter.delete('/:id', async (req, res) => {
   const snap = await ref.get();
   if (!snap.exists) return res.status(404).json({ error: 'Document not found' });
   await db().recursiveDelete(ref);
+  await syncAutoReadiness(req.uid!); // requirements that relied on this file are judged again
   await writeAudit({
     actor: { type: 'student', id: req.uid! },
     subjectUid: req.uid!,

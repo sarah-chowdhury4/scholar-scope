@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { FieldValue, Timestamp } from 'firebase-admin/firestore';
-import { db, userDoc, writeAudit, recomputeCounts, deadlineFromParts, deadlineRecord, isTimeZone, verificationAfterReview } from '@scholarscope/shared';
+import { db, userDoc, writeAudit, recomputeCounts, deadlineFromParts, deadlineRecord, isTimeZone, verificationAfterReview, isAutoAssessed, syncAutoReadiness } from '@scholarscope/shared';
 import { readinessSchema, reviewSchema } from '../validation';
 import { HttpError } from '../http';
 
@@ -149,6 +149,7 @@ requirementsRouter.post('/:rid/review', async (req, res) => {
   });
 
   await recomputeCounts(schRef);
+  await syncAutoReadiness(uid, [schRef.id]);
   await writeAudit({ actor, subjectUid: uid, action: `requirement.${body.action}`, resource: reqRef.path, before: outcome.before, after: outcome.after });
   res.json({ ok: true });
 });
@@ -163,6 +164,9 @@ requirementsRouter.patch('/:rid', async (req, res) => {
   if (!snap.exists || snap.get('removedAt') != null) return res.status(404).json({ error: 'Requirement not found' });
   if (snap.get('changeFlag.active') === true) {
     return res.status(409).json({ error: 'This requirement changed in the source. Review the change first.' });
+  }
+  if (isAutoAssessed(snap.data() ?? {})) {
+    return res.status(409).json({ error: 'This is checked automatically from your documents.' });
   }
   await reqRef.update({ readiness: body.readiness, updatedAt: FieldValue.serverTimestamp() });
   await recomputeCounts(schRef);

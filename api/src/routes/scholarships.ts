@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { FieldValue, Timestamp } from 'firebase-admin/firestore';
-import { db, userDoc, getAppConfig, writeAudit, minGpaFromRequirements, deadlineFromParts, deadlineRecord, isTimeZone } from '@scholarscope/shared';
+import { db, userDoc, getAppConfig, writeAudit, minGpaFromRequirements, deadlineFromParts, deadlineRecord, isTimeZone, syncAutoReadiness } from '@scholarscope/shared';
 import { HttpError } from '../http';
 import { createScholarshipSchema, updateScholarshipSchema } from '../validation';
 import { scholarshipDocuments } from '../studentDocuments';
@@ -105,8 +105,10 @@ scholarshipsRouter.post('/', async (req, res) => {
 /** One record with its requirement checklist (FR-1.2, FR-1.3). */
 scholarshipsRouter.get('/:id', async (req, res) => {
   const ref = userDoc(req.uid!).collection('scholarships').doc(req.params.id);
+  if (!(await ref.get()).exists) return res.status(404).json({ error: 'Not found' });
+  // Judge what the student's checked documents can show (GPA, required files) before reading the checklist.
+  const assessments = await syncAutoReadiness(req.uid!, [ref.id]);
   const snap = await ref.get();
-  if (!snap.exists) return res.status(404).json({ error: 'Not found' });
   const reqs = await ref.collection('requirements').where('removedAt', '==', null).get();
   const requirements = reqs.docs.map((d) => ({ id: d.id, ...d.data() }) as RequirementRecord);
   const deadline = (snap.get('deadline.utc') as Timestamp | undefined)?.toDate() ?? null;
@@ -117,7 +119,7 @@ scholarshipsRouter.get('/:id', async (req, res) => {
   });
   res.json({
     ...serialize(snap.id, snap.data()!),
-    requirements: requirements.map((item) => toPlain(item)),
+    requirements: requirements.map((item) => ({ ...(toPlain(item) as object), assessment: assessments.get(item.id) ?? null })),
     documents,
   });
 });

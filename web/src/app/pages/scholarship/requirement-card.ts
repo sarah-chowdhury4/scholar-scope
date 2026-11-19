@@ -1,4 +1,5 @@
 import { Component, inject, input, output, signal } from '@angular/core';
+import { RouterLink } from '@angular/router';
 import { ZonedDatePipe } from '../../core/zoned-date.pipe';
 import { TimeZoneService } from '../../core/time-zone.service';
 import { ApiService, apiMessage, type Requirement, type RequirementVersion } from '../../core/api.service';
@@ -6,23 +7,29 @@ import { ApiService, apiMessage, type Requirement, type RequirementVersion } fro
 /** One requirement on a scholarship page: its source quote, the student's review, and the checklist tick. */
 @Component({
   selector: 'li[appRequirementCard]',
-  imports: [ZonedDatePipe],
+  imports: [ZonedDatePipe, RouterLink],
   host: { class: 'card', '[class.changed]': 'requirement().changeFlag?.active' },
   template: `
     @let r = requirement();
       <div class="req-head">
-        <label class="check">
-          <input
-            type="checkbox"
-            [checked]="r.readiness === 'ready'"
-            [disabled]="busy() || r.changeFlag?.active"
-            (change)="toggleReady($event)"
-            [attr.aria-label]="'Done: ' + r.label"
-          />
-          <strong>{{ r.label }}</strong>
-        </label>
+        @if (r.assessment; as a) {
+          <!-- Judged from the student's documents: no tick box, the result is shown below. -->
+          <span class="status-dot" [class]="a.status" role="img" [attr.aria-label]="statusWord(a.status)">{{ statusIcon(a.status) }}</span>
+          <strong class="req-label">{{ r.label }}</strong>
+        } @else {
+          <label class="check">
+            <input
+              type="checkbox"
+              [checked]="r.readiness === 'ready'"
+              [disabled]="busy() || r.changeFlag?.active"
+              (change)="toggleReady($event)"
+              [attr.aria-label]="'Done: ' + r.label"
+            />
+            <strong>{{ r.label }}</strong>
+          </label>
+        }
         <span>
-          <span class="badge" [class]="r.verification">{{ verificationLabel(r.verification) }}</span>
+          <span class="badge" [class]="r.verification" [attr.title]="verificationHelp(r.verification)">{{ verificationLabel(r.verification) }}</span>
           @if (r.changeFlag?.active) {
             <span class="badge changed">Changed</span>
           }
@@ -31,6 +38,20 @@ import { ApiService, apiMessage, type Requirement, type RequirementVersion } fro
 
       @if (facts().length) {
         <p class="small">{{ facts().join(' · ') }}</p>
+      }
+
+      @if (r.assessment; as a) {
+        <div class="assessment" [class]="a.status" role="status">
+          <p><strong>{{ statusWord(a.status) }}.</strong> {{ a.message }}</p>
+          @if (a.quote) {
+            <p class="small evidence">
+              From your {{ (a.documentTitle ?? 'document').toLowerCase() }}: “{{ a.quote }}”{{ a.page ? ' (page ' + a.page + ')' : '' }}
+            </p>
+          }
+          @if (a.status !== 'met') {
+            <a class="small" routerLink="/documents">Go to Documents</a>
+          }
+        </div>
       }
 
       @if (r.current.citation; as c) {
@@ -42,7 +63,9 @@ import { ApiService, apiMessage, type Requirement, type RequirementVersion } fro
           </footer>
         </blockquote>
       } @else {
-        <p class="warning">No source found for this item. Don't rely on it until it's confirmed.</p>
+        <p class="muted small">
+          This rule is not from the official guidelines yet. Upload them or save the scholarship's page to confirm it.
+        </p>
       }
 
       @if (r.review; as review) {
@@ -76,14 +99,16 @@ import { ApiService, apiMessage, type Requirement, type RequirementVersion } fro
           </div>
         </form>
       } @else {
-        <div class="actions">
-          @if (r.review?.status !== 'confirmed' && r.verification !== 'verified') {
-            <button type="button" class="secondary" [disabled]="busy()" (click)="review('confirm')">Looks right</button>
+        <!-- Checking the rule itself (is the scholarship's requirement right?) is secondary: small links. -->
+        <p class="rule-links small">
+          @if (r.verification !== 'verified' && r.review?.status !== 'confirmed') {
+            <span class="muted">Is this rule right?</span>
+            <button type="button" class="link" [disabled]="busy()" (click)="review('confirm')">Looks right</button>
           }
-          <button type="button" class="secondary" [disabled]="busy()" (click)="editing.set(true)">Fix</button>
-          <button type="button" class="secondary" [disabled]="busy()" (click)="reject()">Not a requirement</button>
+          <button type="button" class="link" [disabled]="busy()" (click)="editing.set(true)">Fix</button>
+          <button type="button" class="link" [disabled]="busy()" (click)="reject()">Not a requirement</button>
           <button type="button" class="link" (click)="toggleHistory()">{{ history() ? 'Hide history' : 'History' }}</button>
-        </div>
+        </p>
       }
 
       @if (history(); as versions) {
@@ -120,6 +145,26 @@ export class RequirementCard {
   protected readonly error = signal('');
   protected readonly history = signal<RequirementVersion[] | null>(null);
 
+  statusWord(status: string) {
+    if (status === 'met') return 'Met';
+    if (status === 'not_met') return 'Not met';
+    if (status === 'check') return 'Check this';
+    return 'Not checked yet';
+  }
+
+  statusIcon(status: string) {
+    if (status === 'met') return '✓';
+    if (status === 'not_met') return '✕';
+    if (status === 'check') return '!';
+    return '○';
+  }
+
+  verificationHelp(v: string) {
+    if (v === 'verified') return 'This rule is quoted from the official guidelines.';
+    if (v === 'needs_review') return 'Read from the guidelines, but please check the wording.';
+    return 'This rule is not from the official guidelines yet.';
+  }
+
   verificationLabel(v: string) {
     return v === 'verified' ? 'From source' : v === 'needs_review' ? 'Needs review' : 'Unverified';
   }
@@ -140,10 +185,12 @@ export class RequirementCard {
   facts(): string[] {
     const value = this.requirement().current.value;
     const out: string[] = [];
+    const label = this.requirement().label.toLowerCase();
+    const numbers = (label.match(/\d+(?:\.\d+)?/g) ?? []).map(Number);
     const words = this.wordLimit();
-    if (words) out.push(`Up to ${words} words`);
+    if (words && !numbers.includes(words)) out.push(`Up to ${words} words`);
     const gpa = this.minGpa();
-    if (gpa != null) out.push(`Minimum GPA ${gpa}`);
+    if (gpa != null && !(label.includes('gpa') && numbers.includes(gpa))) out.push(`Minimum GPA ${gpa}`);
     if (typeof value['details'] === 'string' && value['details']) out.push(value['details']);
     return out;
   }

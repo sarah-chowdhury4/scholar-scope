@@ -11,6 +11,7 @@ import {
   quoteHash,
   deadlineFromSource,
   deadlineRecord,
+  syncAutoReadiness,
   updateJob,
   enqueueJob,
   log,
@@ -141,6 +142,8 @@ export async function handleExtract(job: JobMessage): Promise<void> {
   }
 
   for (const sid of scholarshipIds) await recomputeCounts(userDoc(job.uid).collection('scholarships').doc(sid));
+  // New or changed rules (a minimum GPA, a transcript) are judged against the student's documents right away.
+  await syncAutoReadiness(job.uid, scholarshipIds);
 
   await versionRef.update({
     extraction: { status: 'done', jobId: job.jobId, itemsFound: result.items?.length ?? 0, ...stats, finishedAt: FieldValue.serverTimestamp() },

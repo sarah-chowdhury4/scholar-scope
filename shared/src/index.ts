@@ -18,6 +18,8 @@ export * from './catalogStore';
 export * from './documents';
 export * from './outbox';
 export * from './documentChecks';
+export * from './assessments';
+export * from './autoReadiness';
 export * from './requirements';
 export * from './diff';
 export * from './drafts';
