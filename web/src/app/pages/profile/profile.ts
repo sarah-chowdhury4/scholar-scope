@@ -98,9 +98,10 @@ import { CountryPicker } from './country-picker';
                 </form>
               }
             }
-            @if (me.emails.length === 1) {
-              <p class="hint">Add another confirmed address before you can remove the primary.</p>
-            }
+            <p class="hint">
+              To change the address you sign in with: add the new one, confirm its code, press <strong>Make primary</strong>, then
+              remove the old one.
+            </p>
 
             @if (me.pendingEmail) {
               <form (submit)="$event.preventDefault(); verifyEmail()">
@@ -130,35 +131,19 @@ import { CountryPicker } from './country-picker';
                 </div>
               </form>
             } @else {
-              <h3>Add an address</h3>
-              <form [formGroup]="addForm" (ngSubmit)="addEmail()">
-                <label for="addEmail">New email</label>
-                <input id="addEmail" type="email" formControlName="address" autocomplete="email" placeholder="you@example.com" />
-                @if (errors()['add']) { <p class="error" role="alert">{{ errors()['add'] }}</p> }
-                <button type="submit" [disabled]="busy() !== null || me.emails.length >= (options()?.limits?.maxEmails ?? 5)">Send confirmation code</button>
-              </form>
-
-              <h3>Change an address</h3>
-              <form [formGroup]="replaceForm" (ngSubmit)="replaceEmail()">
-                <label for="replaceWhich">Address to replace</label>
-                <select id="replaceWhich" formControlName="currentAddress">
-                  @for (email of me.emails; track email.address) {
-                    <option [value]="email.address">{{ email.address }}{{ email.primary ? ' (primary)' : '' }}</option>
-                  }
-                </select>
-                <label for="replaceNew">New email</label>
-                <input id="replaceNew" type="email" formControlName="newAddress" autocomplete="email" placeholder="you@example.com" />
-                @if (replacingPrimary()) {
-                  <label for="replacePwd">Current password</label>
-                  <div class="pwd">
-                    <input id="replacePwd" [type]="show()['replace'] ? 'text' : 'password'" formControlName="currentPassword" autocomplete="current-password" />
-                    <button type="button" class="toggle" (click)="toggleShow('replace')" [attr.aria-pressed]="!!show()['replace']">{{ show()['replace'] ? 'Hide' : 'Show' }}</button>
+              @if (me.emails.length < (options()?.limits?.maxEmails ?? 5)) {
+                <form [formGroup]="addForm" (ngSubmit)="addEmail()">
+                  <label for="addEmail">Add an email</label>
+                  <div class="inline-add">
+                    <input id="addEmail" type="email" formControlName="address" autocomplete="email" placeholder="you@example.com" />
+                    <button type="submit" [disabled]="busy() !== null">Add email</button>
                   </div>
-                  <p class="hint">Needed because this changes the address you sign in with.</p>
-                }
-                @if (errors()['replace']) { <p class="error" role="alert">{{ errors()['replace'] }}</p> }
-                <button type="submit" [disabled]="busy() !== null">Change email</button>
-              </form>
+                  <p class="hint">We email it a 6-digit code; it is added once you enter the code.</p>
+                  @if (errors()['add']) { <p class="error" role="alert">{{ errors()['add'] }}</p> }
+                </form>
+              } @else {
+                <p class="hint">You have the most addresses allowed. Remove one to add another.</p>
+              }
             }
           </section>
 
@@ -422,6 +407,8 @@ import { CountryPicker } from './country-picker';
     .summary p { margin: 0 0 6px; }
     .summary p:last-child { margin-bottom: 0; }
     .danger-zone { border-color: var(--bad-bg); }
+    .inline-add { display: flex; gap: 10px; flex-wrap: wrap; }
+    .inline-add input { flex: 1 1 220px; }
     @media (max-width: 900px) {
       .profile-hero { grid-template-columns: auto 1fr; }
       .complete { grid-column: 1 / -1; }
@@ -464,11 +451,6 @@ export class ProfilePage implements OnInit, OnDestroy {
 
   protected readonly nameForm = this.fb.nonNullable.group({ displayName: ['', Validators.maxLength(80)] });
   protected readonly addForm = this.fb.nonNullable.group({ address: ['', Validators.required] });
-  protected readonly replaceForm = this.fb.nonNullable.group({
-    currentAddress: [''],
-    newAddress: ['', Validators.required],
-    currentPassword: [''],
-  });
   protected readonly passwordForm = this.fb.nonNullable.group({
     current: ['', Validators.required],
     next: ['', Validators.required],
@@ -593,11 +575,6 @@ export class ProfilePage implements OnInit, OnDestroy {
     return `${items.slice(0, -1).join(', ')} and ${items[items.length - 1]}`;
   }
 
-  protected replacingPrimary(): boolean {
-    const address = this.replaceForm.controls.currentAddress.value;
-    return this.profile()?.emails.some((email) => email.address === address && email.primary) ?? false;
-  }
-
   protected countriesDirty(): boolean {
     return !sameSet(this.draftCountries(), this.profile()?.countriesOfInterest ?? []);
   }
@@ -653,25 +630,6 @@ export class ProfilePage implements OnInit, OnDestroy {
       this.addForm.reset();
       this.remember(me);
       this.setStatus(`Code sent to ${me.pendingEmail?.address ?? address}. It is not saved until you confirm it.`);
-    });
-  }
-
-  protected async replaceEmail() {
-    const currentAddress = this.replaceForm.controls.currentAddress.value;
-    const newAddress = this.replaceForm.controls.newAddress.value.trim();
-    const currentPassword = this.replaceForm.controls.currentPassword.value;
-    if (!newAddress) return this.fail('replace', 'Enter a valid email address.');
-    if (this.replacingPrimary() && !currentPassword) return this.fail('replace', 'Enter your current password.');
-    await this.run('replace', async () => {
-      const me = await this.api.changeEmail({
-        currentAddress,
-        newAddress,
-        currentPassword: this.replacingPrimary() ? currentPassword : undefined,
-      });
-      this.replaceForm.controls.newAddress.reset();
-      this.replaceForm.controls.currentPassword.reset();
-      this.remember(me);
-      this.setStatus(`Code sent to ${newAddress}. Nothing changes until you confirm it.`);
     });
   }
 
@@ -917,10 +875,6 @@ export class ProfilePage implements OnInit, OnDestroy {
   }
 
   private syncEmailSelect(me: Me) {
-    const current = this.replaceForm.controls.currentAddress.value;
-    if (!me.emails.some((email) => email.address === current)) {
-      this.replaceForm.controls.currentAddress.setValue(me.email ?? me.emails[0]?.address ?? '');
-    }
     if (this.primaryFor() && !me.emails.some((email) => email.address === this.primaryFor() && !email.primary)) {
       this.primaryFor.set(null);
     }
