@@ -259,9 +259,17 @@ details.draft summary { cursor: pointer; font-weight: 600; color: var(--accent);
 .assessment.check { border-left-color: var(--warn-ink); background: var(--warn-bg); color: var(--warn-ink); }
 .assessment .evidence { color: inherit; opacity: 0.9; }
 .rule-links { display: flex; flex-wrap: wrap; gap: 6px 14px; align-items: center; margin: 8px 0 0; }
-.days-left { display: inline-flex; align-items: baseline; gap: 4px; padding: 4px 12px; border-radius: 999px; font-size: 14px; font-weight: 600; background: var(--leaf); color: var(--green); }
-.days-left strong { font-size: 18px; }
-.days-left.soon { background: var(--warn-bg); color: var(--warn-ink); }
-.days-left.urgent { background: var(--bad-bg); color: var(--bad-ink); }
-.days-left.passed { background: var(--surface-2); color: var(--ink-soft); font-weight: 500; }
+/* Countdown: an outlined tile with an accent bar, so it never reads as a status badge (badges are filled pills). */
+.days-left {
+  display: inline-flex; align-items: baseline; gap: 6px; padding: 6px 14px 6px 12px;
+  border: 1px solid var(--line); border-left: 4px solid var(--olive); border-radius: 6px;
+  background: var(--field); color: var(--ink-soft);
+  font-size: 12px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase;
+}
+.days-left strong { font-size: 24px; line-height: 1; font-weight: 700; font-variant-numeric: tabular-nums; letter-spacing: 0; text-transform: none; color: var(--ink); }
+.days-left.soon { border-left-color: #c08a1e; color: var(--warn-ink); }
+.days-left.soon strong { color: var(--warn-ink); }
+.days-left.urgent { border-color: var(--bad-bg); border-left-color: var(--danger); color: var(--bad-ink); }
+.days-left.urgent strong { color: var(--danger); }
+.days-left.passed { border-style: dashed; border-left-style: solid; border-left-color: var(--line); background: transparent; color: var(--ink-soft); }
 .days-row { margin: 4px 0 6px; }
