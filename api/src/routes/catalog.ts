@@ -8,6 +8,7 @@ import {
   loadCatalog,
   userDoc,
   writeAudit,
+  isTeamVerified,
 } from '@scholarscope/shared';
 
 /** Discover page: browse, search and filter the scholarship catalog, and add one to "My scholarships". */
@@ -42,6 +43,7 @@ catalogRouter.get('/', async (req, res) => {
   const items = filterCatalog(all, query, today).map((e) => ({
     ...e,
     deadlinePassed: e.deadline !== null && e.deadline < today,
+    teamVerified: isTeamVerified(e),
     addedScholarshipId: added.get(e.catalogId) ?? null,
   }));
   res.json({

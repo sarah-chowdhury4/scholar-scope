@@ -27,7 +27,7 @@ type Row = Scholarship & { requirements: Requirement[] };
         <p class="muted">
           {{ s.provider }} ·
           @if (s.deadline) {
-            Due <app-deadline [deadline]="s.deadline" /> ({{ label(s.deadline.verification) }})
+            Due <app-deadline [deadline]="s.deadline" /> ({{ label(s.deadline.verification, s.deadline.verifiedBy) }})
           } @else {
             No deadline yet
           }
@@ -66,7 +66,8 @@ export class PrintPage implements OnInit {
     }
   }
 
-  label(v: string) {
+  label(v: string, verifiedBy?: string | null) {
+    if (v === 'verified' && verifiedBy) return 'Verified'; // checked by the ScholarScope team
     return v === 'verified' ? 'From source' : v === 'needs_review' ? 'Needs review' : 'Unverified';
   }
 

@@ -60,7 +60,7 @@ import { ApiService, type Scholarship } from '../../core/api.service';
             @if (s.deadline) {
               <p>
                 Due <app-deadline [deadline]="s.deadline" [withTime]="false" />
-                <span class="badge" [class]="s.deadline.verification">{{ label(s.deadline.verification) }}</span>
+                <span class="badge" [class]="s.deadline.verification">{{ label(s.deadline.verification, s.deadline.verifiedBy) }}</span>
               </p>
             } @else {
               <p class="muted">No deadline yet</p>
@@ -96,7 +96,8 @@ export class Dashboard implements OnInit {
     await this.load();
   }
 
-  label(v: string) {
+  label(v: string, verifiedBy?: string | null) {
+    if (v === 'verified' && verifiedBy) return 'Verified'; // checked by the ScholarScope team
     return v === 'verified' ? 'From source' : v === 'needs_review' ? 'Needs review' : 'Unverified';
   }
 

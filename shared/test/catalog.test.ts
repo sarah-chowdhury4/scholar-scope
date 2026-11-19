@@ -78,3 +78,42 @@ describe('dataset sheet with display headers', () => {
     });
   });
 });
+
+describe('team-checked catalog entries', () => {
+  it('counts an entry with a source and an active status as checked by the team', async () => {
+    const { isTeamVerified } = await import('../src/catalog');
+    expect(isTeamVerified({ sourceUrl: 'https://www.dellscholars.org/students/', datasetStatus: 'Active' })).toBe(true);
+    expect(isTeamVerified({ sourceUrl: 'https://x.org', datasetStatus: 'Deadline Changed' })).toBe(true);
+    expect(isTeamVerified({ sourceUrl: 'https://x.org', datasetStatus: 'Unverified' })).toBe(false);
+    expect(isTeamVerified({ sourceUrl: null, datasetStatus: 'Active' })).toBe(false);
+  });
+
+  it('cites the dataset row and the official page for each requirement', async () => {
+    const { catalogCitation, requirementsFromCatalog } = await import('../src/catalog');
+    const entry = {
+      catalogId: 'SCH-001', organization: 'Dell Foundation', name: 'Dell Scholars Program', deadline: '2026-12-01', minGpa: 2.4,
+      promptOrMaterials: 'Describe a personal hurdle you have overcome.', sourceUrl: 'https://www.dellscholars.org/students/',
+      datasetVersion: 'v1.0', datasetStatus: 'Active', tags: [],
+    };
+    const items = requirementsFromCatalog(entry);
+    expect(items.map((i) => i.quote)).toEqual(['Current deadline: 2026-12-01', 'Minimum GPA: 2.4', 'Describe a personal hurdle you have overcome.']);
+    expect(catalogCitation(entry, items[1]!.quote)).toEqual({
+      kind: 'catalog', catalogId: 'SCH-001', sourceUrl: 'https://www.dellscholars.org/students/', datasetVersion: 'v1.0', verifiedBy: 'ScholarScope team', quote: 'Minimum GPA: 2.4',
+    });
+    expect(catalogCitation({ ...entry, datasetStatus: 'Unverified' }, 'x')).toBeNull();
+  });
+
+  it('marks the fictional examples as not checked', async () => {
+    const { readFileSync } = await import('node:fs');
+    const { parseCsv, catalogEntryFromRow, isTeamVerified } = await import('../src/catalog');
+    const rows = parseCsv(readFileSync(new URL('../../api/seed/dataset.example.csv', import.meta.url), 'utf8'));
+    expect(rows.map((r) => isTeamVerified(catalogEntryFromRow(r) as never))).toEqual([false, false]);
+  });
+
+  it("treats every entry in the team's dataset as checked", async () => {
+    const { readFileSync } = await import('node:fs');
+    const { parseCsv, catalogEntryFromRow, isTeamVerified } = await import('../src/catalog');
+    const rows = parseCsv(readFileSync(new URL('../../Dataset/ScholarScope Updated Dataset.csv', import.meta.url), 'utf8'));
+    expect(rows.map((r) => isTeamVerified(catalogEntryFromRow(r) as never)).every(Boolean)).toBe(true);
+  });
+});

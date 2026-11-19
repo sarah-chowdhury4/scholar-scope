@@ -2,7 +2,8 @@ import { FieldValue, Timestamp } from 'firebase-admin/firestore';
 import { deadlineFromParts } from './deadlines';
 import { deadlineRecord } from './deadlineRecord';
 import { db, userDoc } from './firebase';
-import { requirementsFromCatalog, tagsFor, type CatalogEntry } from './catalog';
+import { catalogCitation, isTeamVerified, requirementsFromCatalog, tagsFor, type CatalogEntry } from './catalog';
+import { recomputeCounts } from './requirements';
 
 const CACHE_MS = 60_000;
 let cache: { at: number; entries: CatalogEntry[] } | undefined;
@@ -81,6 +82,9 @@ export async function addFromCatalog(uid: string, catalogId: string, limit: numb
       return { status: 'added', scholarshipId: schRef.id } as const;
     }
     const catalogDeadline = entry.deadline ? deadlineFromParts(entry.deadline, null, null) : null;
+    // Team-checked entries are a verified source; the others start unverified until guidelines are uploaded.
+    const verified = isTeamVerified(entry);
+    const verification = verified ? 'verified' : 'unverified';
     tx.set(schRef, {
       name: entry.name,
       provider: entry.organization,
@@ -89,10 +93,10 @@ export async function addFromCatalog(uid: string, catalogId: string, limit: numb
       awardAmount: null,
       // The dataset gives a date but no time zone: keep the zone unknown rather than guess UTC.
       deadline: catalogDeadline
-        ? { ...deadlineRecord(catalogDeadline, entry.deadline!), requirementId: null, verification: 'unverified' }
+        ? { ...deadlineRecord(catalogDeadline, entry.deadline!), requirementId: null, verification, verifiedBy: verified ? 'ScholarScope team' : null }
         : null,
       status: 'researching',
-      counts: { open: requirements.length, changed: 0, unverified: requirements.length, needsReview: 0, ready: 0, total: requirements.length },
+      counts: { open: requirements.length, changed: 0, unverified: verified ? 0 : requirements.length, needsReview: 0, ready: 0, total: requirements.length },
       readinessPct: 0,
       recheck: {
         enabled: Boolean(entry.sourceUrl),
@@ -109,10 +113,11 @@ export async function addFromCatalog(uid: string, catalogId: string, limit: numb
     for (const req of requirements) {
       const reqRef = schRef.collection('requirements').doc();
       const verRef = reqRef.collection('versions').doc();
+      const citation = catalogCitation(entry, req.quote);
       tx.set(verRef, {
         versionNo: 1,
         value: req.value,
-        citation: null,
+        citation,
         origin: 'seed',
         extraction: null,
         review: null,
@@ -126,8 +131,8 @@ export async function addFromCatalog(uid: string, catalogId: string, limit: numb
         label: req.label,
         currentVersionId: verRef.id,
         currentVersionNo: 1,
-        current: { value: req.value, citation: null },
-        verification: 'unverified',
+        current: { value: req.value, citation },
+        verification,
         readiness: 'missing',
         changeFlag: null,
         needsRecheck: false,
@@ -139,4 +144,39 @@ export async function addFromCatalog(uid: string, catalogId: string, limit: numb
     }
     return { status: 'added', scholarshipId: schRef.id } as const;
   });
+}
+
+/**
+ * Bring scholarships students already added in line with the catalog's check status: requirements copied from a
+ * team-checked entry that still have no source become verified, citing the dataset row and the official page.
+ * Only untouched catalog copies change (no citation yet and never reviewed or corrected by the student).
+ * Returns how many requirements were updated.
+ */
+export async function applyCatalogVerification(): Promise<number> {
+  const catalog = new Map((await loadCatalog({ fresh: true })).map((e) => [e.catalogId, e]));
+  const added = await db().collectionGroup('scholarships').where('catalogId', '!=', null).get();
+  let updated = 0;
+  for (const sch of added.docs) {
+    const entry = catalog.get(sch.get('catalogId') as string);
+    if (!entry || !isTeamVerified(entry)) continue;
+    const items = new Map(requirementsFromCatalog(entry).map((r) => [r.label, r]));
+    const reqs = await sch.ref.collection('requirements').where('removedAt', '==', null).get();
+    let changed = false;
+    for (const r of reqs.docs) {
+      const item = items.get(r.get('label') as string);
+      if (!item || r.get('current.citation') || r.get('review') || r.get('verification') !== 'unverified') continue;
+      const citation = catalogCitation(entry, item.quote);
+      await r.ref.update({ verification: 'verified', 'current.citation': citation, updatedAt: FieldValue.serverTimestamp() });
+      const versionId = r.get('currentVersionId') as string | undefined;
+      if (versionId) await r.ref.collection('versions').doc(versionId).update({ citation });
+      updated++;
+      changed = true;
+    }
+    if (sch.get('deadline') && sch.get('deadline.verification') === 'unverified' && !sch.get('deadline.requirementId')) {
+      await sch.ref.update({ 'deadline.verification': 'verified', 'deadline.verifiedBy': 'ScholarScope team' });
+      changed = true;
+    }
+    if (changed) await recomputeCounts(sch.ref);
+  }
+  return updated;
 }

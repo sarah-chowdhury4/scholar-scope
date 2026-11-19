@@ -26,7 +26,7 @@ import { EssayDraft } from './essay-draft';
       @if (s.deadline) {
         <p>
           Due <app-deadline [deadline]="s.deadline" />
-          <span class="badge" [class]="s.deadline.verification">{{ label(s.deadline.verification) }}</span>
+          <span class="badge" [class]="s.deadline.verification">{{ label(s.deadline.verification, s.deadline.verifiedBy) }}</span>
         </p>
       }
 
@@ -163,7 +163,8 @@ export class ScholarshipPage implements OnInit {
     await this.load();
   }
 
-  label(v: string) {
+  label(v: string, verifiedBy?: string | null) {
+    if (v === 'verified' && verifiedBy) return 'Verified'; // checked by the ScholarScope team
     return v === 'verified' ? 'From source' : v === 'needs_review' ? 'Needs review' : 'Unverified';
   }
 

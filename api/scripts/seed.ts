@@ -20,6 +20,7 @@ import { readFileSync } from 'node:fs';
 import { FieldValue } from 'firebase-admin/firestore';
 import {
   addFromCatalog,
+  applyCatalogVerification,
   assertSafeEnvironment,
   auth,
   catalogEntryFromRow,
@@ -59,6 +60,9 @@ for (const row of parseCsv(readFileSync(csvPath, 'utf8'))) {
 await ensureAppConfig();
 await saveCatalog(entries);
 console.log(`Catalog: ${entries.length} scholarships saved.`);
+// Scholarships students already added from a team-checked entry become verified too.
+const upgraded = await applyCatalogVerification();
+if (upgraded) console.log(`Marked ${upgraded} requirement(s) on scholarships already added as verified by the ScholarScope team.`);
 
 if (catalogOnly) process.exit(0);
 

@@ -10,6 +10,10 @@ export type Citation = {
   page: number | null;
   quote: string;
   ocrDerived: boolean;
+  /** "catalog": from the ScholarScope team's checked dataset, not from an uploaded document. */
+  kind?: 'catalog';
+  sourceUrl?: string;
+  datasetVersion?: string | null;
 };
 
 export type Scholarship = {
@@ -26,6 +30,8 @@ export type Scholarship = {
     sourceText: string;
     allDay: boolean;
     verification: Verification;
+    /** "ScholarScope team" when the deadline comes from the team-checked catalog. */
+    verifiedBy?: string | null;
   } | null;
   counts: { open: number; changed: number; unverified: number; needsReview: number; ready: number; total: number };
   readinessPct: number;
@@ -265,6 +271,8 @@ export type CatalogItem = {
   tags: CatalogTag[];
   deadlinePassed: boolean;
   addedScholarshipId: string | null;
+  /** Collected and checked by the ScholarScope team against the official page. */
+  teamVerified: boolean;
 };
 
 export type CatalogQuery = {

@@ -6,7 +6,7 @@ import { ApiService, type CatalogQuery } from '../../core/api.service';
 const item = (id: string, extra: object = {}) => ({
   catalogId: id, organization: 'Org ' + id, name: 'Scholarship ' + id, deadline: '2027-01-15', minGpa: 3,
   promptOrMaterials: 'Essay; Transcript', sourceUrl: 'https://example.org', tags: ['essay', 'transcript'],
-  deadlinePassed: false, addedScholarshipId: null, ...extra,
+  deadlinePassed: false, addedScholarshipId: null, teamVerified: true, ...extra,
 });
 
 describe('Discover', () => {

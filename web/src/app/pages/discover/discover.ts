@@ -18,6 +18,7 @@ const TAG_LABELS: Record<CatalogTag, string> = {
   selector: 'app-discover',
   imports: [FormsModule, RouterLink, DatePipe],
   styles: `
+    .team-badge { margin: 0 0 6px; }
     .search-row { display: grid; grid-template-columns: 1fr 220px auto; gap: 12px; align-items: end; }
     .search-row label { margin-top: 0; }
     .filters-toggle { min-width: 120px; }
@@ -39,7 +40,7 @@ const TAG_LABELS: Record<CatalogTag, string> = {
     <div class="page-head">
       <div>
         <h1>Discover scholarships</h1>
-        <p class="hint">Add any of these to <a routerLink="/">My scholarships</a>. Listed details are not yet verified: upload the official guidelines to confirm them.</p>
+        <p class="hint">Add any of these to <a routerLink="/">My scholarships</a>. Scholarships marked <span class="badge verified">Verified</span> were collected and checked by the ScholarScope team against their official pages.</p>
       </div>
       <a class="button secondary" routerLink="/scholarships/new">Not listed? Add your own</a>
     </div>
@@ -139,6 +140,9 @@ const TAG_LABELS: Record<CatalogTag, string> = {
       @for (s of items(); track s.catalogId) {
         <li class="card">
           <h2>{{ s.name }}</h2>
+          @if (s.teamVerified) {
+            <span class="badge verified team-badge" title="Collected and checked by the ScholarScope team against the official page">Verified</span>
+          }
           <p class="muted">{{ s.organization }}</p>
           <p>
             @if (s.deadline) {
@@ -154,7 +158,12 @@ const TAG_LABELS: Record<CatalogTag, string> = {
             @for (t of s.tags; track t) { <span class="chip">{{ labels[t] }}</span> }
           </p>
           @if (s.sourceUrl) {
-            <p class="small"><a [href]="s.sourceUrl" target="_blank" rel="noopener noreferrer">Provider website</a> <span class="muted">(listed source, not yet verified)</span></p>
+            <p class="small">
+              <a [href]="s.sourceUrl" target="_blank" rel="noopener noreferrer">{{ s.teamVerified ? 'Official page' : 'Provider website' }}</a>
+              @if (!s.teamVerified) {
+                <span class="muted">(listed source, not yet verified)</span>
+              }
+            </p>
           }
           @if (s.addedScholarshipId) {
             <a class="button secondary" [routerLink]="['/scholarships', s.addedScholarshipId]">Added · open</a>

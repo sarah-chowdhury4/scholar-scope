@@ -1,7 +1,11 @@
 /**
  * Scholarship catalog: the shared list of known scholarships a student can browse on the
- * Discover page and add to their own records. Catalog values come from a curated dataset,
- * not from a cited source document, so anything copied from it starts as "unverified".
+ * Discover page and add to their own records.
+ *
+ * The dataset is collected and checked by the ScholarScope team against each scholarship's official page.
+ * An entry with a verified source URL and a status other than "Unverified" counts as a checked source:
+ * requirements copied from it are "verified", citing the dataset row and the official page. Entries marked
+ * "Unverified" (like the fictional examples) start as unverified until the guidelines are uploaded.
  */
 
 export type CatalogEntry = {
@@ -121,11 +125,32 @@ export function catalogEntryFromRow(r: CsvRow): CatalogEntry | { error: string }
   };
 }
 
-/** Requirement checklist items to create when a student adds a catalog scholarship. */
-export function requirementsFromCatalog(e: CatalogEntry): { kind: string; label: string; value: Record<string, unknown> }[] {
-  const items: { kind: string; label: string; value: Record<string, unknown> }[] = [];
-  if (e.deadline) items.push({ kind: 'deadline', label: 'Application deadline', value: { deadline: { sourceText: e.deadline, allDay: true } } });
-  if (e.minGpa !== null) items.push({ kind: 'eligibility', label: `Minimum GPA ${e.minGpa.toFixed(2)}`, value: { minGpa: e.minGpa } });
+/** True when the team checked this entry against the official page (see the note at the top). */
+export function isTeamVerified(e: Pick<CatalogEntry, 'sourceUrl' | 'datasetStatus'>): boolean {
+  return Boolean(e.sourceUrl) && !!e.datasetStatus && !/unverified/i.test(e.datasetStatus);
+}
+
+/** Where a team-checked catalog requirement comes from: the dataset row, checked against the official page. */
+export type CatalogCitation = {
+  kind: 'catalog';
+  catalogId: string;
+  sourceUrl: string;
+  datasetVersion: string | null;
+  verifiedBy: 'ScholarScope team';
+  /** The dataset text this requirement was taken from. */
+  quote: string;
+};
+
+export function catalogCitation(e: CatalogEntry, quote: string): CatalogCitation | null {
+  if (!isTeamVerified(e)) return null;
+  return { kind: 'catalog', catalogId: e.catalogId, sourceUrl: e.sourceUrl!, datasetVersion: e.datasetVersion, verifiedBy: 'ScholarScope team', quote };
+}
+
+/** Requirement checklist items to create when a student adds a catalog scholarship (`quote` = the dataset text). */
+export function requirementsFromCatalog(e: CatalogEntry): { kind: string; label: string; value: Record<string, unknown>; quote: string }[] {
+  const items: { kind: string; label: string; value: Record<string, unknown>; quote: string }[] = [];
+  if (e.deadline) items.push({ kind: 'deadline', label: 'Application deadline', value: { deadline: { sourceText: e.deadline, allDay: true } }, quote: `Current deadline: ${e.deadline}` });
+  if (e.minGpa !== null) items.push({ kind: 'eligibility', label: `Minimum GPA ${e.minGpa.toFixed(2)}`, value: { minGpa: e.minGpa }, quote: `Minimum GPA: ${e.minGpa}` });
   for (const part of e.promptOrMaterials.split(';').map((s) => s.trim()).filter(Boolean)) {
     const tags = tagsFor(part);
     const kind = tags.includes('essay')
@@ -139,7 +164,7 @@ export function requirementsFromCatalog(e: CatalogEntry): { kind: string; label:
             : tags.includes('financial')
               ? 'financial_doc'
               : 'other';
-    items.push({ kind, label: part.slice(0, 200), value: { text: part } });
+    items.push({ kind, label: part.slice(0, 200), value: { text: part }, quote: part });
   }
   return items;
 }

@@ -55,13 +55,22 @@ import { ApiService, apiMessage, type Requirement, type RequirementVersion } fro
       }
 
       @if (r.current.citation; as c) {
-        <blockquote>
-          “{{ c.quote }}”
-          <footer>
-            {{ c.page ? 'Page ' + c.page : 'Whole document' }}{{ c.ocrDerived ? ' · read by OCR' : '' }} ·
-            <button class="link" type="button" (click)="openSource.emit(c)">Open source</button>
-          </footer>
-        </blockquote>
+        @if (c.kind === 'catalog') {
+          <p class="muted small">
+            Checked by the ScholarScope team against the official page{{ c.datasetVersion ? ' (' + c.datasetVersion + ')' : '' }}.
+            @if (c.sourceUrl) {
+              <a [href]="c.sourceUrl" target="_blank" rel="noopener noreferrer">Official page</a>
+            }
+          </p>
+        } @else {
+          <blockquote>
+            “{{ c.quote }}”
+            <footer>
+              {{ c.page ? 'Page ' + c.page : 'Whole document' }}{{ c.ocrDerived ? ' · read by OCR' : '' }} ·
+              <button class="link" type="button" (click)="openSource.emit(c)">Open source</button>
+            </footer>
+          </blockquote>
+        }
       } @else {
         <p class="muted small">
           This rule is not from the official guidelines yet. Upload them or save the scholarship's page to confirm it.
@@ -160,12 +169,14 @@ export class RequirementCard {
   }
 
   verificationHelp(v: string) {
+    if (v === 'verified' && this.requirement().current.citation?.kind === 'catalog') return 'Checked by the ScholarScope team against the official page.';
     if (v === 'verified') return 'This rule is quoted from the official guidelines.';
     if (v === 'needs_review') return 'Read from the guidelines, but please check the wording.';
     return 'This rule is not from the official guidelines yet.';
   }
 
   verificationLabel(v: string) {
+    if (v === 'verified' && this.requirement().current.citation?.kind === 'catalog') return 'Verified';
     return v === 'verified' ? 'From source' : v === 'needs_review' ? 'Needs review' : 'Unverified';
   }
 
