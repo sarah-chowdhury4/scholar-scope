@@ -278,7 +278,13 @@ export class ScholarshipPage implements OnInit {
   private celebrateProgress(pct: number, name: string) {
     const before = this.lastPct;
     this.lastPct = pct;
-    if (before === null || pct <= before) return;
+    if (before !== null && pct < before) {
+      // Unticked: the "Nice!" (or "ready") note no longer fits, so it goes at once.
+      clearTimeout(this.cheerTimer);
+      this.cheer.set('');
+      return;
+    }
+    if (before === null || pct === before) return;
     this.bump.set(false);
     setTimeout(() => this.bump.set(true));
     clearTimeout(this.cheerTimer);
