@@ -173,8 +173,8 @@ export function requirementsFromCatalog(e: CatalogEntry): { kind: string; label:
 
 export type CatalogQuery = {
   q?: string;
-  /** upcoming (default): deadline today or later · 30 / 90: within that many days · all: include past */
-  deadline?: 'upcoming' | '30' | '90' | 'all';
+  /** upcoming (default): deadline today or later · 30 / 90: within that many days · past: only closed ones (archived) · all: both */
+  deadline?: 'upcoming' | '30' | '90' | 'past' | 'all';
   /** The student's GPA: hide scholarships whose minimum is higher. */
   gpa?: number;
   /** Only scholarships that ask for ALL of these. */
@@ -197,7 +197,9 @@ export function filterCatalog(entries: CatalogEntry[], query: CatalogQuery, toda
       const hay = `${e.name} ${e.organization} ${e.promptOrMaterials}`.toLowerCase();
       if (!words.every((w) => hay.includes(w))) return false;
     }
-    if (window !== 'all') {
+    if (window === 'past') {
+      if (!e.deadline || Date.parse(`${e.deadline}T00:00:00Z`) >= todayMs) return false;
+    } else if (window !== 'all') {
       if (!e.deadline) return false;
       const d = Date.parse(`${e.deadline}T00:00:00Z`);
       if (d < todayMs) return false;
@@ -214,6 +216,8 @@ export function filterCatalog(entries: CatalogEntry[], query: CatalogQuery, toda
   return matches.sort((a, b) => {
     if (sort === 'name') return a.name.localeCompare(b.name);
     if (sort === 'gpa') return (a.minGpa ?? 0) - (b.minGpa ?? 0) || a.name.localeCompare(b.name);
+    // Archived scholarships: the one that closed most recently first.
+    if (window === 'past') return (b.deadline ?? '').localeCompare(a.deadline ?? '') || a.name.localeCompare(b.name);
     return (a.deadline ?? '9999-12-31').localeCompare(b.deadline ?? '9999-12-31') || a.name.localeCompare(b.name);
   });
 }

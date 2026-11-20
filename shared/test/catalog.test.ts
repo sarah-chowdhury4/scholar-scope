@@ -39,6 +39,13 @@ describe('filterCatalog', () => {
   it('can include past deadlines', () => {
     expect(ids(filterCatalog(entries, { deadline: 'all' }, today))).toContain('SCH-011');
   });
+  it('lists only closed scholarships when archived, most recently closed first', () => {
+    const past = filterCatalog(entries, { deadline: 'past' }, today);
+    expect(past.length).toBeGreaterThan(0);
+    expect(ids(past)).toContain('SCH-011');
+    expect(past.every((e) => e.deadline !== null && e.deadline < today)).toBe(true);
+    expect(past.map((e) => e.deadline)).toEqual([...past.map((e) => e.deadline)].sort().reverse());
+  });
   it('limits to a deadline window', () => {
     expect(ids(filterCatalog(entries, { deadline: '30' }, today))).toEqual(['SCH-001']);
   });

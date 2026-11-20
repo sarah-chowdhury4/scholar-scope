@@ -49,7 +49,9 @@ describe('Discover', () => {
     expect(el.querySelector('input#q')).toBeTruthy();
     expect(el.querySelector('select#deadline')).toBeTruthy();
     expect(el.querySelector('input#gpa')).toBeTruthy();
-    expect(el.textContent).toContain('3 of 15 scholarships');
+    // The count is what is on the page, not the whole catalog.
+    expect(el.textContent).toContain('3 scholarships');
+    expect(el.textContent).not.toContain('of 15');
     // A YYYY-MM-DD deadline shows as that same day in every time zone (it was a day early east of UTC).
     expect(el.textContent).toContain('Jan 15, 2027');
     expect(el.textContent).toContain('Add to my scholarships');
@@ -66,6 +68,22 @@ describe('Discover', () => {
     fixture.detectChanges();
     expect(added).toEqual(['SCH-001']);
     expect((fixture.nativeElement as HTMLElement).querySelectorAll('a[href="/scholarships/catalog-sch-001"]').length).toBe(1);
+  });
+
+  it('shows archived (closed) scholarships with the Archived button', async () => {
+    const fixture = await render();
+    const el = fixture.nativeElement as HTMLElement;
+    const button = el.querySelector('.archived-toggle') as HTMLButtonElement;
+    expect(button.getAttribute('aria-pressed')).toBe('false');
+    button.click();
+    await new Promise((r) => setTimeout(r));
+    fixture.detectChanges();
+    expect(queries.at(-1)).toMatchObject({ deadline: 'past' });
+    expect(button.getAttribute('aria-pressed')).toBe('true');
+    expect(el.textContent).toContain('archived scholarships');
+    button.click();
+    await new Promise((r) => setTimeout(r));
+    expect(queries.at(-1)).toMatchObject({ deadline: 'upcoming' });
   });
 
   it('sends tag filters to the API', async () => {

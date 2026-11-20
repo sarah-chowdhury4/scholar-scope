@@ -281,7 +281,7 @@ export type CatalogItem = {
 
 export type CatalogQuery = {
   q?: string;
-  deadline?: 'upcoming' | '30' | '90' | 'all';
+  deadline?: 'upcoming' | '30' | '90' | 'past' | 'all';
   gpa?: number | null;
   requires?: CatalogTag[];
   excludes?: CatalogTag[];

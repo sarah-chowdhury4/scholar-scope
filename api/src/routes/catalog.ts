@@ -22,7 +22,7 @@ const tagList = z
 
 export const catalogQuerySchema = z.object({
   q: z.string().trim().max(100).optional(),
-  deadline: z.enum(['upcoming', '30', '90', 'all']).default('upcoming'),
+  deadline: z.enum(['upcoming', '30', '90', 'past', 'all']).default('upcoming'),
   gpa: z.coerce.number().min(0).max(5).optional(),
   requires: tagList,
   excludes: tagList,

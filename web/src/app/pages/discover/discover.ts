@@ -19,9 +19,10 @@ const TAG_LABELS: Record<CatalogTag, string> = {
   imports: [FormsModule, RouterLink, DatePipe],
   styles: `
     .team-badge { margin: 0 0 6px; }
-    .search-row { display: grid; grid-template-columns: 1fr 220px auto; gap: 12px; align-items: end; }
+    .search-row { display: grid; grid-template-columns: 1fr 220px auto auto; gap: 12px; align-items: end; }
     .search-row label { margin-top: 0; }
     .filters-toggle { min-width: 120px; }
+    .archived-toggle[aria-pressed='true'] { background: var(--green); color: #fff; }
     .filters-toggle .count { display: inline-grid; place-items: center; min-width: 22px; height: 22px; padding: 0 6px; border-radius: 99px; background: var(--green); color: #fff; font-size: 12px; }
     .active-filters { margin-top: 14px; }
     .filter-panel { margin-top: 18px; padding-top: 4px; border-top: 1px solid var(--line); }
@@ -31,9 +32,10 @@ const TAG_LABELS: Record<CatalogTag, string> = {
     @media (max-width: 700px) {
       .search-row { grid-template-columns: 1fr auto; }
       .search-row .search { grid-column: 1 / -1; }
+      .search-row .sort { grid-column: 1 / -1; }
     }
     @media (max-width: 420px) {
-      .search-row { grid-template-columns: 1fr; }
+      .search-row { grid-template-columns: 1fr 1fr; }
     }
   `,
   template: `
@@ -68,6 +70,10 @@ const TAG_LABELS: Record<CatalogTag, string> = {
           }
           <span aria-hidden="true">{{ showFilters() ? '▴' : '▾' }}</span>
         </button>
+        <button type="button" class="secondary archived-toggle" [attr.aria-pressed]="archived()" (click)="toggleArchived()"
+                title="Scholarships whose deadline has passed">
+          Archived
+        </button>
       </div>
 
       @if (activeFilters().length) {
@@ -85,11 +91,10 @@ const TAG_LABELS: Record<CatalogTag, string> = {
         <div class="filter-grid">
           <div>
             <label for="deadline">Deadline</label>
-            <select id="deadline" [ngModel]="deadline()" (ngModelChange)="deadline.set($event); reload()">
+            <select id="deadline" [ngModel]="deadline()" (ngModelChange)="deadline.set($event); reload()" [disabled]="archived()">
               <option value="upcoming">Any upcoming</option>
               <option value="30">Next 30 days</option>
               <option value="90">Next 90 days</option>
-              <option value="all">Include closed</option>
             </select>
           </div>
           <div>
@@ -125,7 +130,14 @@ const TAG_LABELS: Record<CatalogTag, string> = {
     </section>
 
     <p class="hint" role="status" aria-live="polite">
-      @if (loading()) { Searching… } @else { {{ items().length }} of {{ total() }} scholarships }
+      @if (loading()) {
+        Searching…
+      } @else if (archived()) {
+        {{ items().length }} archived {{ items().length === 1 ? 'scholarship' : 'scholarships' }}, deadline passed ·
+        <button type="button" class="link" (click)="toggleArchived()">Back to open scholarships</button>
+      } @else {
+        {{ items().length }} {{ items().length === 1 ? 'scholarship' : 'scholarships' }}
+      }
     </p>
     @if (error()) {
       <p class="error" role="alert">{{ error() }}</p>
@@ -133,7 +145,7 @@ const TAG_LABELS: Record<CatalogTag, string> = {
     @if (!loading() && total() === 0) {
       <p class="card">The catalog is empty. Load the team dataset with <code>docker compose exec api npm run seed:catalog</code>.</p>
     } @else if (!loading() && items().length === 0) {
-      <p class="card">No scholarships match. Try fewer words or clear a filter.</p>
+      <p class="card">{{ archived() && !q() && !activeFilters().length ? 'No archived scholarships. None of the deadlines have passed yet.' : 'No scholarships match. Try fewer words or clear a filter.' }}</p>
     }
 
     <ul class="cards">
@@ -190,7 +202,9 @@ export class Discover implements OnInit, OnDestroy {
   protected readonly adding = signal<string | null>(null);
 
   protected readonly q = signal('');
-  protected readonly deadline = signal<NonNullable<CatalogQuery['deadline']>>('upcoming');
+  protected readonly deadline = signal<'upcoming' | '30' | '90'>('upcoming');
+  /** Archived: show only scholarships whose deadline has passed, instead of the open ones. */
+  protected readonly archived = signal(false);
   protected readonly gpa = signal<number | null>(null);
   protected readonly organization = signal('');
   protected readonly sort = signal<NonNullable<CatalogQuery['sort']>>('deadline');
@@ -202,9 +216,8 @@ export class Discover implements OnInit, OnDestroy {
   protected readonly activeFilters = computed(() => {
     const out: { key: string; label: string }[] = [];
     const deadline = this.deadline();
-    if (deadline === '30') out.push({ key: 'deadline', label: 'Due in 30 days' });
-    if (deadline === '90') out.push({ key: 'deadline', label: 'Due in 90 days' });
-    if (deadline === 'all') out.push({ key: 'deadline', label: 'Including closed' });
+    if (!this.archived() && deadline === '30') out.push({ key: 'deadline', label: 'Due in 30 days' });
+    if (!this.archived() && deadline === '90') out.push({ key: 'deadline', label: 'Due in 90 days' });
     const gpa = this.gpa();
     if (gpa !== null && `${gpa}` !== '') out.push({ key: 'gpa', label: `My GPA ${gpa}` });
     if (this.organization()) out.push({ key: 'org', label: this.organization() });
@@ -228,6 +241,11 @@ export class Discover implements OnInit, OnDestroy {
     this.q.set(value);
     clearTimeout(this.searchTimer);
     this.searchTimer = setTimeout(() => void this.reload(), 300);
+  }
+
+  toggleArchived() {
+    this.archived.set(!this.archived());
+    void this.reload();
   }
 
   tagState(t: CatalogTag) {
@@ -269,7 +287,7 @@ export class Discover implements OnInit, OnDestroy {
     try {
       const r = await this.api.catalog({
         q: this.q(),
-        deadline: this.deadline(),
+        deadline: this.archived() ? 'past' : this.deadline(),
         gpa: gpa !== null && Number.isFinite(Number(gpa)) ? Number(gpa) : null,
         requires: this.requires(),
         excludes: this.excludes(),
