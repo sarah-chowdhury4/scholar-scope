@@ -1,3 +1,4 @@
+import { PageLoading } from '../../core/page-loading';
 import { Component, OnInit, inject, signal } from '@angular/core';
 import { DeadlineText } from '../../core/deadline-text';
 import { ZonedDatePipe } from '../../core/zoned-date.pipe';
@@ -10,7 +11,7 @@ type Row = Scholarship & { requirements: Requirement[] };
 /** A plain checklist of every tracked scholarship, laid out for printing or "Save as PDF". */
 @Component({
   selector: 'app-print',
-  imports: [RouterLink, DeadlineText, ZonedDatePipe],
+  imports: [RouterLink, DeadlineText, ZonedDatePipe, PageLoading],
   template: `
     <div class="no-print actions">
       <a routerLink="/">← My scholarships</a>
@@ -19,7 +20,7 @@ type Row = Scholarship & { requirements: Requirement[] };
     <h1>Scholarship checklist</h1>
     <p class="muted">Printed {{ today | zonedDate: tz.zone() : false }}, times in {{ tz.zone() }}. “Verified” items were checked by the ScholarScope team, “From source” items quote the official guidelines; check “Unverified” items yourself.</p>
     @if (loading()) {
-      <p>Loading…</p>
+      <app-page-loading [cards]="2" />
     }
     @for (s of rows(); track s.id) {
       <section class="print-block">

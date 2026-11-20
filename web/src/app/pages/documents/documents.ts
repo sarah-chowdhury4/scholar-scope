@@ -1,3 +1,4 @@
+import { PageLoading } from '../../core/page-loading';
 import { Component, DestroyRef, OnInit, computed, inject, signal } from '@angular/core';
 import { WORK_STEPS, WorkingIndicator } from '../../core/working';
 import { RouterLink } from '@angular/router';
@@ -73,7 +74,7 @@ const GROUPS: readonly Group[] = [
 
 @Component({
   selector: 'app-documents',
-  imports: [RouterLink, DocumentCheckView, WorkingIndicator],
+  imports: [RouterLink, DocumentCheckView, WorkingIndicator, PageLoading],
   template: `
     <h1>Documents</h1>
     <p class="hint">
@@ -95,7 +96,7 @@ const GROUPS: readonly Group[] = [
     }
 
     @if (loading()) {
-      <p>Loading…</p>
+      <app-page-loading [cards]="3" />
     } @else if (loadError()) {
       <p class="error" role="alert">{{ loadError() }}</p>
       <button type="button" (click)="load()">Try again</button>

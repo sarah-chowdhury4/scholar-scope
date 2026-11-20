@@ -309,3 +309,18 @@ details.draft summary { cursor: pointer; font-weight: 600; color: var(--accent);
 .ready-dock-cheer { margin: 6px 0 0; font-weight: 600; color: var(--green); animation: working-in 0.5s ease; }
 @keyframes dock-bump { 40% { transform: scale(1.25); } }
 @keyframes dock-shine { to { background-position: -200% 0; } }
+
+/* ---------- Page changes ---------- */
+/* Each page fades in when it opens instead of snapping into place. */
+app-root > main > :not(router-outlet) { display: block; animation: page-in 0.2s ease-out; }
+@keyframes page-in { from { opacity: 0; transform: translateY(4px); } }
+
+/* Loading placeholder: reserves the page's shape so nothing collapses and jumps. */
+.skeleton { min-height: 60vh; }
+.sk-line { height: 14px; border-radius: 6px; margin: 0 0 12px; background: linear-gradient(90deg, var(--line) 25%, var(--surface-2) 50%, var(--line) 75%); background-size: 200% 100%; animation: sk-shimmer 1.4s linear infinite; }
+.sk-title { height: 34px; width: min(420px, 70%); margin-bottom: 16px; }
+.sk-short { width: 60%; }
+.sk-shorter { width: 35%; }
+.sk-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 16px; margin-top: 24px; }
+.sk-card { background: var(--surface); border-radius: var(--radius); padding: 22px; min-height: 150px; }
+@keyframes sk-shimmer { to { background-position: -200% 0; } }

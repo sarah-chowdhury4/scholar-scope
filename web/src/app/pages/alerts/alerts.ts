@@ -1,3 +1,4 @@
+import { PageLoading } from '../../core/page-loading';
 import { Component, OnInit, inject, signal } from '@angular/core';
 import { ZonedDatePipe } from '../../core/zoned-date.pipe';
 import { TimeZoneService } from '../../core/time-zone.service';
@@ -8,7 +9,7 @@ import { AlertsStore } from '../../core/alerts.store';
 /** Deadline reminders and requirement changes (FR-7.1, FR-7.2). Emails go out too, unless turned off in Profile. */
 @Component({
   selector: 'app-alerts',
-  imports: [ZonedDatePipe, RouterLink],
+  imports: [ZonedDatePipe, RouterLink, PageLoading],
   template: `
     <div class="page-head">
       <div>
@@ -21,7 +22,7 @@ import { AlertsStore } from '../../core/alerts.store';
     </div>
 
     @if (loading()) {
-      <p>Loading…</p>
+      <app-page-loading [cards]="2" />
     } @else if (error()) {
       <p class="error" role="alert">{{ error() }}</p>
     } @else if (items().length === 0) {

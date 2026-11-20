@@ -1,3 +1,4 @@
+import { PageLoading } from '../../core/page-loading';
 import { Component, OnInit, inject, signal } from '@angular/core';
 import { DeadlineText } from '../../core/deadline-text';
 import { DaysLeft } from '../../core/days-left';
@@ -6,7 +7,7 @@ import { ApiService, type Scholarship } from '../../core/api.service';
 
 @Component({
   selector: 'app-dashboard',
-  imports: [RouterLink, DeadlineText, DaysLeft],
+  imports: [RouterLink, DeadlineText, DaysLeft, PageLoading],
   template: `
     <div class="page-head">
       <div>
@@ -39,7 +40,7 @@ import { ApiService, type Scholarship } from '../../core/api.service';
     }
 
     @if (loading()) {
-      <p>Loading…</p>
+      <app-page-loading [cards]="3" />
     } @else if (error()) {
       <p class="error" role="alert">{{ error() }}</p>
     } @else if (items().length === 0) {

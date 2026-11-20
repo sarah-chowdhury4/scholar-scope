@@ -1,3 +1,4 @@
+import { PageLoading } from '../../core/page-loading';
 import { Component, ElementRef, OnInit, computed, inject, input, signal, viewChild } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import {
@@ -20,7 +21,7 @@ import { celebrate, confetti } from '../../core/confetti';
 
 @Component({
   selector: 'app-scholarship',
-  imports: [RouterLink, DocumentCheckView, RequirementCard, ChangeReview, EssayDraft, DeadlineText, DaysLeft, WorkingIndicator],
+  imports: [RouterLink, DocumentCheckView, RequirementCard, ChangeReview, EssayDraft, DeadlineText, DaysLeft, WorkingIndicator, PageLoading],
   template: `
     <p><a routerLink="/">← All scholarships</a></p>
     @if (data(); as s) {
@@ -198,7 +199,7 @@ import { celebrate, confetti } from '../../core/confetti';
         }
       </div>
     } @else {
-      <p>Loading…</p>
+      <app-page-loading [cards]="3" />
     }
   `,
   styles: `

@@ -1,3 +1,4 @@
+import { PageLoading } from '../../core/page-loading';
 import { Component, OnDestroy, OnInit, inject, signal } from '@angular/core';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { Router } from '@angular/router';
@@ -10,10 +11,10 @@ import { CountryPicker } from './country-picker';
 
 @Component({
   selector: 'app-profile',
-  imports: [ReactiveFormsModule, CountryPicker],
+  imports: [ReactiveFormsModule, CountryPicker, PageLoading],
   template: `
     @if (loading()) {
-      <p>Loading…</p>
+      <app-page-loading [cards]="2" />
     } @else if (loadError()) {
       <p class="error" role="alert">{{ loadError() }}</p>
       <button type="button" (click)="load()">Try again</button>

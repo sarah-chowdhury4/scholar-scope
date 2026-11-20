@@ -46,7 +46,16 @@ nav a.active {
   border-bottom-color: var(--green);
   font-weight: 600;
 }
+/* Header, page, footer: the footer stays at the bottom even while a page is loading. */
+:host {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+}
 main {
+  flex: 1 0 auto;
+  width: 100%;
+  box-sizing: border-box;
   max-width: 1080px;
   margin: 0 auto;
   padding: 32px 24px 64px;
