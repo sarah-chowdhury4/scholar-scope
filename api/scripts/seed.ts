@@ -58,8 +58,9 @@ for (const row of parseCsv(readFileSync(csvPath, 'utf8'))) {
   else entries.push(result);
 }
 await ensureAppConfig();
-await saveCatalog(entries);
+const removed = await saveCatalog(entries);
 console.log(`Catalog: ${entries.length} scholarships saved.`);
+if (removed.length) console.log(`Removed from Discover (not in this file): ${removed.join(', ')}.`);
 // Scholarships students already added from a team-checked entry become verified too.
 const upgraded = await applyCatalogVerification();
 if (upgraded) console.log(`Marked ${upgraded} requirement(s) on scholarships already added as verified by the ScholarScope team.`);

@@ -97,6 +97,12 @@ async function start() {
   const webUp = await waitFor(() => answers(SITE), 300, 'the web app');
   if (!apiUp || !webUp) fail(`Not answering yet. Check: docker compose ${apiUp ? '--profile web logs web' : 'logs api'}`);
 
+  // Discover always lists the team's dataset (Dataset/), whatever an older save of the data contained.
+  say('Loading the team\'s scholarship catalog…');
+  if ((await docker(['compose', 'exec', '-T', 'api', 'npm', 'run', '--silent', 'seed:catalog'])) !== 0) {
+    console.warn('  The catalog could not be loaded; Discover may show an older list. Try: docker compose exec api npm run seed:catalog');
+  }
+
   console.log(`
 ✓ ScholarScope is running.
 

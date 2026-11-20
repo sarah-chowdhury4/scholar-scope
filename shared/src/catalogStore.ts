@@ -32,7 +32,21 @@ export async function loadCatalog(options: { fresh?: boolean } = {}): Promise<Ca
   return entries;
 }
 
-export async function saveCatalog(entries: CatalogEntry[]): Promise<void> {
+/**
+ * Make the catalog exactly these entries: each is written by its Scholarship ID, and entries no longer in the
+ * file are removed from Discover (scholarships students already added keep their own copy).
+ * Returns the ids that were removed.
+ */
+export async function saveCatalog(entries: CatalogEntry[]): Promise<string[]> {
+  if (entries.length === 0) throw new Error('The dataset has no scholarships; the catalog was left as it is.');
+  const keep = new Set(entries.map((e) => e.catalogId));
+  const existing = await db().collection('scholarshipCatalog').get();
+  const removed = existing.docs.filter((d) => !keep.has(d.id)).map((d) => d.ref);
+  for (let i = 0; i < removed.length; i += 400) {
+    const batch = db().batch();
+    for (const ref of removed.slice(i, i + 400)) batch.delete(ref);
+    await batch.commit();
+  }
   for (let i = 0; i < entries.length; i += 400) {
     const batch = db().batch();
     for (const e of entries.slice(i, i + 400)) {
@@ -42,6 +56,7 @@ export async function saveCatalog(entries: CatalogEntry[]): Promise<void> {
     await batch.commit();
   }
   cache = undefined;
+  return removed.map((r) => r.id);
 }
 
 export type AddFromCatalogResult =

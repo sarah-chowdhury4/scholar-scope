@@ -203,7 +203,7 @@ The **Discover** page lists the scholarships in the catalog. The team dataset (1
 docker compose exec api npm run seed:catalog
 ```
 
-Run it again after the dataset changes: rows are matched by `Scholarship ID`, so it updates them instead of adding copies. To load another export instead, put it in `api/seed/` (columns as in `api/seed/dataset.example.csv`, or the dataset sheet's headers; dates as `YYYY-MM-DD`) and run `… seed:catalog -- seed/<file>.csv`.
+`npm start` runs it for you on every start. Run it again after the dataset changes: rows are matched by `Scholarship ID`, so it updates them instead of adding copies, and scholarships no longer in the file are removed from Discover (students who already added one keep their copy). To load another export instead, put it in `api/seed/` (columns as in `api/seed/dataset.example.csv`, or the dataset sheet's headers; dates as `YYYY-MM-DD`) and run `… seed:catalog -- seed/<file>.csv`.
 
 **Done when:** it prints `Catalog: 15 scholarships saved.`
 
