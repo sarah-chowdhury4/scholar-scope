@@ -1,5 +1,5 @@
 <header class="topbar">
-  <a routerLink="/" class="brand">ScholarScope</a>
+  <a routerLink="/" class="brand"><img src="logo.png" alt="" width="30" height="30" />ScholarScope</a>
   <span class="tagline">No source, no claim.</span>
   @if (auth.signedIn()) {
     <nav aria-label="Main">
@@ -22,6 +22,11 @@
 <main>
   <router-outlet />
 </main>
+<footer class="site-footer">
+  <!-- Required by the Flaticon free license (logo: "Graduate hat" by Mayor Icons, recolored green). -->
+  Logo icon by <a href="https://www.flaticon.com/authors/mayor-icons" target="_blank" rel="noopener noreferrer">Mayor Icons</a>
+  from <a href="https://www.flaticon.com/free-icon/graduate-hat_8262226" target="_blank" rel="noopener noreferrer">Flaticon</a>
+</footer>
 <div class="toasts" aria-live="polite">
   @for (t of toasts.items(); track t.id) {
     <div class="toast" [class.err]="t.error" [attr.role]="t.error ? 'alert' : 'status'" (click)="toasts.dismiss(t.id)">{{ t.message }}</div>
