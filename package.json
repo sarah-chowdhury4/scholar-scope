@@ -12,6 +12,8 @@
     "node": ">=22"
   },
   "scripts": {
+    "start": "node scripts/site.mjs start",
+    "stop": "node scripts/site.mjs stop",
     "typecheck": "npm run typecheck --workspaces --if-present",
     "test": "vitest run",
     "check": "npm run typecheck && npm test"

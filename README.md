@@ -289,7 +289,9 @@ All ports listen on `127.0.0.1` only.
 
 | Task | Command |
 |---|---|
-| Start / stop | `docker compose up -d` / `docker compose stop` |
+| Start everything (starts Docker Desktop if needed, waits until the site answers) | `npm start` |
+| Stop everything (saves accounts and data first; stop before shutting down the computer or quitting Docker) | `npm stop` |
+| Start / stop without the helper | `docker compose --profile web up -d` / `docker compose --profile web stop` |
 | Recent logs | `docker compose logs --tail 30 worker` (add `-f` to follow) |
 | Restart after changing code in `shared/` | `docker compose restart api worker` |
 | Rebuild after changing a `package.json` | `docker compose up -d --build --renew-anon-volumes api worker` |
