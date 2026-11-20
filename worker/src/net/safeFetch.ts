@@ -39,10 +39,29 @@ export function isPrivateAddress(ip: string): boolean {
   );
 }
 
+/**
+ * Local development only: host names (exact match) that may resolve to a private address, such as the
+ * fictional scholarship site in samples/scholarship-site. Ignored unless APP_ENV=local.
+ *   FETCH_ALLOW_PRIVATE_HOSTS=sample-scholarship.localhost
+ */
+export function isAllowedLocalTestHost(raw: string): boolean {
+  if (process.env.APP_ENV !== 'local') return false;
+  const allowed = (process.env.FETCH_ALLOW_PRIVATE_HOSTS ?? '')
+    .split(',')
+    .map((h) => h.trim().toLowerCase())
+    .filter(Boolean);
+  try {
+    return allowed.includes(new URL(raw).hostname.toLowerCase());
+  } catch {
+    return false;
+  }
+}
+
 export async function assertPublicUrl(raw: string): Promise<URL> {
   const url = new URL(raw);
   if (url.protocol !== 'http:' && url.protocol !== 'https:') throw new BlockedUrlError('Only http and https links are allowed');
   if (url.username || url.password) throw new BlockedUrlError('Links with credentials are not allowed');
+  if (isAllowedLocalTestHost(raw)) return url;
   const host = url.hostname.replace(/^\[|\]$/g, '');
   const addresses = isIP(host) ? [host] : (await lookup(host, { all: true })).map((a) => a.address);
   if (addresses.length === 0 || addresses.some(isPrivateAddress)) {

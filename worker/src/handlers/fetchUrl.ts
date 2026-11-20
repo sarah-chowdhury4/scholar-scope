@@ -2,7 +2,7 @@ import { createHash } from 'node:crypto';
 import { FieldValue, Timestamp } from 'firebase-admin/firestore';
 import { convert } from 'html-to-text';
 import robotsParser from 'robots-parser';
-import { assertPublicUrl, safeFetch } from '../net/safeFetch';
+import { assertPublicUrl, isAllowedLocalTestHost, safeFetch } from '../net/safeFetch';
 import { markdownToText, readerEnabled, readWithJina } from '../net/jinaReader';
 import { extractText } from '../text/extractText';
 import {
@@ -82,7 +82,8 @@ export async function handleFetchUrl(job: JobMessage): Promise<void> {
   let links: PageLink[] = [];
   try {
     await assertPublicUrl(url); // never hand an internal address to anyone, Jina included
-    const page = readerEnabled() ? await readWithJina(url) : null;
+    // Jina is on the internet and can't reach a local test site, so those are always fetched directly.
+    const page = readerEnabled() && !isAllowedLocalTestHost(url) ? await readWithJina(url) : null;
     if (page) {
       reader = 'jina';
       httpStatus = 200;
@@ -132,6 +133,16 @@ export async function handleFetchUrl(job: JobMessage): Promise<void> {
   if (!discovered) await syncRelatedPages(job.uid, source, links, scholarshipIds);
 
   if (source.get('lastTextHash') === textHash) {
+    // Same text, but its requirements were never read (the AI limit was reached, or reading failed): read it again.
+    const currentId = source.get('currentVersionId') as string | null;
+    const current = currentId ? await sourceRef.collection('versions').doc(currentId).get() : null;
+    const extraction = current?.get('extraction.status') as string | undefined;
+    if (current?.exists && extraction !== 'done' && extraction !== 'running') {
+      const nextJobId = await enqueueJob(job.uid, 'extract', current.ref.path);
+      await updateJob(job.uid, job.jobId, { status: 'done', progress: 100, nextJobId });
+      log.info('recheck_unchanged_reread', { target: job.target, extraction: extraction ?? null });
+      return;
+    }
     await updateJob(job.uid, job.jobId, { status: 'done', progress: 100 });
     log.info('recheck_unchanged', { target: job.target });
     await maybeSearch(job.uid, scholarshipIds);

@@ -64,6 +64,13 @@ async function markGivenUp(job: JobMessage, error: string): Promise<void> {
       await setDeliveryStatus(job.uid, (await outbox.get()).get('statusField'), 'failed');
       await outbox.delete(); // it holds a one-time code: do not keep it
     }
+    if (job.type === 'extract') {
+      // Show the reading as failed (not "reading…" forever); saving the page again reads it again.
+      const quota = /exceeded your current quota|quota exceeded/i.test(error);
+      await db()
+        .doc(job.target)
+        .set({ extraction: { status: 'failed', reason: quota ? 'ai_quota' : 'error', jobId: job.jobId } }, { merge: true });
+    }
     if (job.type === 'search_sources') {
       await db().doc(job.target).set({ search: { status: 'failed', error: 'The search could not finish.', jobId: job.jobId, at: FieldValue.serverTimestamp() } }, { merge: true });
     }

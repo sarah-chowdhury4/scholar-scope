@@ -264,6 +264,7 @@ export class ScholarshipPage implements OnInit {
     if (!ex) return when;
     if (ex.status === 'done') return `${when} · ${ex.itemsFound ?? 0} requirement${ex.itemsFound === 1 ? '' : 's'} found`;
     if (ex.status === 'paused') return `${when} · reading is paused`;
+    if (ex.status === 'failed') return `${when} · could not read the requirements yet. Press Save page to try again.`;
     return `${when} · reading the requirements…`;
   }
 

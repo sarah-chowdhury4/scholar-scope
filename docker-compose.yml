@@ -115,6 +115,23 @@ services:
     ports:
       - "127.0.0.1:8025:8025"       # web inbox for alert emails
 
+  # ---------- Fictional scholarship website, for testing re-checks ----------
+  # http://sample-scholarship.localhost:8088 in the browser; the worker reaches the same address on the Docker
+  # network. Edit samples/scholarship-site/index.html to change the deadlines (served fresh on every request).
+  sample-site:
+    image: node:22-bookworm-slim
+    command: node /site/server.mjs
+    volumes:
+      - ./samples/scholarship-site:/site:ro
+    environment:
+      PORT: "8088"
+    ports:
+      - "127.0.0.1:8088:8088"
+    networks:
+      default:
+        aliases:
+          - sample-scholarship.localhost
+
   # ---------- ScholarScope API (Express) ----------
   api:
     build:
@@ -195,6 +212,8 @@ services:
       NIM_ENABLED: ${NIM_ENABLED:-true}               # "false" = no NVIDIA key: NIM calls run on Gemini
       NIM_BASE_URL: https://integrate.api.nvidia.com/v1
       READER_BACKEND: ${READER_BACKEND:-jina}           # "direct" = fetch saved pages ourselves, never via Jina Reader
+      # The fictional test site (service sample-site) is on the Docker network, which the URL guard normally blocks.
+      FETCH_ALLOW_PRIVATE_HOSTS: sample-scholarship.localhost
       AI_REAL_STUDENT_DATA_ALLOWED: "false"          # synthetic documents only (NFR-1.5)
       MAIL_BACKEND: ${MAIL_BACKEND:-smtp}           # smtp = Mailpit test inbox; gmail or brevo = real inboxes
       MAIL_FROM: ${MAIL_FROM:-ScholarScope <alerts@scholarscope.local>}  # with brevo: a sender verified in Brevo
