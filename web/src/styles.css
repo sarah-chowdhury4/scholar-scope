@@ -236,7 +236,7 @@ details.draft summary { cursor: pointer; font-weight: 600; color: var(--accent);
 .print-list { list-style: none; padding: 0; display: grid; gap: 0.35rem; }
 .print-list .box { font-size: 1.1rem; margin-right: 0.3rem; }
 @media print {
-  .topbar, .no-print { display: none !important; }
+  .topbar, .site-footer, .no-print { display: none !important; }
   body { background: #fff; color: #000; }
   a { color: #000; }
 }

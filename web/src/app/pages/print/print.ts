@@ -17,7 +17,7 @@ type Row = Scholarship & { requirements: Requirement[] };
       <button type="button" (click)="print()" [disabled]="loading()">Print or save as PDF</button>
     </div>
     <h1>Scholarship checklist</h1>
-    <p class="muted">Printed {{ today | zonedDate: tz.zone() : false }}, times in {{ tz.zone() }}. “From source” items quote the official guidelines; check “Unverified” items yourself.</p>
+    <p class="muted">Printed {{ today | zonedDate: tz.zone() : false }}, times in {{ tz.zone() }}. “Verified” items were checked by the ScholarScope team, “From source” items quote the official guidelines; check “Unverified” items yourself.</p>
     @if (loading()) {
       <p>Loading…</p>
     }
@@ -39,7 +39,7 @@ type Row = Scholarship & { requirements: Requirement[] };
           @for (r of s.requirements; track r.id) {
             <li>
               <span class="box" aria-hidden="true">{{ r.readiness === 'ready' ? '☑' : '☐' }}</span>
-              <strong>{{ r.label }}</strong> — {{ label(r.verification) }}
+              <strong>{{ r.label }}</strong> — {{ label(r.verification, r.current.citation?.kind === 'catalog' ? 'ScholarScope team' : null) }}
               @if (r.current.citation; as c) {
                 <div class="muted small">“{{ c.quote }}”{{ c.page ? ' (page ' + c.page + ')' : '' }}</div>
               }
