@@ -45,8 +45,21 @@ export function createApp() {
   app.use('/api/auth', passwordResetRouter);
 
   const api = express.Router();
-  api.use(rateLimit({ windowMs: 60_000, limit: 120, standardHeaders: 'draft-8', legacyHeaders: false }));
+  // Before sign-in checks: a generous cap per address, against floods of unauthenticated requests.
+  api.use(rateLimit({ windowMs: 60_000, limit: 1200, standardHeaders: 'draft-8', legacyHeaders: false }));
   api.use(requireAuth);
+  // Per signed-in student, so classmates on one network don't share an allowance. Switching pages quickly
+  // makes 3-4 reads per page, so this leaves plenty of room while still stopping a runaway client.
+  api.use(
+    rateLimit({
+      windowMs: 60_000,
+      limit: 600,
+      standardHeaders: 'draft-8',
+      legacyHeaders: false,
+      keyGenerator: (req) => `uid:${req.uid}`,
+      message: { error: 'Too many requests. Wait a few seconds and try again.' },
+    }),
+  );
   api.use('/me', meRouter);
   api.use('/scholarships/:id/requirements', requirementsRouter);
   api.use('/scholarships/:id/changes', changesRouter);

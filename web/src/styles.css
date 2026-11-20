@@ -311,9 +311,9 @@ details.draft summary { cursor: pointer; font-weight: 600; color: var(--accent);
 @keyframes dock-shine { to { background-position: -200% 0; } }
 
 /* ---------- Page changes ---------- */
-/* Each page fades in when it opens instead of snapping into place. */
-app-root > main > :not(router-outlet) { display: block; animation: page-in 0.2s ease-out; }
-@keyframes page-in { from { opacity: 0; transform: translateY(4px); } }
+/* A page opens invisible until its data is in (at most 0.4 s), then fades in once, complete. */
+app-root > main { transition: opacity 0.18s ease-out, transform 0.18s ease-out; }
+app-root > main.entering { opacity: 0; transform: translateY(4px); transition: none; }
 
 /* Loading placeholder: reserves the page's shape so nothing collapses and jumps. */
 .skeleton { min-height: 60vh; }

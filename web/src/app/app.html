@@ -19,7 +19,7 @@
     <a routerLink="/login" class="nav">Sign in</a>
   }
 </header>
-<main>
+<main [class.entering]="pages.entering()">
   <router-outlet />
 </main>
 <footer class="site-footer">
