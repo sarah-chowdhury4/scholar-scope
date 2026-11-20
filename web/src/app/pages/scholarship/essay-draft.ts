@@ -1,5 +1,6 @@
 import { Component, OnInit, inject, input, output, signal } from '@angular/core';
 import { ApiService, apiMessage, type Draft, type Requirement } from '../../core/api.service';
+import { WORK_STEPS, WorkingIndicator } from '../../core/working';
 
 /**
  * Essay draft helper for one requirement. The student writes their own notes first; Gemini drafts
@@ -7,6 +8,7 @@ import { ApiService, apiMessage, type Draft, type Requirement } from '../../core
  */
 @Component({
   selector: 'app-essay-draft',
+  imports: [WorkingIndicator],
   template: `
     <details class="draft" [open]="open()" (toggle)="onToggle($event)">
       <summary>Draft this essay with AI</summary>
@@ -16,7 +18,7 @@ import { ApiService, apiMessage, type Draft, type Requirement } from '../../core
             <p role="status">Waiting to start…</p>
           }
           @case ('writing') {
-            <p role="status">Writing your draft… this can take up to a minute.</p>
+            <app-working [steps]="draftSteps" announce="Writing your draft" />
           }
           @case ('failed') {
             <p class="warning">{{ d.error || 'The draft could not be written.' }}</p>
@@ -90,6 +92,7 @@ import { ApiService, apiMessage, type Draft, type Requirement } from '../../core
   `,
 })
 export class EssayDraft implements OnInit {
+  protected readonly draftSteps = WORK_STEPS.draft;
   private readonly api = inject(ApiService);
   readonly requirement = input.required<Requirement>();
   readonly scholarshipId = input.required<string>();

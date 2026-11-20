@@ -1,4 +1,5 @@
-import { Component, OnInit, inject, signal } from '@angular/core';
+import { Component, DestroyRef, OnInit, computed, inject, signal } from '@angular/core';
+import { WORK_STEPS, WorkingIndicator } from '../../core/working';
 import { RouterLink } from '@angular/router';
 import { ApiService, apiMessage, type Scholarship, type StudentDocument } from '../../core/api.service';
 import { DocumentCheckView } from './document-check';
@@ -72,7 +73,7 @@ const GROUPS: readonly Group[] = [
 
 @Component({
   selector: 'app-documents',
-  imports: [RouterLink, DocumentCheckView],
+  imports: [RouterLink, DocumentCheckView, WorkingIndicator],
   template: `
     <h1>Documents</h1>
     <p class="hint">
@@ -87,7 +88,9 @@ const GROUPS: readonly Group[] = [
     </p>
     <p><a routerLink="/">← My scholarships</a></p>
 
-    @if (status()) {
+    @if (phase() && !statusBad()) {
+      <app-working [steps]="steps()" />
+    } @else if (status()) {
       <p [class]="statusBad() ? 'error' : 'success'" role="status">{{ status() }}</p>
     }
 
@@ -189,9 +192,19 @@ export class DocumentsPage implements OnInit {
   protected readonly busy = signal<string | null>(null);
   protected readonly picked = signal<Record<string, string>>({});
   protected readonly custom = signal<Record<string, string>>({});
+  /** What a running upload or check is doing, for the working indicator. */
+  protected readonly phase = signal<keyof typeof WORK_STEPS | null>(null);
+  protected readonly steps = computed(() => WORK_STEPS[this.phase() ?? 'upload']);
+  private poll: ReturnType<typeof setInterval> | undefined;
+  private readonly destroyRef = inject(DestroyRef);
 
   async ngOnInit() {
     await this.load();
+    // A check started earlier (or in another tab) may still be running: refresh until it finishes.
+    this.poll = setInterval(() => {
+      if (!this.busy() && this.items().some((d) => d.check?.status === 'queued' || d.check?.status === 'running')) void this.refresh();
+    }, 4000);
+    this.destroyRef.onDestroy(() => clearInterval(this.poll));
   }
 
   ofType(type: string) {
@@ -275,6 +288,7 @@ export class DocumentsPage implements OnInit {
 
   async recheck(doc: StudentDocument) {
     this.busy.set(doc.id);
+    this.phase.set('documentCheck');
     this.note('Checking the document again…', false);
     try {
       const { jobId, items } = await this.api.checkDocument(doc.id);
@@ -287,6 +301,7 @@ export class DocumentsPage implements OnInit {
       await this.refresh();
     } finally {
       this.busy.set(null);
+      this.phase.set(null);
     }
   }
 
@@ -323,13 +338,16 @@ export class DocumentsPage implements OnInit {
 
   private async send(type: string, file: File, title?: string) {
     this.busy.set(type);
+    this.phase.set('upload');
     this.note('Uploading…', false);
     try {
       const jobId = await this.api.uploadDocument(file, type, title);
+      this.phase.set('scan');
       this.note('Checking the file for viruses…', false);
       const checkJob = await this.waitFor(jobId);
       await this.refresh();
       if (checkJob) {
+        this.phase.set('documentCheck');
         this.note('File saved. The AI check is reading it now…', false);
         try {
           await this.waitFor(checkJob);
@@ -344,6 +362,7 @@ export class DocumentsPage implements OnInit {
       await this.refresh();
     } finally {
       this.busy.set(null);
+      this.phase.set(null);
     }
   }
 

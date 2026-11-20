@@ -1,18 +1,20 @@
 import { Component, input } from '@angular/core';
+import { WORK_STEPS, WorkingIndicator } from '../../core/working';
 import type { DocumentCheck, DocumentFinding } from '../../core/api.service';
 
 /** Shows the AI check of one saved file: a status line, then each finding with the text it came from. */
 @Component({
   selector: 'app-document-check',
+  imports: [WorkingIndicator],
   template: `
     @if (check(); as c) {
       <div class="doc-check" [attr.data-severity]="c.severity">
         @switch (c.status) {
           @case ('queued') {
-            <p class="muted small" role="status">AI check waiting to start…</p>
+            <app-working [compact]="true" [steps]="queuedSteps" announce="AI check waiting to start" />
           }
           @case ('running') {
-            <p class="muted small" role="status">AI check reading the file…</p>
+            <app-working [compact]="true" [steps]="readingSteps" announce="The AI is checking this document" />
           }
           @case ('paused') {
             <p class="warning small">AI check paused. {{ c.reason }}</p>
@@ -51,6 +53,8 @@ import type { DocumentCheck, DocumentFinding } from '../../core/api.service';
   `,
 })
 export class DocumentCheckView {
+  protected readonly queuedSteps = ['AI check waiting to start…', 'Next in line for the AI…'];
+  protected readonly readingSteps = WORK_STEPS.documentCheck;
   readonly check = input<DocumentCheck | null>(null);
   /** Findings that compare this file with one scholarship (deadline, GPA…). */
   readonly extra = input<DocumentFinding[]>([]);

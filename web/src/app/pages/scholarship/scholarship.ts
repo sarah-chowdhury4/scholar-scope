@@ -1,4 +1,4 @@
-import { Component, ElementRef, OnInit, inject, input, signal, viewChild } from '@angular/core';
+import { Component, ElementRef, OnInit, computed, inject, input, signal, viewChild } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import {
   ApiService,
@@ -15,10 +15,12 @@ import { DaysLeft } from '../../core/days-left';
 import { RequirementCard } from './requirement-card';
 import { ChangeReview } from './change-review';
 import { EssayDraft } from './essay-draft';
+import { WORK_STEPS, WorkingIndicator } from '../../core/working';
+import { celebrate, confetti } from '../../core/confetti';
 
 @Component({
   selector: 'app-scholarship',
-  imports: [RouterLink, DocumentCheckView, RequirementCard, ChangeReview, EssayDraft, DeadlineText, DaysLeft],
+  imports: [RouterLink, DocumentCheckView, RequirementCard, ChangeReview, EssayDraft, DeadlineText, DaysLeft, WorkingIndicator],
   template: `
     <p><a routerLink="/">← All scholarships</a></p>
     @if (data(); as s) {
@@ -43,7 +45,9 @@ import { EssayDraft } from './essay-draft';
           </button>
         </div>
       </header>
-      @if (status()) {
+      @if (busy() && phase()) {
+        <app-working [steps]="steps()" />
+      } @else if (status()) {
         <p class="notice" role="status">{{ status() }}</p>
       }
 
@@ -172,6 +176,27 @@ import { EssayDraft } from './essay-draft';
           </div>
         }
       }
+
+      <!-- Always in view at the bottom of the screen: how ready this application is. -->
+      <div class="ready-dock" #dock [class.done]="s.readinessPct >= 100" [class.bump]="bump()">
+        <div class="ready-dock-row">
+          <strong>{{ s.counts.ready }} of {{ s.counts.total }} requirements ready</strong>
+          <span class="ready-dock-pct" aria-hidden="true">{{ s.readinessPct }}%</span>
+        </div>
+        <div
+          class="progress-track"
+          role="progressbar"
+          aria-label="Application readiness"
+          [attr.aria-valuenow]="s.readinessPct"
+          aria-valuemin="0"
+          aria-valuemax="100"
+        >
+          <div class="progress-bar" #bar [style.width.%]="s.readinessPct"></div>
+        </div>
+        @if (cheer()) {
+          <p class="ready-dock-cheer" role="status">{{ cheer() }}</p>
+        }
+      </div>
     } @else {
       <p>Loading…</p>
     }
@@ -201,6 +226,17 @@ export class ScholarshipPage implements OnInit {
   protected readonly sources = signal<SourceSummary[]>([]);
   protected readonly guidelinesOpen = signal(false);
   private readonly guidelines = viewChild<ElementRef<HTMLDialogElement>>('guidelines');
+  private readonly bar = viewChild<ElementRef<HTMLElement>>('bar');
+
+  /** What a running upload or page save is doing, for the working indicator. */
+  protected readonly phase = signal<keyof typeof WORK_STEPS | null>(null);
+  protected readonly steps = computed(() => WORK_STEPS[this.phase() ?? 'upload']);
+
+  /** Readiness last shown, to celebrate when a student's action raises it (not on first load). */
+  private lastPct: number | null = null;
+  protected readonly bump = signal(false);
+  protected readonly cheer = signal('');
+  private cheerTimer: ReturnType<typeof setTimeout> | undefined;
 
   /** A native modal dialog: keeps focus inside, closes on Escape, and returns focus to the button. */
   openGuidelines() {
@@ -230,11 +266,36 @@ export class ScholarshipPage implements OnInit {
     const s = await this.api.scholarship(this.id());
     this.data.set(s);
     this.requirements.set(s.requirements);
+    this.celebrateProgress(s.readinessPct, s.name);
     try {
       this.sources.set((await this.api.sources(this.id())).items);
     } catch {
       this.sources.set([]);
     }
+  }
+
+  /** Confetti from the end of the bar when readiness goes up; a big celebration at 100%. */
+  private celebrateProgress(pct: number, name: string) {
+    const before = this.lastPct;
+    this.lastPct = pct;
+    if (before === null || pct <= before) return;
+    this.bump.set(false);
+    setTimeout(() => this.bump.set(true));
+    clearTimeout(this.cheerTimer);
+    if (pct >= 100) {
+      celebrate();
+      this.cheer.set(`Everything for ${name} is ready. Well done!`);
+      return; // stays up while the application is complete
+    }
+    // Wait for the bar to grow, then burst from its new end.
+    setTimeout(() => {
+      const rect = this.bar()?.nativeElement.getBoundingClientRect();
+      const x = rect ? (rect.left + rect.width) / window.innerWidth : 0.5;
+      const y = rect ? rect.top / window.innerHeight : 0.92;
+      confetti({ count: 45, origin: { x, y }, spread: 60, speed: 11 });
+    }, 450);
+    this.cheer.set(pct - before >= 1 ? `Nice! ${pct}% ready.` : '');
+    this.cheerTimer = setTimeout(() => this.cheer.set(''), 3500);
   }
 
   sourceKind(src: SourceSummary): string {
@@ -277,11 +338,13 @@ export class ScholarshipPage implements OnInit {
     }
     this.busy.set(true);
     this.closeGuidelines();
+    this.phase.set('fetchPage');
     this.status.set('Fetching the page…');
     try {
       const { jobId } = await this.api.addSourceUrl(this.id(), url);
       const next = await this.waitFor(jobId);
       if (next) {
+        this.phase.set('requirements');
         this.status.set('Reading the requirements… this can take up to a minute.');
         await this.waitFor(next);
         this.status.set('Done. Review the requirements below.');
@@ -292,6 +355,7 @@ export class ScholarshipPage implements OnInit {
       this.status.set(friendlyFetchError(err instanceof Error ? err.message : apiMessage(err, 'Could not save that page.')));
     } finally {
       this.busy.set(false);
+      this.phase.set(null);
       await this.load();
     }
   }
@@ -346,12 +410,15 @@ export class ScholarshipPage implements OnInit {
     if (!file) return;
     this.busy.set(true);
     this.closeGuidelines();
+    this.phase.set('upload');
     this.status.set('Uploading…');
     try {
       const jobId = await this.api.uploadSource(this.id(), file);
+      this.phase.set('scan');
       this.status.set('Checking the file for viruses…');
       const next = await this.waitFor(jobId);
       if (next) {
+        this.phase.set('requirements');
         this.status.set('Reading the requirements… this can take up to a minute.');
         await this.waitFor(next);
       }
@@ -361,6 +428,7 @@ export class ScholarshipPage implements OnInit {
       this.status.set(err instanceof Error ? err.message : 'Upload failed.');
     } finally {
       this.busy.set(false);
+      this.phase.set(null);
     }
   }
 
