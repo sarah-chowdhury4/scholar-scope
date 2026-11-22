@@ -53,6 +53,20 @@ jobs:
       - name: Shell scripts
         run: shellcheck -S warning local/*/*.sh
 
+  infra:
+    name: Terraform — fmt, validate, tfsec, checkov, infracost
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      # The same pinned tool images as `npm run infra:check` locally. No Google Cloud credentials are used.
+      # The cost step runs only when the repository has an INFRACOST_API_KEY secret (a free key from infracost.io).
+      - run: node scripts/infra-check.mjs
+        env:
+          INFRACOST_API_KEY: ${{ secrets.INFRACOST_API_KEY }}
+
   secrets:
     name: Secret scan (gitleaks)
     runs-on: ubuntu-latest
