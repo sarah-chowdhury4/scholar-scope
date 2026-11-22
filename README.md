@@ -380,7 +380,7 @@ shared/     Firestore access, adapters, citation + deadline logic
 web/        Angular app
 local/      emulator config, MinIO policies + tests, LocalStack init, dev Dockerfiles
 infra/      Terraform for Google Cloud, checked locally (fmt, validate, tfsec, checkov, infracost)
-scripts/    helper scripts (infra-check)
+scripts/    npm start / npm stop (site.mjs) and the Terraform checks (infra-check.mjs)
 .github/    CI workflow
 ```
 
