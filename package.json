@@ -14,7 +14,8 @@
   "scripts": {
     "typecheck": "npm run typecheck --workspaces --if-present",
     "test": "vitest run",
-    "check": "npm run typecheck && npm test"
+    "check": "npm run typecheck && npm test",
+    "infra:check": "node scripts/infra-check.mjs"
   },
   "devDependencies": {
     "@types/node": "^22.10.0",

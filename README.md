@@ -281,6 +281,7 @@ All ports listen on `127.0.0.1` only.
 npm ci && npm run check                     # typecheck + unit tests (shared, api, worker)
 cd web && npx ng test --watch=false && cd ..   # Angular tests
 docker compose run --rm --entrypoint /bin/sh minio-init /init/test-permissions.sh
+npm run infra:check                         # Terraform: fmt, validate, tfsec, checkov, infracost (Docker only, no cloud account)
 ```
 
 In Windows PowerShell 5, use `;` instead of `&&`.
@@ -325,6 +326,7 @@ Before pasting logs into an issue or chat, check them for passwords and keys.
 | Worker: virus scan, OCR, extraction, page re-checks, alerts | `worker/` | `worker` container |
 | Shared code: data access, adapters, citation and deadline logic | `shared/` | used by API and worker |
 | Local infrastructure | `local/`, `docker-compose.yml` | containers below |
+| Google Cloud infrastructure (Terraform) | `infra/` | checked locally with `npm run infra:check`, see [infra/README.md](infra/README.md) |
 
 | Production service (Google Cloud) | Local stand-in |
 |---|---|
@@ -346,6 +348,8 @@ worker/     job handlers (scan, extract, fetch_url), cron jobs, delete-user job
 shared/     Firestore access, adapters, citation + deadline logic
 web/        Angular app
 local/      emulator config, MinIO policies + tests, LocalStack init, dev Dockerfiles
+infra/      Terraform for Google Cloud, checked locally (fmt, validate, tfsec, checkov, infracost)
+scripts/    helper scripts (infra-check)
 .github/    CI workflow
 ```
 
@@ -389,12 +393,13 @@ The local setup does **not** provide encryption at rest, IAM enforcement in Loca
 | Draft generation with citations, approval | To do |
 | Calendar (ICS) and PDF/CSV export | To do |
 | Google Cloud adapters (GCS, Cloud Tasks, Secret Manager) | Stubs in `shared/src/platform/` |
+| Google Cloud infrastructure as code (Terraform) | Done, checked locally and in CI (`infra/`) |
 
 ---
 
 ## Contributing
 
-- Work on a branch and open a pull request into `main`. CI (`.github/workflows/ci.yml`) must pass: typecheck and unit tests, Angular build and tests, a `docker-compose.yml` check, shell-script checks and a gitleaks secret scan.
+- Work on a branch and open a pull request into `main`. CI (`.github/workflows/ci.yml`) must pass: typecheck and unit tests, Angular build and tests, a `docker-compose.yml` check, shell-script checks, Terraform checks (`npm run infra:check`) and a gitleaks secret scan.
 - **Never commit** `.env`, `.env.secrets`, real student documents or keys. If a key is ever committed or shown, revoke it and create a new one.
 - Keep shell scripts and Dockerfiles with LF line endings (`.gitattributes` handles this).
 - New image versions: test locally, then update the digests in `.env.example` in the same pull request.

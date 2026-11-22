@@ -1,0 +1,33 @@
+# Expected monthly usage for `infracost breakdown`, for a pilot of about 500 students.
+# Without these numbers infracost prices only the fixed costs. Adjust them as real usage becomes known.
+version: 0.1
+resource_usage:
+  google_storage_bucket.uploads:
+    storage_gb: 2                  # quarantine only: files leave within minutes and are deleted after 7 days
+    monthly_class_a_operations: 20000
+    monthly_class_b_operations: 20000
+    monthly_egress_data_transfer_gb:
+      same_continent: 0
+      worldwide: 0
+  google_storage_bucket.originals:
+    storage_gb: 20                 # about 40 MB of documents per student
+    monthly_class_a_operations: 20000
+    monthly_class_b_operations: 100000
+    monthly_egress_data_transfer_gb:
+      same_continent: 5
+      worldwide: 5
+  google_storage_bucket.exports:
+    storage_gb: 1
+    monthly_class_a_operations: 5000
+    monthly_class_b_operations: 5000
+  google_secret_manager_secret.worker["NVIDIA_API_KEY"]:
+    active_secret_versions: 1
+    monthly_access_operations: 3000
+  google_secret_manager_secret.worker["JINA_API_KEY"]:
+    active_secret_versions: 1
+    monthly_access_operations: 3000
+  google_secret_manager_secret.worker["BREVO_API_KEY"]:
+    active_secret_versions: 1
+    monthly_access_operations: 3000
+  google_artifact_registry_repository.images:
+    storage_gb: 5

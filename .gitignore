@@ -32,3 +32,6 @@ Thumbs.db
 api/seed/*.csv
 !api/seed/dataset.example.csv
 coverage/
+
+# Terraform variable values (copy terraform.tfvars.example)
+terraform.tfvars
