@@ -28,6 +28,30 @@ export function dueDeadlineAlert(
   return offsets.includes(days) ? days : null;
 }
 
+/** How many days late a missed reminder may still go out (covers a weekend with the worker switched off). */
+export const MAX_REMINDER_DELAY_DAYS = 3;
+
+/**
+ * The reminder to send now, catching up on a missed day. The latest reminder day that has arrived (the smallest
+ * offset that is not below the days left) is due, as long as it arrived at most MAX_REMINDER_DELAY_DAYS ago.
+ * So if the job did not run 7 days before, it still sends that reminder the next time it runs, 6 days before,
+ * saying "6 days". Older missed reminders are not sent: only the most recent one is useful. Each reminder is
+ * stored under its offset, so the regular run and a catch-up can never both send it.
+ */
+export function dueDeadlineReminder(
+  deadline: Date,
+  now: Date,
+  timeZone: string,
+  offsets: number[],
+): { offset: number; daysLeft: number } | null {
+  const daysLeft = daysUntil(deadline, now, timeZone);
+  if (daysLeft < 0) return null;
+  const arrived = offsets.filter((o) => o >= daysLeft);
+  if (arrived.length === 0) return null;
+  const offset = Math.min(...arrived);
+  return offset - daysLeft <= MAX_REMINDER_DELAY_DAYS ? { offset, daysLeft } : null;
+}
+
 /** Subject of a deadline reminder: "… is due today", "… is due tomorrow" or "… is due in N days". */
 export function deadlineAlertTitle(name: string, offsetDays: number): string {
   if (offsetDays === 0) return `${name} is due today`;

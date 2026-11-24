@@ -150,6 +150,8 @@ export type AlertItem = {
   body: string;
   scholarshipId: string | null;
   changeId: string | null;
+  /** Days left when a deadline reminder was sent; null for other alerts and older reminders. */
+  daysLeft?: number | null;
   read: boolean;
   createdAt: string | null;
 };

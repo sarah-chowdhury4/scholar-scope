@@ -5,7 +5,7 @@ import {
   enqueueJob,
   getAppConfig,
   sendMail,
-  dueDeadlineAlert,
+  dueDeadlineReminder,
   deadlineAlertTitle,
   deadlineSentence,
   deadlineDedupeKey,
@@ -85,8 +85,10 @@ export async function runDeadlineAlerts(now = new Date()): Promise<{ sent: numbe
     const user = await userRef.get();
     const timeZone = (user.get('timezone') as string | undefined) || 'UTC';
     const deadline = (sch.get('deadline.utc') as Timestamp).toDate();
-    const offset = dueDeadlineAlert(deadline, now, timeZone, alertOffsetsDays);
-    if (offset === null) continue;
+    // Catches up on a reminder day the job missed (worker switched off), see dueDeadlineReminder.
+    const due = dueDeadlineReminder(deadline, now, timeZone, alertOffsetsDays);
+    if (due === null) continue;
+    const { offset, daysLeft } = due;
 
     const dedupeKey = deadlineDedupeKey(sch.id, offset, deadline);
     const alertRef = userRef.collection('alerts').doc(createHash('sha256').update(dedupeKey).digest('hex').slice(0, 32));
@@ -102,12 +104,14 @@ export async function runDeadlineAlerts(now = new Date()): Promise<{ sent: numbe
       timeZone,
     );
     const caution = verification === 'verified' ? '' : '\n\nThis deadline has not been confirmed from a source document yet. Check the official page.';
-    const title = deadlineAlertTitle(name, offset);
+    const title = deadlineAlertTitle(name, daysLeft);
     const body = `${name} (${sch.get('provider')}) is due on ${when}.${caution}`;
 
     try {
       await alertRef.create({
         type: `deadline_${offset}`,
+        daysLeft,
+        late: daysLeft !== offset,
         dedupeKey,
         scholarshipId: sch.id,
         changeId: null,

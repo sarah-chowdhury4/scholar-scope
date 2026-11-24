@@ -35,6 +35,9 @@ if (process.env.SCHEDULER === 'cron') {
   cron.schedule(process.env.CRON_RECHECK || '0 2 * * *', safely('recheck', runRecheck), { timezone: 'UTC' });
   cron.schedule(process.env.CRON_DEADLINE_ALERTS || '0 13 * * *', safely('deadline_alerts', () => runDeadlineAlerts()), { timezone: 'UTC' });
   log.info('cron_scheduled', { recheck: process.env.CRON_RECHECK, deadlineAlerts: process.env.CRON_DEADLINE_ALERTS });
+  // Catch up on reminders at start-up too: if the computer or Docker was off at the scheduled time, today's
+  // reminders go out now instead of being skipped. Already-sent reminders are never sent again.
+  setTimeout(safely('deadline_alerts_startup', () => runDeadlineAlerts()), 30_000);
 }
 
 log.info('worker_started', { env: process.env.APP_ENV });

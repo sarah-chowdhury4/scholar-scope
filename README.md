@@ -5,7 +5,7 @@
 - Upload a scholarship's guidelines (PDF, Word, image or text) or save its web page.
 - Requirements, deadlines, word limits and eligibility rules are extracted, and **each one links to the exact page and sentence in the source**. Anything that can't be found in the source is shown as **Unverified**.
 - Requirements are versioned, never overwritten. When a saved page changes, the affected requirement is flagged until the student acknowledges it.
-- Deadline alerts go out 14, 7, 3 and 1 days before each deadline, and on the day itself.
+- Deadline alerts go out 14, 7, 3 and 1 days before each deadline, and on the day itself. If the worker was off on a reminder day, that reminder goes out when it next runs (up to 3 days late, with the real number of days left); the worker also checks for due reminders each time it starts.
 
 Everything runs on your own computer with Docker. **You don't need a cloud account or a payment method.**
 

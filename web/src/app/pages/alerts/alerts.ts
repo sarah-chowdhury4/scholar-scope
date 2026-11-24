@@ -35,7 +35,7 @@ import { AlertsStore } from '../../core/alerts.store';
         @for (a of items(); track a.id) {
           <li class="card" [class.unread]="!a.read" [class.changed]="a.type === 'change' && !a.read">
             <p>
-              <span class="badge" [class]="a.type === 'change' ? 'changed' : 'needs_review'">{{ kind(a.type) }}</span>
+              <span class="badge" [class]="a.type === 'change' ? 'changed' : 'needs_review'">{{ kind(a.type, a.daysLeft) }}</span>
               @if (!a.read) {
                 <span class="badge unverified">New</span>
               }
@@ -72,12 +72,14 @@ export class AlertsPage implements OnInit {
     await this.load();
   }
 
-  kind(type: string) {
+  kind(type: string, daysLeft?: number | null) {
     if (type === 'change') return 'Requirement changed';
-    if (type === 'deadline_0') return 'Due today';
-    if (type === 'deadline_1') return 'Due tomorrow';
-    if (type.startsWith('deadline_')) return `Due in ${type.slice('deadline_'.length)} days`;
-    return 'Notice';
+    if (!type.startsWith('deadline_')) return 'Notice';
+    // A reminder sent late (the job was off on its day) says how many days were really left.
+    const days = daysLeft ?? Number(type.slice('deadline_'.length));
+    if (days === 0) return 'Due today';
+    if (days === 1) return 'Due tomorrow';
+    return `Due in ${days} days`;
   }
 
   async load() {

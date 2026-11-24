@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { daysUntil, dueDeadlineAlert, deadlineAlertTitle, deadlineDedupeKey, parseSourceDeadline, timeZoneOffsetMinutes, deadlineFromSource, isApplicationDeadline, pickApplicationDeadline } from '../src/deadlines';
+import { daysUntil, dueDeadlineAlert, dueDeadlineReminder, deadlineAlertTitle, deadlineDedupeKey, parseSourceDeadline, timeZoneOffsetMinutes, deadlineFromSource, isApplicationDeadline, pickApplicationDeadline } from '../src/deadlines';
 
 describe('daysUntil / dueDeadlineAlert', () => {
   const offsets = [14, 7, 3, 1];
@@ -30,6 +30,22 @@ describe('daysUntil / dueDeadlineAlert', () => {
     expect(deadlineAlertTitle('Dell Scholars', 0)).toBe('Dell Scholars is due today');
     expect(deadlineAlertTitle('Dell Scholars', 1)).toBe('Dell Scholars is due tomorrow');
     expect(deadlineAlertTitle('Dell Scholars', 14)).toBe('Dell Scholars is due in 14 days');
+  });
+  it('catches up on a reminder day the job missed, saying the real days left', () => {
+    const deadline = new Date('2026-12-01T23:59:00Z');
+    const at = (day: string) => dueDeadlineReminder(deadline, new Date(`${day}T13:00:00Z`), 'UTC', [14, 7, 3, 1, 0]);
+    expect(at('2026-11-24')).toEqual({ offset: 7, daysLeft: 7 }); // on time
+    expect(at('2026-11-25')).toEqual({ offset: 7, daysLeft: 6 }); // the 7-day run was missed: sent a day late
+    expect(at('2026-11-27')).toEqual({ offset: 7, daysLeft: 4 }); // three days late is the limit
+    expect(at('2026-11-29')).toEqual({ offset: 3, daysLeft: 2 });
+    expect(at('2026-12-01')).toEqual({ offset: 0, daysLeft: 0 });
+  });
+  it('does not send old reminders for a scholarship added late, or for passed deadlines', () => {
+    const deadline = new Date('2026-12-01T23:59:00Z');
+    const at = (day: string) => dueDeadlineReminder(deadline, new Date(`${day}T13:00:00Z`), 'UTC', [14, 7, 3, 1, 0]);
+    expect(at('2026-11-21')).toBeNull(); // 10 days left: the 14-day reminder is 4 days stale
+    expect(at('2026-11-10')).toBeNull(); // 21 days left: nothing due yet
+    expect(at('2026-12-02')).toBeNull(); // passed
   });
   it('builds a stable dedupe key', () => {
     expect(deadlineDedupeKey('sch1', 7, new Date('2026-12-01T23:59:59Z'))).toBe('deadline_7:sch1:2026-12-01');

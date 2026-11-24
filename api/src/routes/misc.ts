@@ -70,6 +70,7 @@ type AlertDto = {
   body: string;
   scholarshipId: string | null;
   changeId: string | null;
+  daysLeft: number | null;
   read: boolean;
   createdAt: string | null;
 };
@@ -82,6 +83,8 @@ function toAlert(doc: FirebaseFirestore.QueryDocumentSnapshot): AlertDto {
     body: String(doc.get('body') ?? ''),
     scholarshipId: (doc.get('scholarshipId') as string | null) ?? null,
     changeId: (doc.get('changeId') as string | null) ?? null,
+    // Days left when a deadline reminder went out (differs from its type's offset when it was sent late).
+    daysLeft: typeof doc.get('daysLeft') === 'number' ? (doc.get('daysLeft') as number) : null,
     read: doc.get('inApp.readAt') != null,
     createdAt: iso(doc.get('createdAt')),
   };
