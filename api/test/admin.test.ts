@@ -107,7 +107,8 @@ describe('admin input rules', () => {
     expect(adminSettingsSchema.safeParse({ maxScholarshipsPerStudent: 0 }).success).toBe(false);
     expect(adminSettingsSchema.safeParse({ alertOffsetsDays: [7, 7] }).success).toBe(false);
     expect(adminSettingsSchema.safeParse({ alertOffsetsDays: [] }).success).toBe(false);
-    expect(adminSettingsSchema.safeParse({ alertOffsetsDays: [14, 7, 3, 1], aiEnabled: false }).success).toBe(true);
+    expect(adminSettingsSchema.safeParse({ alertOffsetsDays: [14, 7, 3, 1, 0], aiEnabled: false }).success).toBe(true);
+    expect(adminSettingsSchema.safeParse({ alertOffsetsDays: [-1] }).success).toBe(false);
   });
 
   it('requires the email to be typed to delete an account', () => {

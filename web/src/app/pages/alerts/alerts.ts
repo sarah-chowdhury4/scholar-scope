@@ -14,7 +14,7 @@ import { AlertsStore } from '../../core/alerts.store';
     <div class="page-head">
       <div>
         <h1>Alerts</h1>
-        <p class="hint">Deadline reminders 14, 7, 3 and 1 days ahead, and every change to a requirement. Email copies can be turned off in <a routerLink="/profile">Profile</a>.</p>
+        <p class="hint">Deadline reminders 14, 7, 3 and 1 days ahead and on the day, and every change to a requirement. Email copies can be turned off in <a routerLink="/profile">Profile</a>.</p>
       </div>
       @if (unread() > 0) {
         <button type="button" class="secondary" [disabled]="busy()" (click)="readAll()">Mark all as read</button>
@@ -74,7 +74,9 @@ export class AlertsPage implements OnInit {
 
   kind(type: string) {
     if (type === 'change') return 'Requirement changed';
-    if (type.startsWith('deadline_')) return `Due in ${type.slice('deadline_'.length)} day${type === 'deadline_1' ? '' : 's'}`;
+    if (type === 'deadline_0') return 'Due today';
+    if (type === 'deadline_1') return 'Due tomorrow';
+    if (type.startsWith('deadline_')) return `Due in ${type.slice('deadline_'.length)} days`;
     return 'Notice';
   }
 

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { daysUntil, dueDeadlineAlert, deadlineDedupeKey, parseSourceDeadline, timeZoneOffsetMinutes, deadlineFromSource, isApplicationDeadline, pickApplicationDeadline } from '../src/deadlines';
+import { daysUntil, dueDeadlineAlert, deadlineAlertTitle, deadlineDedupeKey, parseSourceDeadline, timeZoneOffsetMinutes, deadlineFromSource, isApplicationDeadline, pickApplicationDeadline } from '../src/deadlines';
 
 describe('daysUntil / dueDeadlineAlert', () => {
   const offsets = [14, 7, 3, 1];
@@ -18,6 +18,18 @@ describe('daysUntil / dueDeadlineAlert', () => {
     const now = new Date('2026-11-30T19:00:00Z'); // already Dec 1 01:00 in Dhaka
     expect(daysUntil(deadline, now, 'Asia/Dhaka')).toBe(0);
     expect(daysUntil(deadline, now, 'UTC')).toBe(1);
+  });
+  it('reminds on the deadline day itself (offset 0)', () => {
+    const deadline = new Date('2026-12-01T23:59:00Z');
+    const withDayOf = [14, 7, 3, 1, 0];
+    expect(dueDeadlineAlert(deadline, new Date('2026-12-01T13:00:00Z'), 'UTC', withDayOf)).toBe(0);
+    expect(dueDeadlineAlert(deadline, new Date('2026-12-01T13:00:00Z'), 'UTC', offsets)).toBeNull();
+    expect(dueDeadlineAlert(deadline, new Date('2026-11-29T13:00:00Z'), 'UTC', withDayOf)).toBeNull(); // 2 days: no reminder
+  });
+  it('words the reminder subject for today, tomorrow and later', () => {
+    expect(deadlineAlertTitle('Dell Scholars', 0)).toBe('Dell Scholars is due today');
+    expect(deadlineAlertTitle('Dell Scholars', 1)).toBe('Dell Scholars is due tomorrow');
+    expect(deadlineAlertTitle('Dell Scholars', 14)).toBe('Dell Scholars is due in 14 days');
   });
   it('builds a stable dedupe key', () => {
     expect(deadlineDedupeKey('sch1', 7, new Date('2026-12-01T23:59:59Z'))).toBe('deadline_7:sch1:2026-12-01');

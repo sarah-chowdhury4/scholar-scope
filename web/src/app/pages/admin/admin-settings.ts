@@ -47,8 +47,8 @@ import { AdminPage } from './admin';
 
         <h2 style="margin-top: 28px">Deadline reminders</h2>
         <label for="s-offsets">Days before a deadline to remind students (comma-separated)</label>
-        <input id="s-offsets" name="offsets" [(ngModel)]="offsets" placeholder="14, 7, 3, 1" />
-        <p class="hint">Up to six, between 1 and 60 days.</p>
+        <input id="s-offsets" name="offsets" [(ngModel)]="offsets" placeholder="14, 7, 3, 1, 0" />
+        <p class="hint">Up to six, between 0 and 60 days. 0 sends a reminder on the deadline day itself.</p>
 
         @if (error()) {
           <p class="error" role="alert">{{ error() }}</p>
@@ -96,7 +96,7 @@ export class AdminSettingsPage implements OnInit {
       .filter(Boolean)
       .map(Number);
     if (days.some((d) => !Number.isInteger(d))) {
-      this.error.set('Reminder days must be whole numbers, like 14, 7, 3, 1.');
+      this.error.set('Reminder days must be whole numbers, like 14, 7, 3, 1, 0.');
       return;
     }
     this.saving.set(true);

@@ -334,7 +334,7 @@ import { CountryPicker } from './country-picker';
             <h2>Deadlines and alerts</h2>
             <p class="muted">
               Deadlines across the site are shown in this time zone, with the scholarship's own time next to them when it differs.
-              Email alerts (14, 7, 3 and 1 days before) go to
+              Email alerts (14, 7, 3 and 1 days before, and on the day) go to
               <strong>{{ me.email }}</strong>. In-app alerts stay on.
             </p>
             <form [formGroup]="settings" (ngSubmit)="saveSettings()">

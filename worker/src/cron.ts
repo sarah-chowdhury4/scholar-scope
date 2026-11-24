@@ -6,6 +6,7 @@ import {
   getAppConfig,
   sendMail,
   dueDeadlineAlert,
+  deadlineAlertTitle,
   deadlineSentence,
   deadlineDedupeKey,
   log,
@@ -101,7 +102,7 @@ export async function runDeadlineAlerts(now = new Date()): Promise<{ sent: numbe
       timeZone,
     );
     const caution = verification === 'verified' ? '' : '\n\nThis deadline has not been confirmed from a source document yet. Check the official page.';
-    const title = `${name} is due in ${offset} day${offset === 1 ? '' : 's'}`;
+    const title = deadlineAlertTitle(name, offset);
     const body = `${name} (${sch.get('provider')}) is due on ${when}.${caution}`;
 
     try {

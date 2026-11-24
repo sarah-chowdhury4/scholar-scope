@@ -34,7 +34,7 @@ export const adminSettingsSchema = z
     dailyDraftLimit: z.number().int().min(0).max(200),
     dailyPageLimit: z.number().int().min(0).max(1000),
     alertOffsetsDays: z
-      .array(z.number().int().min(1).max(60))
+      .array(z.number().int().min(0).max(60)) // 0 = on the deadline day
       .min(1, 'Keep at least one reminder.')
       .max(6, 'Six reminders at most.')
       .refine((list) => new Set(list).size === list.length, 'Each reminder day only once.'),

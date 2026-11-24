@@ -15,7 +15,7 @@ export function daysUntil(deadline: Date, now: Date, timeZone: string): number {
 }
 
 /**
- * Which deadline alert (14/7/3/1 days, FR-7.1) is due today, if any.
+ * Which deadline alert (14/7/3/1 days before, and on the day; FR-7.1) is due today, if any.
  * Runs once a day, so exactly one offset can match.
  */
 export function dueDeadlineAlert(
@@ -26,6 +26,13 @@ export function dueDeadlineAlert(
 ): number | null {
   const days = daysUntil(deadline, now, timeZone);
   return offsets.includes(days) ? days : null;
+}
+
+/** Subject of a deadline reminder: "… is due today", "… is due tomorrow" or "… is due in N days". */
+export function deadlineAlertTitle(name: string, offsetDays: number): string {
+  if (offsetDays === 0) return `${name} is due today`;
+  if (offsetDays === 1) return `${name} is due tomorrow`;
+  return `${name} is due in ${offsetDays} days`;
 }
 
 /** Stable key so a retried job never sends the same alert twice. */

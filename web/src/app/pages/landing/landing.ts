@@ -31,7 +31,7 @@ import { RouterLink } from '@angular/router';
         </li>
         <li class="card">
           <strong>Stay on top of it</strong>
-          <p>Tick items off, get reminders 14, 7, 3 and 1 days before each deadline, and see changes to the guidelines side by side.</p>
+          <p>Tick items off, get reminders 14, 7, 3 and 1 days before each deadline and on the day, and see changes to the guidelines side by side.</p>
         </li>
       </ol>
     </section>
