@@ -16,6 +16,15 @@ export const EXTRACT_TASK =
   'character limits, transcripts, recommendation letters, eligibility rules (GPA, enrollment, citizenship, ' +
   'financial need), forms, videos and financial documents. Give a confidence between 0 and 1.';
 
+/** Added to the task for pages we found ourselves, which may describe several programmes. */
+export function forScholarship(name: string, provider: string): string {
+  const who = provider ? `"${name}" (${provider})` : `"${name}"`;
+  return (
+    ` This page was found while looking for the rules of ${who.slice(0, 300)}. ` +
+    'Only list requirements that apply to that scholarship. If the page is about other programmes or none of it applies, return no items.'
+  );
+}
+
 export type ExtractedItem = {
   kind: (typeof REQUIREMENT_KINDS)[number];
   label: string;

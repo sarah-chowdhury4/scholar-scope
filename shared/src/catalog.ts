@@ -1,7 +1,11 @@
 /**
  * Scholarship catalog: the shared list of known scholarships a student can browse on the
- * Discover page and add to their own records. Catalog values come from a curated dataset,
- * not from a cited source document, so anything copied from it starts as "unverified".
+ * Discover page and add to their own records.
+ *
+ * The dataset is collected and checked by the ScholarScope team against each scholarship's official page.
+ * An entry with a verified source URL and a status other than "Unverified" counts as a checked source:
+ * requirements copied from it are "verified", citing the dataset row and the official page. Entries marked
+ * "Unverified" (like the fictional examples) start as unverified until the guidelines are uploaded.
  */
 
 export type CatalogEntry = {
@@ -69,7 +73,31 @@ export function parseCsv(text: string): CsvRow[] {
   if (row.some((c) => c.trim() !== '')) rows.push(row);
   const [header, ...body] = rows;
   if (!header) return [];
-  return body.map((cells) => Object.fromEntries(header.map((h, i) => [h.trim(), (cells[i] ?? '').trim()])));
+  const keys = header.map((h) => columnKey(h));
+  return body.map((cells) => Object.fromEntries(keys.map((key, i) => [key, (cells[i] ?? '').trim()])));
+}
+
+/**
+ * The dataset sheet is exported with display headers ("Scholarship ID", "Sponsoring Organization", ...);
+ * older exports use the database keys ("scholarship_id", ...). Both map to the same keys.
+ */
+const COLUMN_ALIASES: Record<string, string> = {
+  scholarshipid: 'scholarship_id',
+  organization: 'organization',
+  sponsoringorganization: 'organization',
+  scholarshipname: 'scholarship_name',
+  currentdeadline: 'current_deadline',
+  mingpa: 'min_gpa',
+  essayprompt: 'essay_prompt',
+  requiredessaypromptmaterials: 'essay_prompt',
+  verifiedsourceurl: 'verified_source_url',
+  versionflag: 'version_flag',
+  datastatusversionflag: 'version_flag',
+};
+
+export function columnKey(header: string): string {
+  const clean = header.replace(/^﻿/, '').trim();
+  return COLUMN_ALIASES[clean.toLowerCase().replace(/[^a-z0-9]/g, '')] ?? clean;
 }
 
 /** One dataset row → catalog entry, or an error message explaining why it was skipped. */
@@ -97,11 +125,32 @@ export function catalogEntryFromRow(r: CsvRow): CatalogEntry | { error: string }
   };
 }
 
-/** Requirement checklist items to create when a student adds a catalog scholarship. */
-export function requirementsFromCatalog(e: CatalogEntry): { kind: string; label: string; value: Record<string, unknown> }[] {
-  const items: { kind: string; label: string; value: Record<string, unknown> }[] = [];
-  if (e.deadline) items.push({ kind: 'deadline', label: 'Application deadline', value: { deadline: { sourceText: e.deadline, allDay: true } } });
-  if (e.minGpa !== null) items.push({ kind: 'eligibility', label: `Minimum GPA ${e.minGpa.toFixed(2)}`, value: { minGpa: e.minGpa } });
+/** True when the team checked this entry against the official page (see the note at the top). */
+export function isTeamVerified(e: Pick<CatalogEntry, 'sourceUrl' | 'datasetStatus'>): boolean {
+  return Boolean(e.sourceUrl) && !!e.datasetStatus && !/unverified/i.test(e.datasetStatus);
+}
+
+/** Where a team-checked catalog requirement comes from: the dataset row, checked against the official page. */
+export type CatalogCitation = {
+  kind: 'catalog';
+  catalogId: string;
+  sourceUrl: string;
+  datasetVersion: string | null;
+  verifiedBy: 'ScholarScope team';
+  /** The dataset text this requirement was taken from. */
+  quote: string;
+};
+
+export function catalogCitation(e: CatalogEntry, quote: string): CatalogCitation | null {
+  if (!isTeamVerified(e)) return null;
+  return { kind: 'catalog', catalogId: e.catalogId, sourceUrl: e.sourceUrl!, datasetVersion: e.datasetVersion, verifiedBy: 'ScholarScope team', quote };
+}
+
+/** Requirement checklist items to create when a student adds a catalog scholarship (`quote` = the dataset text). */
+export function requirementsFromCatalog(e: CatalogEntry): { kind: string; label: string; value: Record<string, unknown>; quote: string }[] {
+  const items: { kind: string; label: string; value: Record<string, unknown>; quote: string }[] = [];
+  if (e.deadline) items.push({ kind: 'deadline', label: 'Application deadline', value: { deadline: { sourceText: e.deadline, allDay: true } }, quote: `Current deadline: ${e.deadline}` });
+  if (e.minGpa !== null) items.push({ kind: 'eligibility', label: `Minimum GPA ${e.minGpa.toFixed(2)}`, value: { minGpa: e.minGpa }, quote: `Minimum GPA: ${e.minGpa}` });
   for (const part of e.promptOrMaterials.split(';').map((s) => s.trim()).filter(Boolean)) {
     const tags = tagsFor(part);
     const kind = tags.includes('essay')
@@ -115,7 +164,7 @@ export function requirementsFromCatalog(e: CatalogEntry): { kind: string; label:
             : tags.includes('financial')
               ? 'financial_doc'
               : 'other';
-    items.push({ kind, label: part.slice(0, 200), value: { text: part } });
+    items.push({ kind, label: part.slice(0, 200), value: { text: part }, quote: part });
   }
   return items;
 }
@@ -124,8 +173,8 @@ export function requirementsFromCatalog(e: CatalogEntry): { kind: string; label:
 
 export type CatalogQuery = {
   q?: string;
-  /** upcoming (default): deadline today or later · 30 / 90: within that many days · all: include past */
-  deadline?: 'upcoming' | '30' | '90' | 'all';
+  /** upcoming (default): deadline today or later · 30 / 90: within that many days · past: only closed ones (archived) · all: both */
+  deadline?: 'upcoming' | '30' | '90' | 'past' | 'all';
   /** The student's GPA: hide scholarships whose minimum is higher. */
   gpa?: number;
   /** Only scholarships that ask for ALL of these. */
@@ -148,7 +197,9 @@ export function filterCatalog(entries: CatalogEntry[], query: CatalogQuery, toda
       const hay = `${e.name} ${e.organization} ${e.promptOrMaterials}`.toLowerCase();
       if (!words.every((w) => hay.includes(w))) return false;
     }
-    if (window !== 'all') {
+    if (window === 'past') {
+      if (!e.deadline || Date.parse(`${e.deadline}T00:00:00Z`) >= todayMs) return false;
+    } else if (window !== 'all') {
       if (!e.deadline) return false;
       const d = Date.parse(`${e.deadline}T00:00:00Z`);
       if (d < todayMs) return false;
@@ -165,6 +216,8 @@ export function filterCatalog(entries: CatalogEntry[], query: CatalogQuery, toda
   return matches.sort((a, b) => {
     if (sort === 'name') return a.name.localeCompare(b.name);
     if (sort === 'gpa') return (a.minGpa ?? 0) - (b.minGpa ?? 0) || a.name.localeCompare(b.name);
+    // Archived scholarships: the one that closed most recently first.
+    if (window === 'past') return (b.deadline ?? '').localeCompare(a.deadline ?? '') || a.name.localeCompare(b.name);
     return (a.deadline ?? '9999-12-31').localeCompare(b.deadline ?? '9999-12-31') || a.name.localeCompare(b.name);
   });
 }

@@ -51,3 +51,42 @@ describe('catalogQuerySchema', () => {
     expect(() => catalogQuerySchema.parse({ gpa: '12' })).toThrow();
   });
 });
+
+describe('reviewSchema', () => {
+  it('accepts each review action', async () => {
+    const { reviewSchema } = await import('../src/validation');
+    expect(reviewSchema.parse({ action: 'confirm' })).toEqual({ action: 'confirm' });
+    expect(reviewSchema.parse({ action: 'reject', reason: 'Not for this year' }).action).toBe('reject');
+    const corrected = reviewSchema.parse({ action: 'correct', label: 'Essay, 650 words', wordLimit: 650, deadline: { date: '2027-01-15' } });
+    expect(corrected).toMatchObject({ action: 'correct', wordLimit: 650, deadline: { date: '2027-01-15' } });
+    // No time zone given means "not known", never an assumed UTC.
+    expect((corrected as { deadline: { timezone?: string } }).deadline.timezone).toBeUndefined();
+  });
+
+  it('rejects an empty correction and unknown fields', async () => {
+    const { reviewSchema } = await import('../src/validation');
+    expect(() => reviewSchema.parse({ action: 'correct', label: '  ' })).toThrow();
+    expect(() => reviewSchema.parse({ action: 'confirm', verification: 'verified' })).toThrow();
+    expect(() => reviewSchema.parse({ action: 'approve' })).toThrow();
+  });
+});
+
+describe('createDraftSchema', () => {
+  it('needs the student to write their own notes first', async () => {
+    const { createDraftSchema } = await import('../src/validation');
+    expect(() => createDraftSchema.parse({ scholarshipId: 's', requirementId: 'r', notes: 'too short' })).toThrow();
+    const ok = createDraftSchema.parse({ scholarshipId: 's', requirementId: 'r', notes: 'I led the robotics club for two years and tutored younger students.' });
+    expect(ok.notes).toContain('robotics');
+  });
+});
+
+describe('isStaleCheck', () => {
+  it('treats a check stuck in queued or running for over 15 minutes as lost', async () => {
+    const { isStaleCheck } = await import('../src/studentDocuments');
+    const at = (msAgo: number) => ({ toMillis: () => Date.now() - msAgo });
+    expect(isStaleCheck({ status: 'running', updatedAt: at(16 * 60 * 1000) })).toBe(true);
+    expect(isStaleCheck({ status: 'queued', updatedAt: at(60 * 1000) })).toBe(false);
+    expect(isStaleCheck({ status: 'running' })).toBe(true);
+    expect(isStaleCheck({ status: 'done', updatedAt: at(99 * 60 * 1000) })).toBe(false);
+  });
+});

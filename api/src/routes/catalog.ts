@@ -8,6 +8,7 @@ import {
   loadCatalog,
   userDoc,
   writeAudit,
+  isTeamVerified,
 } from '@scholarscope/shared';
 
 /** Discover page: browse, search and filter the scholarship catalog, and add one to "My scholarships". */
@@ -21,7 +22,7 @@ const tagList = z
 
 export const catalogQuerySchema = z.object({
   q: z.string().trim().max(100).optional(),
-  deadline: z.enum(['upcoming', '30', '90', 'all']).default('upcoming'),
+  deadline: z.enum(['upcoming', '30', '90', 'past', 'all']).default('upcoming'),
   gpa: z.coerce.number().min(0).max(5).optional(),
   requires: tagList,
   excludes: tagList,
@@ -42,6 +43,7 @@ catalogRouter.get('/', async (req, res) => {
   const items = filterCatalog(all, query, today).map((e) => ({
     ...e,
     deadlinePassed: e.deadline !== null && e.deadline < today,
+    teamVerified: isTeamVerified(e),
     addedScholarshipId: added.get(e.catalogId) ?? null,
   }));
   res.json({

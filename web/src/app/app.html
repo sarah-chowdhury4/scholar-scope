@@ -1,15 +1,37 @@
 <header class="topbar">
-  <a routerLink="/" class="brand">ScholarScope</a>
+  <a routerLink="/" class="brand"><img src="logo.png" alt="" width="30" height="30" />ScholarScope</a>
   <span class="tagline">No source, no claim.</span>
   @if (auth.signedIn()) {
     <nav aria-label="Main">
       <a routerLink="/" routerLinkActive="active" [routerLinkActiveOptions]="{ exact: true }">My scholarships</a>
       <a routerLink="/discover" routerLinkActive="active">Discover</a>
+      <a routerLink="/documents" routerLinkActive="active">Documents</a>
+      <a routerLink="/alerts" routerLinkActive="active">
+        Alerts
+        @if (alerts.unread() > 0) {
+          <span class="count" [attr.aria-label]="alerts.unread() + ' unread'">{{ alerts.unread() }}</span>
+        }
+      </a>
       <a routerLink="/profile" routerLinkActive="active">Profile</a>
+      @if (auth.isAdmin()) {
+        <a routerLink="/admin" routerLinkActive="active">Admin</a>
+      }
     </nav>
     <button type="button" class="link" (click)="auth.signOut()">Sign out</button>
+  } @else if (auth.user() === null) {
+    <a routerLink="/login" class="nav">Sign in</a>
   }
 </header>
-<main>
+<main [class.entering]="pages.entering()">
   <router-outlet />
 </main>
+<footer class="site-footer">
+  <!-- Required by the Flaticon free license (logo: "Graduate hat" by Mayor Icons, recolored green). -->
+  Logo icon by <a href="https://www.flaticon.com/authors/mayor-icons" target="_blank" rel="noopener noreferrer">Mayor Icons</a>
+  from <a href="https://www.flaticon.com/free-icon/graduate-hat_8262226" target="_blank" rel="noopener noreferrer">Flaticon</a>
+</footer>
+<div class="toasts" aria-live="polite">
+  @for (t of toasts.items(); track t.id) {
+    <div class="toast" [class.err]="t.error" [attr.role]="t.error ? 'alert' : 'status'" (click)="toasts.dismiss(t.id)">{{ t.message }}</div>
+  }
+</div>

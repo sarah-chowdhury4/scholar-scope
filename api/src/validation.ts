@@ -15,11 +15,15 @@ export const createScholarshipSchema = z.object({
     .object({ amount: z.number().nonnegative().max(10_000_000), currency: z.string().length(3).toUpperCase() })
     .nullable()
     .optional(),
-  /** A deadline typed by the student is stored as "unverified" until a source confirms it. */
+  /**
+   * A deadline typed by the student, stored as "unverified" until a source confirms it.
+   * `timezone` is the SCHOLARSHIP's time zone; leave it out when the student does not know it.
+   */
   deadline: z
     .object({
       date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Use YYYY-MM-DD'),
-      timezone: z.string().min(1).max(64).default('UTC'),
+      time: z.string().regex(/^\d{2}:\d{2}$/, 'Use HH:MM').nullable().optional(),
+      timezone: z.string().min(1).max(64).nullable().optional(),
     })
     .nullable()
     .optional(),
@@ -45,12 +49,66 @@ export const createUploadSchema = z.object({
   /** Scholarship guidelines (a source) or a library item (a material). */
   purpose: z.enum(['source', 'material']),
   scholarshipId: z.string().min(1).max(128).optional(),
+  /** Set for a student's own application file (transcript, passport, and so on). */
+  documentType: z
+    .enum(['transcript', 'school_certificate', 'university_certificate', 'passport', 'birth_certificate', 'other'])
+    .optional(),
+  title: z.string().trim().max(120, 'The name must be 120 characters or fewer.').optional(),
 });
+
+export const documentLinksSchema = z
+  .object({
+    scholarshipIds: z.array(z.string().min(1).max(128)).max(15, 'A document can be shown on up to 15 scholarships.'),
+  })
+  .strict();
 
 export const addUrlSourceSchema = z.object({
   scholarshipId: z.string().min(1).max(128),
   url: httpsOrHttpUrl,
 });
+
+/** A student's review of one extracted requirement (FR-2.5). */
+export const reviewSchema = z.discriminatedUnion('action', [
+  z.object({ action: z.literal('confirm') }).strict(),
+  z.object({ action: z.literal('restore') }).strict(),
+  z.object({ action: z.literal('reject'), reason: z.string().trim().max(300).optional() }).strict(),
+  z
+    .object({
+      action: z.literal('correct'),
+      label: z.string().trim().min(1, 'Describe the requirement.').max(300),
+      details: z.string().trim().max(1000).optional(),
+      wordLimit: z.number().int().positive().max(100_000).nullable().optional(),
+      minGpa: z.number().nonnegative().max(100).nullable().optional(),
+      deadline: z
+        .object({
+          date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Use YYYY-MM-DD'),
+          time: z.string().regex(/^\d{2}:\d{2}$/, 'Use HH:MM').nullable().optional(),
+          timezone: z.string().min(1).max(64).nullable().optional(),
+        })
+        .nullable()
+        .optional(),
+    })
+    .strict(),
+]);
+
+export const readinessSchema = z.object({ readiness: z.enum(['missing', 'in_draft', 'ready']) }).strict();
+
+/** Ask for an essay draft. The notes are the student's own facts; the draft may use nothing else (FR-6). */
+export const createDraftSchema = z
+  .object({
+    scholarshipId: z.string().min(1).max(128),
+    requirementId: z.string().min(1).max(128),
+    notes: z
+      .string()
+      .trim()
+      .min(40, 'Write a few lines about your own experience first. The draft only uses what you write.')
+      .max(4000, 'Keep your notes under 4000 characters.'),
+    includeGpa: z.boolean().optional(),
+  })
+  .strict();
+
+export const editDraftSchema = z.object({ text: z.string().max(20_000, 'That draft is too long.') }).strict();
+export const approveDraftSchema = z.object({ text: z.string().max(20_000, 'That draft is too long.').optional() }).strict();
 
 export const consentSchema = z.object({ version: z.string().min(1).max(32) });
 

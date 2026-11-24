@@ -5,7 +5,9 @@ import {
   enqueueJob,
   getAppConfig,
   sendMail,
-  dueDeadlineAlert,
+  dueDeadlineReminder,
+  deadlineAlertTitle,
+  deadlineSentence,
   deadlineDedupeKey,
   log,
   errorMessage,
@@ -83,21 +85,33 @@ export async function runDeadlineAlerts(now = new Date()): Promise<{ sent: numbe
     const user = await userRef.get();
     const timeZone = (user.get('timezone') as string | undefined) || 'UTC';
     const deadline = (sch.get('deadline.utc') as Timestamp).toDate();
-    const offset = dueDeadlineAlert(deadline, now, timeZone, alertOffsetsDays);
-    if (offset === null) continue;
+    // Catches up on a reminder day the job missed (worker switched off), see dueDeadlineReminder.
+    const due = dueDeadlineReminder(deadline, now, timeZone, alertOffsetsDays);
+    if (due === null) continue;
+    const { offset, daysLeft } = due;
 
     const dedupeKey = deadlineDedupeKey(sch.id, offset, deadline);
     const alertRef = userRef.collection('alerts').doc(createHash('sha256').update(dedupeKey).digest('hex').slice(0, 32));
     const verification = sch.get('deadline.verification') as string;
     const name = sch.get('name') as string;
-    const when = new Intl.DateTimeFormat('en-US', { dateStyle: 'full', timeZone }).format(deadline);
+    const when = deadlineSentence(
+      {
+        utc: deadline,
+        sourceTimezone: (sch.get('deadline.sourceTimezone') as string | null | undefined) ?? null,
+        date: (sch.get('deadline.date') as string | null | undefined) ?? null,
+        time: (sch.get('deadline.time') as string | null | undefined) ?? null,
+      },
+      timeZone,
+    );
     const caution = verification === 'verified' ? '' : '\n\nThis deadline has not been confirmed from a source document yet. Check the official page.';
-    const title = `${name} is due in ${offset} day${offset === 1 ? '' : 's'}`;
+    const title = deadlineAlertTitle(name, daysLeft);
     const body = `${name} (${sch.get('provider')}) is due on ${when}.${caution}`;
 
     try {
       await alertRef.create({
         type: `deadline_${offset}`,
+        daysLeft,
+        late: daysLeft !== offset,
         dedupeKey,
         scholarshipId: sch.id,
         changeId: null,

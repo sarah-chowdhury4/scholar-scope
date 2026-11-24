@@ -1,8 +1,9 @@
 import { Component, inject, signal } from '@angular/core';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
-import { Router, RouterLink } from '@angular/router';
+import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { ApiService, apiMessage } from '../../core/api.service';
 import { AuthService } from '../../core/auth.service';
+import { MIN_PASSWORD_LENGTH, passwordHint, passwordLevel } from '../../core/password-strength';
 
 @Component({
   selector: 'app-forgot-password',
@@ -28,10 +29,16 @@ import { AuthService } from '../../core/auth.service';
           <label for="resetCode">Code</label>
           <input id="resetCode" inputmode="numeric" autocomplete="one-time-code" maxlength="6" formControlName="code" required />
           <label for="resetNew">New password</label>
-          <input id="resetNew" type="password" formControlName="password" autocomplete="new-password" required />
-          <p class="hint">At least 12 characters.</p>
+          <div class="pwd">
+            <input id="resetNew" [type]="show() ? 'text' : 'password'" formControlName="password" autocomplete="new-password" (input)="passwordText.set($any($event.target).value)" required />
+            <button type="button" class="toggle" (click)="show.set(!show())" [attr.aria-pressed]="show()">{{ show() ? 'Hide' : 'Show' }}</button>
+          </div>
+          <div class="meter" [attr.data-level]="level()" aria-hidden="true"><span></span><span></span><span></span><span></span></div>
+          <p class="hint" aria-live="polite">{{ hint() }}</p>
           <label for="resetConfirm">Confirm new password</label>
-          <input id="resetConfirm" type="password" formControlName="confirm" autocomplete="new-password" required />
+          <div class="pwd">
+            <input id="resetConfirm" [type]="show() ? 'text' : 'password'" formControlName="confirm" autocomplete="new-password" required />
+          </div>
           @if (error()) {
             <p class="error" role="alert">{{ error() }}</p>
           }
@@ -39,7 +46,7 @@ import { AuthService } from '../../core/auth.service';
         </form>
         <button type="button" class="link" [disabled]="busy()" (click)="send()">Send a new code</button>
       }
-      <a routerLink="/login">Back to sign in</a>
+      <p class="small"><a routerLink="/login">Back to sign in</a></p>
     </section>
   `,
 })
@@ -51,6 +58,8 @@ export class ForgotPassword {
   protected readonly busy = signal(false);
   protected readonly error = signal('');
   protected readonly codeSent = signal(false);
+  protected readonly show = signal(false);
+  protected readonly passwordText = signal('');
 
   protected readonly requestForm = inject(FormBuilder).nonNullable.group({
     email: ['', [Validators.required, Validators.email]],
@@ -60,6 +69,22 @@ export class ForgotPassword {
     password: ['', Validators.required],
     confirm: ['', Validators.required],
   });
+
+  constructor() {
+    // Arriving from the profile page's "Forgot password?" dialog: the code was already sent to this address.
+    const query = inject(ActivatedRoute).snapshot.queryParamMap;
+    const email = query.get('email');
+    if (email) this.requestForm.controls.email.setValue(email);
+    if (email && query.get('sent') === '1') this.codeSent.set(true);
+  }
+
+  protected level() {
+    return passwordLevel(this.passwordText());
+  }
+
+  protected hint() {
+    return passwordHint(this.passwordText());
+  }
 
   async send() {
     if (this.requestForm.invalid) return this.error.set('Enter a valid email address.');
@@ -79,7 +104,7 @@ export class ForgotPassword {
     const email = this.requestForm.controls.email.value.trim();
     const { code, password, confirm } = this.confirmForm.getRawValue();
     if (!/^\d{6}$/.test(code.trim())) return this.error.set('Enter the 6-digit code from the email.');
-    if (password.length < 12) return this.error.set('Use a password with at least 12 characters.');
+    if (password.length < MIN_PASSWORD_LENGTH) return this.error.set(`Use a password with at least ${MIN_PASSWORD_LENGTH} characters.`);
     if (password !== confirm) return this.error.set("Passwords don't match.");
     this.busy.set(true);
     this.error.set('');

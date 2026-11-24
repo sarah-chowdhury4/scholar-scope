@@ -19,6 +19,8 @@ export type NewRequirementVersion = {
   citation: Citation | null;
   verification: Verification;
   origin: 'extraction' | 'refetch';
+  /** Where the source came from. Pages we found only add rules; they never overrule a rule from another source. */
+  sourceOrigin?: 'student' | 'linked' | 'search';
   extraction: { model: string; promptVersion: string; confidence: number; jobId: string; ocrDerived: boolean };
   createdBy: Actor;
 };
@@ -29,10 +31,9 @@ export type NewRequirementVersion = {
  * - same matchKey, same quote → no new version (unchanged)
  * - same matchKey, new quote  → version n+1, flagged "changed" until the student acknowledges (FR-3.4)
  */
-export async function upsertRequirement(
-  scholarshipRef: DocumentReference,
-  item: NewRequirementVersion,
-): Promise<'created' | 'unchanged' | 'changed'> {
+export type UpsertOutcome = { outcome: 'created' | 'unchanged' | 'changed'; requirementId: string; changeId: string | null };
+
+export async function upsertRequirement(scholarshipRef: DocumentReference, item: NewRequirementVersion): Promise<UpsertOutcome> {
   const matchKey = matchKeyFor(item.kind, item.label);
   const existing = await scholarshipRef.collection('requirements').where('matchKey', '==', matchKey).limit(1).get();
 
@@ -42,7 +43,13 @@ export async function upsertRequirement(
     const prevHash = (current?.get('current.citation.quoteHash') as string | undefined) ?? null;
     const newHash = item.citation?.quoteHash ?? null;
 
-    if (current && prevHash && prevHash === newHash) return 'unchanged';
+    if (current && prevHash && prevHash === newHash) return { outcome: 'unchanged', requirementId: reqRef.id, changeId: null };
+    // The same rule worded differently on a page we found (an FAQ, a search result) is not a change: the
+    // existing source keeps the rule, so two pages never flag each other back and forth.
+    const prevCitation = current?.get('current.citation') as { sourceId?: string } | null | undefined;
+    if (current && prevCitation && item.sourceOrigin && item.sourceOrigin !== 'student' && prevCitation.sourceId !== item.citation?.sourceId) {
+      return { outcome: 'unchanged', requirementId: reqRef.id, changeId: null };
+    }
 
     const versionNo = ((current?.get('currentVersionNo') as number | undefined) ?? 0) + 1;
     const verRef = reqRef.collection('versions').doc();
@@ -73,7 +80,7 @@ export async function upsertRequirement(
 
     if (!current) {
       tx.set(reqRef, { ...head, readiness: 'missing', changeFlag: null, needsRecheck: false, createdAt: FieldValue.serverTimestamp() });
-      return 'created';
+      return { outcome: 'created', requirementId: reqRef.id, changeId: null };
     }
 
     const changeRef = scholarshipRef.collection('changes').doc();
@@ -84,6 +91,12 @@ export async function upsertRequirement(
       fromVersionId: current.get('currentVersionId') ?? null,
       toVersionId: verRef.id,
       fromSourceVersionId: current.get('current.citation.sourceVersionId') ?? null,
+      fromSourceId: current.get('current.citation.sourceId') ?? null,
+      toSourceId: item.citation?.sourceId ?? null,
+      fromQuote: current.get('current.citation.quote') ?? null,
+      toQuote: item.citation?.quote ?? null,
+      label: item.label,
+      aiSummary: null,
       toSourceVersionId: item.citation?.sourceVersionId ?? null,
       summary: `"${item.label}" changed in the source.`,
       detectedBy: item.createdBy,
@@ -100,26 +113,8 @@ export async function upsertRequirement(
       changeFlag: { active: true, changeId: changeRef.id, since: Timestamp.now() },
       needsRecheck: true,
     });
-    return 'changed';
+    return { outcome: 'changed', requirementId: reqRef.id, changeId: changeRef.id };
   });
 }
 
-/** Recompute the dashboard counts on the scholarship head (FR-1.4). */
-export async function recomputeCounts(scholarshipRef: DocumentReference): Promise<void> {
-  const reqs = await scholarshipRef.collection('requirements').where('removedAt', '==', null).get();
-  const counts = { open: 0, changed: 0, unverified: 0, needsReview: 0, ready: 0, total: reqs.size };
-  for (const r of reqs.docs) {
-    const readiness = r.get('readiness');
-    const verification = r.get('verification');
-    if (readiness === 'ready') counts.ready++;
-    else counts.open++;
-    if (readiness === 'changed' || r.get('changeFlag.active')) counts.changed++;
-    if (verification === 'unverified') counts.unverified++;
-    if (verification === 'needs_review') counts.needsReview++;
-  }
-  await scholarshipRef.update({
-    counts,
-    readinessPct: counts.total ? Math.round((counts.ready / counts.total) * 100) : 0,
-    updatedAt: FieldValue.serverTimestamp(),
-  });
-}
+export { recomputeCounts } from '@scholarscope/shared';

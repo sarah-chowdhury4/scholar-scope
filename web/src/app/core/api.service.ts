@@ -10,6 +10,10 @@ export type Citation = {
   page: number | null;
   quote: string;
   ocrDerived: boolean;
+  /** "catalog": from the ScholarScope team's checked dataset, not from an uploaded document. */
+  kind?: 'catalog';
+  sourceUrl?: string;
+  datasetVersion?: string | null;
 };
 
 export type Scholarship = {
@@ -18,10 +22,60 @@ export type Scholarship = {
   provider: string;
   url: string | null;
   status: string;
-  deadline: { utc: string; sourceText: string; allDay: boolean; verification: Verification } | null;
+  deadline: {
+    utc: string;
+    sourceTimezone: string | null;
+    date: string | null;
+    time: string | null;
+    sourceText: string;
+    allDay: boolean;
+    verification: Verification;
+    /** "ScholarScope team" when the deadline comes from the team-checked catalog. */
+    verifiedBy?: string | null;
+  } | null;
   counts: { open: number; changed: number; unverified: number; needsReview: number; ready: number; total: number };
   readinessPct: number;
   recheck?: { status: string; lastVerifiedAt?: { _seconds: number } | null };
+  /** The one-time web search for official pages, when the saved pages gave few requirements. */
+  search?: { status: 'queued' | 'done' | 'paused' | 'failed'; pagesFound?: number; officialSite?: string | null } | null;
+};
+
+export type StudentDocument = {
+  id: string;
+  type: string;
+  title: string;
+  fileName: string;
+  scanStatus: string;
+  ready: boolean;
+  usedIn: string[];
+  /** AI check of the current file; null until it has run once. */
+  check: DocumentCheck | null;
+};
+
+export type FindingSeverity = 'ok' | 'warning' | 'problem';
+
+export type DocumentFinding = {
+  code: string;
+  severity: FindingSeverity;
+  message: string;
+  quote: string | null;
+  page: number | null;
+};
+
+export type DocumentCheck = {
+  status: 'queued' | 'running' | 'done' | 'paused' | 'failed';
+  reason: string | null;
+  severity: FindingSeverity | null;
+  findings: DocumentFinding[];
+  checkedAt: string | null;
+};
+
+/** A saved file as shown on one scholarship, with findings against that scholarship's deadline and rules. */
+export type ScholarshipDocument = StudentDocument & { scholarshipFindings: DocumentFinding[] };
+
+export type ScholarshipDocuments = {
+  needed: { type: string; label: string; documents: ScholarshipDocument[] }[];
+  extras: ScholarshipDocument[];
 };
 
 export type Requirement = {
@@ -30,8 +84,97 @@ export type Requirement = {
   label: string;
   verification: Verification;
   readiness: string;
-  changeFlag: { active: boolean } | null;
+  changeFlag: { active: boolean; changeId?: string } | null;
   current: { value: Record<string, unknown>; citation: Citation | null };
+  review?: { status: 'confirmed' | 'corrected' | 'rejected' | 'restored'; at: string | null } | null;
+  currentVersionNo?: number;
+  /** Set when the platform judges this requirement from the student's checked documents (GPA, required files). */
+  assessment?: RequirementAssessment | null;
+};
+
+export type RequirementAssessment = {
+  status: 'met' | 'not_met' | 'check' | 'missing';
+  message: string;
+  quote: string | null;
+  page: number | null;
+  documentTitle: string | null;
+};
+
+export type RequirementVersion = {
+  id: string;
+  versionNo: number;
+  value: Record<string, unknown>;
+  citation: Citation | null;
+  origin: string;
+  createdAt: string | null;
+};
+
+export type RemovedRequirement = { id: string; kind: string; label: string; removedAt: string | null };
+
+export type SourceSummary = {
+  id: string;
+  kind: 'upload' | 'url';
+  title: string;
+  url: string | null;
+  /** "linked": read from a link on a page the student saved; "search": found by the web search. */
+  origin?: 'student' | 'linked' | 'search';
+  currentVersionId: string | null;
+  robotsAllowed: boolean | null;
+  lastFetch: { ok: boolean; at: string | null } | null;
+  scanStatus: string | null;
+  extraction: { status: string; itemsFound: number | null } | null;
+  capturedAt: string | null;
+};
+
+export type DiffSegment = { type: 'same' | 'added' | 'removed'; text: string };
+
+export type RequirementChange = {
+  id: string;
+  requirementId: string;
+  label: string;
+  status: 'open' | 'acknowledged';
+  detectedAt: string | null;
+  acknowledgedAt: string | null;
+  from: { sourceId: string; sourceVersionId: string } | null;
+  to: { sourceId: string; sourceVersionId: string } | null;
+  fromQuote: string;
+  toQuote: string;
+  diff: { before: DiffSegment[]; after: DiffSegment[] };
+  aiSummary: { summary: string; whatToDo: string; importance: string; model: string | null } | null;
+};
+
+export type AlertItem = {
+  id: string;
+  type: string;
+  title: string;
+  body: string;
+  scholarshipId: string | null;
+  changeId: string | null;
+  /** Days left when a deadline reminder was sent; null for other alerts and older reminders. */
+  daysLeft?: number | null;
+  read: boolean;
+  createdAt: string | null;
+};
+
+export type DraftSentence = { text: string; basedOn: string[]; supported: boolean; paragraph: number };
+
+export type Draft = {
+  id: string;
+  scholarshipId: string;
+  requirementId: string;
+  status: 'queued' | 'writing' | 'ready' | 'approved' | 'failed' | 'paused' | 'discarded';
+  error: string | null;
+  prompt: { label: string; quote: string | null; wordLimit: number | null };
+  notes: string;
+  sentences: DraftSentence[];
+  facts: { id: string; text: string; from: 'notes' | 'profile' }[];
+  text: string;
+  edited: boolean;
+  wordCount: number;
+  unsupportedCount: number;
+  suggestion: string | null;
+  createdAt: string | null;
+  approvedAt: string | null;
 };
 
 export type ProfileEmail = { address: string; verified: boolean; primary: boolean };
@@ -56,7 +199,7 @@ export type Me = {
   notificationPrefs: { email: boolean; inApp: boolean };
   deletion: { requestedAt: string | null; completedAt: string | null } | null;
   emails: ProfileEmail[];
-  pendingEmail: { address: string; replaces: string | null } | null;
+  pendingEmail: { address: string; replaces: string | null; delivery: 'sending' | 'sent' | 'failed' } | null;
   countriesOfInterest: string[];
   citizenships: string[];
   currentLocation: string | null;
@@ -117,7 +260,8 @@ export type NewScholarship = {
   provider: string;
   url?: string | null;
   awardAmount?: { amount: number; currency: string } | null;
-  deadline?: { date: string; timezone: string } | null;
+  /** `timezone` is the scholarship's own zone; leave it out when unknown. */
+  deadline?: { date: string; time?: string | null; timezone?: string | null } | null;
 };
 
 export type CatalogTag = 'essay' | 'recommendation' | 'transcript' | 'video' | 'financial' | 'resume';
@@ -133,11 +277,13 @@ export type CatalogItem = {
   tags: CatalogTag[];
   deadlinePassed: boolean;
   addedScholarshipId: string | null;
+  /** Collected and checked by the ScholarScope team against the official page. */
+  teamVerified: boolean;
 };
 
 export type CatalogQuery = {
   q?: string;
-  deadline?: 'upcoming' | '30' | '90' | 'all';
+  deadline?: 'upcoming' | '30' | '90' | 'past' | 'all';
   gpa?: number | null;
   requires?: CatalogTag[];
   excludes?: CatalogTag[];
@@ -172,7 +318,19 @@ export class ApiService {
 
   scholarships = () => firstValueFrom(this.http.get<{ items: Scholarship[] }>('/api/scholarships'));
   scholarship = (id: string) =>
-    firstValueFrom(this.http.get<Scholarship & { requirements: Requirement[] }>(`/api/scholarships/${id}`));
+    firstValueFrom(
+      this.http.get<Scholarship & { requirements: Requirement[]; deadlineRequirement?: Requirement | null; documents: ScholarshipDocuments }>(
+        `/api/scholarships/${id}`,
+      ),
+    );
+
+  documents = () => firstValueFrom(this.http.get<{ items: StudentDocument[] }>('/api/documents'));
+  linkDocument = (id: string, scholarshipIds: string[]) =>
+    firstValueFrom(this.http.patch<{ items: StudentDocument[] }>(`/api/documents/${id}`, { scholarshipIds }));
+  removeDocument = (id: string) => firstValueFrom(this.http.delete<{ items: StudentDocument[] }>(`/api/documents/${id}`));
+  viewDocument = (id: string) => firstValueFrom(this.http.get<{ url: string }>(`/api/documents/${id}/view`));
+  checkDocument = (id: string) =>
+    firstValueFrom(this.http.post<{ jobId: string; items: StudentDocument[] }>(`/api/documents/${id}/check`, {}));
   createScholarship = (body: NewScholarship) => firstValueFrom(this.http.post<Scholarship>('/api/scholarships', body));
   archiveScholarship = (id: string) => firstValueFrom(this.http.post(`/api/scholarships/${id}/archive`, {}));
 
@@ -193,6 +351,49 @@ export class ApiService {
   addFromCatalog = (catalogId: string) =>
     firstValueFrom(this.http.post<{ scholarshipId: string; alreadyAdded: boolean }>(`/api/catalog/${catalogId}/add`, {}));
 
+  reviewRequirement = (scholarshipId: string, requirementId: string, body: Record<string, unknown>) =>
+    firstValueFrom(this.http.post<{ ok: boolean }>(`/api/scholarships/${scholarshipId}/requirements/${requirementId}/review`, body));
+  setRequirementReadiness = (scholarshipId: string, requirementId: string, readiness: 'missing' | 'in_draft' | 'ready') =>
+    firstValueFrom(this.http.patch<{ ok: boolean }>(`/api/scholarships/${scholarshipId}/requirements/${requirementId}`, { readiness }));
+  removedRequirements = (scholarshipId: string) =>
+    firstValueFrom(this.http.get<{ items: RemovedRequirement[] }>(`/api/scholarships/${scholarshipId}/requirements/removed`));
+  requirementVersions = (scholarshipId: string, requirementId: string) =>
+    firstValueFrom(
+      this.http.get<{ items: RequirementVersion[] }>(`/api/scholarships/${scholarshipId}/requirements/${requirementId}/versions`),
+    );
+
+  sources = (scholarshipId: string) =>
+    firstValueFrom(this.http.get<{ items: SourceSummary[] }>('/api/sources', { params: { scholarshipId } }));
+  addSourceUrl = (scholarshipId: string, url: string) =>
+    firstValueFrom(this.http.post<{ sourceId: string; jobId: string }>('/api/uploads/url', { scholarshipId, url }));
+  changes = (scholarshipId: string) =>
+    firstValueFrom(this.http.get<{ items: RequirementChange[] }>(`/api/scholarships/${scholarshipId}/changes`));
+  acknowledgeChange = (scholarshipId: string, changeId: string) =>
+    firstValueFrom(this.http.post<{ ok: boolean }>(`/api/scholarships/${scholarshipId}/changes/${changeId}/acknowledge`, {}));
+  alerts = () => firstValueFrom(this.http.get<{ items: AlertItem[]; unread: number }>('/api/alerts'));
+  unreadAlerts = () => firstValueFrom(this.http.get<{ unread: number }>('/api/alerts/unread-count'));
+  markAlertRead = (id: string) => firstValueFrom(this.http.post<{ ok: boolean }>(`/api/alerts/${id}/read`, {}));
+  markAllAlertsRead = () => firstValueFrom(this.http.post<{ ok: boolean }>('/api/alerts/read-all', {}));
+  drafts = (scholarshipId: string) => firstValueFrom(this.http.get<{ items: Draft[] }>('/api/drafts', { params: { scholarshipId } }));
+  draft = (id: string) => firstValueFrom(this.http.get<Draft>(`/api/drafts/${id}`));
+  createDraft = (body: { scholarshipId: string; requirementId: string; notes: string; includeGpa: boolean }) =>
+    firstValueFrom(this.http.post<{ draftId: string; jobId: string }>('/api/drafts', body));
+  editDraft = (id: string, text: string) => firstValueFrom(this.http.patch<Draft>(`/api/drafts/${id}`, { text }));
+  approveDraft = (id: string) => firstValueFrom(this.http.post<Draft>(`/api/drafts/${id}/approve`, {}));
+  discardDraft = (id: string) => firstValueFrom(this.http.post<{ ok: boolean }>(`/api/drafts/${id}/discard`, {}));
+  /** Download an export with the sign-in token (a plain link would not carry it). */
+  async download(path: 'calendar.ics' | 'checklist.csv'): Promise<void> {
+    const blob = await firstValueFrom(this.http.get(`/api/exports/${path}`, { responseType: 'blob' }));
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = path === 'calendar.ics' ? 'scholarship-deadlines.ics' : 'scholarship-checklist.csv';
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+  }
+
   viewSource = (sourceId: string, versionId: string) =>
     firstValueFrom(this.http.get<{ url: string }>(`/api/sources/${sourceId}/versions/${versionId}/view`));
 
@@ -200,6 +401,28 @@ export class ApiService {
     firstValueFrom(
       this.http.get<{ type: string; status: string; progress: number; error: string | null; nextJobId: string | null }>(`/api/jobs/${id}`),
     );
+
+  /** Upload one application file. A transcript, passport, or birth certificate replaces the file already saved for that kind. */
+  async uploadDocument(file: File, documentType: string, title?: string): Promise<string> {
+    const contentType = contentTypeFor(file);
+    if (!contentType) throw new Error('Use a PDF, Word, text, or image file.');
+    const init = await firstValueFrom(
+      this.http.post<{ uploadUrl: string; itemId: string; uploadId: string; headers: Record<string, string> }>('/api/uploads', {
+        fileName: file.name,
+        contentType,
+        size: file.size,
+        purpose: 'material',
+        documentType,
+        title,
+      }),
+    );
+    const put = await fetch(init.uploadUrl, { method: 'PUT', headers: init.headers, body: file });
+    if (!put.ok) throw new Error(`Upload failed (${put.status})`);
+    const done = await firstValueFrom(
+      this.http.post<{ jobId: string }>(`/api/uploads/material/${init.itemId}/${init.uploadId}/complete`, {}),
+    );
+    return done.jobId;
+  }
 
   /** Upload a guideline document: get a presigned URL, PUT the file to storage, then start processing. */
   async uploadSource(scholarshipId: string, file: File): Promise<string> {
@@ -219,4 +442,19 @@ export class ApiService {
     );
     return done.jobId;
   }
+}
+
+const UPLOAD_TYPES: Record<string, string> = {
+  pdf: 'application/pdf',
+  docx: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+  txt: 'text/plain',
+  png: 'image/png',
+  jpg: 'image/jpeg',
+  jpeg: 'image/jpeg',
+};
+
+function contentTypeFor(file: File): string | null {
+  if (Object.values(UPLOAD_TYPES).includes(file.type)) return file.type;
+  const ext = file.name.split('.').pop()?.toLowerCase() ?? '';
+  return UPLOAD_TYPES[ext] ?? null;
 }

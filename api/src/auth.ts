@@ -8,6 +8,8 @@ declare global {
     interface Request {
       uid?: string;
       email?: string;
+      /** True when the signed token carries the `admin` custom claim (set only by an admin or the admin script). */
+      admin?: boolean;
     }
   }
 }
@@ -30,6 +32,7 @@ export async function requireAuth(req: Request, res: Response, next: NextFunctio
     const decoded = await auth().verifyIdToken(token, true);
     req.uid = decoded.uid;
     req.email = decoded.email;
+    req.admin = decoded.admin === true;
     authTimeMs = decoded.auth_time * 1000;
   } catch (err) {
     log.warn('auth_rejected', { reason: errorMessage(err) });
@@ -53,5 +56,15 @@ export async function requireAuth(req: Request, res: Response, next: NextFunctio
   } catch (err) {
     return next(err);
   }
+  return next();
+}
+
+/**
+ * Admin-only routes. The role comes from the `admin` custom claim inside the signed ID token, so a student can't
+ * grant it to themselves; the claim is set by `npm run admin -- grant <email>` or by another admin.
+ * Hiding the Admin link in the web app is only a convenience: this check is what protects the routes.
+ */
+export function requireAdmin(req: Request, res: Response, next: NextFunction) {
+  if (!req.admin) return res.status(403).json({ error: 'Admins only' });
   return next();
 }

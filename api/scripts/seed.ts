@@ -1,14 +1,17 @@
 /**
  * Seed the LOCAL emulators from a CSV export of the dataset sheet.
  *
- *   Catalog only (what the Discover page lists):
+ *   Catalog only (what the Discover page lists), from the team dataset in Dataset/:
+ *     docker compose exec api npm run seed:catalog
+ *   or from another export:
  *     docker compose exec api npm run seed:catalog -- seed/dataset.csv
  *
  *   Catalog + a demo student with every catalog scholarship already added:
  *     docker compose exec api npm run seed -- seed/dataset.csv demo@student.test 'a-long-demo-password'
  *
- * CSV columns (header row required):
+ * CSV columns (header row required), either the database keys
  *   scholarship_id,organization,scholarship_name,current_deadline,min_gpa,essay_prompt,verified_source_url,version_flag
+ * or the dataset sheet's display headers ("Scholarship ID", "Sponsoring Organization", ...).
  *
  * Catalog values have NO citation: anything a student adds starts as "unverified" until the real
  * guideline document is uploaded and extracted ("no source, no claim").
@@ -17,6 +20,7 @@ import { readFileSync } from 'node:fs';
 import { FieldValue } from 'firebase-admin/firestore';
 import {
   addFromCatalog,
+  applyCatalogVerification,
   assertSafeEnvironment,
   auth,
   catalogEntryFromRow,
@@ -38,9 +42,11 @@ assertSafeEnvironment();
 
 const args = process.argv.slice(2);
 const catalogOnly = args.includes('--catalog-only');
-const [csvPath, email, password] = args.filter((a) => a !== '--catalog-only');
+const TEAM_DATASET = '../Dataset/ScholarScope Updated Dataset.csv';
+const [givenPath, email, password] = args.filter((a) => a !== '--catalog-only');
+const csvPath = givenPath ?? (catalogOnly ? TEAM_DATASET : undefined);
 if (!csvPath || (!catalogOnly && (!email || !password))) {
-  console.error('Usage: npm run seed:catalog -- <csv>   |   npm run seed -- <csv> <demo-email> <demo-password>');
+  console.error('Usage: npm run seed:catalog [-- <csv>]   |   npm run seed -- <csv> <demo-email> <demo-password>');
   process.exit(1);
 }
 
@@ -52,8 +58,13 @@ for (const row of parseCsv(readFileSync(csvPath, 'utf8'))) {
   else entries.push(result);
 }
 await ensureAppConfig();
-await saveCatalog(entries);
-console.log(`Catalog: ${entries.length} scholarships saved.`);
+const { removed, adminManaged } = await saveCatalog(entries);
+console.log(`Catalog: ${entries.length - entries.filter((e) => adminManaged.includes(e.catalogId)).length} scholarships saved.`);
+if (removed.length) console.log(`Removed from Discover (not in this file): ${removed.join(', ')}.`);
+if (adminManaged.length) console.log(`Left as they are (managed in the admin dashboard): ${adminManaged.join(', ')}.`);
+// Scholarships students already added from a team-checked entry become verified too.
+const upgraded = await applyCatalogVerification();
+if (upgraded) console.log(`Marked ${upgraded} requirement(s) on scholarships already added as verified by the ScholarScope team.`);
 
 if (catalogOnly) process.exit(0);
 

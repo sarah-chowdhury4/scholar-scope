@@ -1,4 +1,4 @@
-import { Component, OnInit, inject, signal } from '@angular/core';
+import { Component, inject, signal } from '@angular/core';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { Router, RouterLink } from '@angular/router';
 import { HttpErrorResponse } from '@angular/common/http';
@@ -45,9 +45,27 @@ import { ApiService } from '../../core/api.service';
         </div>
       </div>
 
-      <label for="deadline">Deadline (optional)</label>
-      <input id="deadline" type="date" formControlName="deadline" />
-      <p class="hint">This date is stored in {{ deadlineZone() }}. Change that on your profile if it is not where you live.</p>
+      <div class="row">
+        <div>
+          <label for="deadline">Deadline (optional)</label>
+          <input id="deadline" type="date" formControlName="deadline" />
+        </div>
+        <div>
+          <label for="deadlineTime">Time (optional)</label>
+          <input id="deadlineTime" type="time" formControlName="time" />
+        </div>
+      </div>
+      <label for="deadlineZone">The scholarship's time zone (optional)</label>
+      <input id="deadlineZone" formControlName="zone" list="zones" autocomplete="off" placeholder="For example America/New_York" />
+      <datalist id="zones">
+        @for (z of zones; track z) {
+          <option [value]="z"></option>
+        }
+      </datalist>
+      <p class="hint">
+        Use the time zone the official page gives, such as "11:59 PM Eastern" → America/New_York. Not sure? Leave it blank:
+        we show the date as written and mark the time zone as not confirmed. No time means the end of that day.
+      </p>
 
       @if (error()) {
         <p class="error" role="alert">{{ error() }}</p>
@@ -59,12 +77,12 @@ import { ApiService } from '../../core/api.service';
     </form>
   `,
 })
-export class AddScholarship implements OnInit {
+export class AddScholarship {
   private readonly api = inject(ApiService);
   private readonly router = inject(Router);
   protected readonly busy = signal(false);
   protected readonly error = signal('');
-  protected readonly deadlineZone = signal(Intl.DateTimeFormat().resolvedOptions().timeZone);
+  protected readonly zones = Intl.supportedValuesOf('timeZone');
   protected readonly form = inject(FormBuilder).nonNullable.group({
     name: ['', Validators.required],
     provider: ['', Validators.required],
@@ -72,20 +90,16 @@ export class AddScholarship implements OnInit {
     amount: [null as number | null],
     currency: ['USD'],
     deadline: [''],
+    time: [''],
+    zone: [''],
   });
-
-  async ngOnInit() {
-    try {
-      const me = await this.api.me();
-      if (me.timezoneChosen && me.timezone) this.deadlineZone.set(me.timezone);
-    } catch {
-      // Keep the device zone when the profile cannot be loaded.
-    }
-  }
 
   async save() {
     const v = this.form.getRawValue();
     if (v.url && !/^https?:\/\//i.test(v.url)) return this.error.set('The official page must start with http:// or https://');
+    const zone = v.zone.trim();
+    if (zone && !this.zones.includes(zone) && zone !== 'UTC') return this.error.set('Pick a time zone from the list, or leave it blank.');
+    if (v.time && !zone) return this.error.set('Add the scholarship\'s time zone for a deadline with a time, or remove the time.');
     this.busy.set(true);
     this.error.set('');
     try {
@@ -94,7 +108,7 @@ export class AddScholarship implements OnInit {
         provider: v.provider,
         url: v.url || null,
         awardAmount: v.amount ? { amount: Number(v.amount), currency: v.currency } : null,
-        deadline: v.deadline ? { date: v.deadline, timezone: this.deadlineZone() } : null,
+        deadline: v.deadline ? { date: v.deadline, time: v.time || null, timezone: zone || null } : null,
       });
       await this.router.navigate(['/scholarships', created.id]);
     } catch (err) {

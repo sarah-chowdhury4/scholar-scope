@@ -1,23 +1,32 @@
 import { Router } from 'express';
 import { FieldValue, Timestamp } from 'firebase-admin/firestore';
-import { db, userDoc, getAppConfig, writeAudit } from '@scholarscope/shared';
+import { db, userDoc, getAppConfig, writeAudit, minGpaFromRequirements, deadlineFromParts, deadlineRecord, isTimeZone, syncAutoReadiness, countRequirements, isChecklistItem, sameCounts } from '@scholarscope/shared';
+import { HttpError } from '../http';
 import { createScholarshipSchema, updateScholarshipSchema } from '../validation';
+import { scholarshipDocuments } from '../studentDocuments';
+import { toPlain } from '../serialize';
+
+type RequirementRecord = {
+  id: string;
+  kind?: string;
+  label?: string;
+  current?: { value?: Record<string, unknown> } | null;
+  [field: string]: unknown;
+};
 
 export const scholarshipsRouter = Router();
 
 const ZERO_COUNTS = { open: 0, changed: 0, unverified: 0, needsReview: 0, ready: 0, total: 0 };
 
-function toDeadline(input: { date: string; timezone: string } | null | undefined) {
+/** A deadline typed by the student, in the scholarship's time zone (or with the zone unknown). */
+function toDeadline(input: { date: string; time?: string | null; timezone?: string | null } | null | undefined) {
   if (!input) return null;
-  // Date-only values (e.g. from the dataset) are stored as end of day UTC and flagged allDay.
-  return {
-    utc: Timestamp.fromDate(new Date(`${input.date}T23:59:59Z`)),
-    sourceTimezone: input.timezone,
-    sourceText: input.date,
-    allDay: true,
-    requirementId: null,
-    verification: 'unverified', // typed by the student, not yet backed by a source (FR-4.2)
-  };
+  if (input.timezone && !isTimeZone(input.timezone)) throw new HttpError(400, 'Unknown time zone. Use a name like America/New_York.');
+  const parts = deadlineFromParts(input.date, input.time ?? null, input.timezone ?? null);
+  if (!parts) throw new HttpError(400, 'That date is not valid.');
+  const written = input.time ? `${input.date} ${input.time}` : input.date;
+  // Typed by the student, not yet backed by a source (FR-4.2).
+  return { ...deadlineRecord(parts, written), requirementId: null, verification: 'unverified' };
 }
 
 function serialize(id: string, data: FirebaseFirestore.DocumentData) {
@@ -96,12 +105,33 @@ scholarshipsRouter.post('/', async (req, res) => {
 /** One record with its requirement checklist (FR-1.2, FR-1.3). */
 scholarshipsRouter.get('/:id', async (req, res) => {
   const ref = userDoc(req.uid!).collection('scholarships').doc(req.params.id);
+  if (!(await ref.get()).exists) return res.status(404).json({ error: 'Not found' });
+  // Judge what the student's checked documents can show (GPA, required files) before reading the checklist.
+  const assessments = await syncAutoReadiness(req.uid!, [ref.id]);
   const snap = await ref.get();
-  if (!snap.exists) return res.status(404).json({ error: 'Not found' });
   const reqs = await ref.collection('requirements').where('removedAt', '==', null).get();
+  const requirements = reqs.docs.map((d) => ({ id: d.id, ...d.data() }) as RequirementRecord);
+  const deadline = (snap.get('deadline.utc') as Timestamp | undefined)?.toDate() ?? null;
+  const documents = await scholarshipDocuments(req.uid!, snap.id, requirements, {
+    deadline,
+    minGpa: minGpaFromRequirements(requirements),
+    requirementLabels: requirements.map((item) => item.label ?? ''),
+  });
+  // Counts saved before the deadline stopped being a checklist item are corrected the first time the page opens.
+  const { counts, readinessPct } = countRequirements(requirements);
+  const data = snap.data()!;
+  if (!sameCounts(data['counts'], counts) || data['readinessPct'] !== readinessPct) {
+    await ref.update({ counts, readinessPct });
+    Object.assign(data, { counts, readinessPct });
+  }
+  const plain = (item: RequirementRecord) => ({ ...(toPlain(item) as object), assessment: assessments.get(item.id) ?? null });
+  const deadlineItem = requirements.find((item) => !isChecklistItem(item));
   res.json({
-    ...serialize(snap.id, snap.data()!),
-    requirements: reqs.docs.map((d) => ({ id: d.id, ...d.data() })),
+    ...serialize(snap.id, data),
+    // The application deadline is a date, not a task: it is sent apart so the page shows it with the due date.
+    requirements: requirements.filter(isChecklistItem).map(plain),
+    deadlineRequirement: deadlineItem ? plain(deadlineItem) : null,
+    documents,
   });
 });
 

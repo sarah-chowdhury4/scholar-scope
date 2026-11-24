@@ -1,19 +1,29 @@
-import { updateJob, log, errorMessage, type JobMessage, type JobType } from '@scholarscope/shared';
+import { FieldValue } from 'firebase-admin/firestore';
+import { db, updateJob, log, errorMessage, setDeliveryStatus, type JobMessage, type JobType } from '@scholarscope/shared';
 import { handleScan } from './scan';
 import { handleExtract } from './extract';
 import { handleFetchUrl } from './fetchUrl';
+import { handleCheckDocument } from './checkDocument';
+import { handleDiff } from './diff';
+import { handleDraft } from './draft';
+import { handleSendEmail } from './sendEmail';
+import { handleSearchSources } from './searchSources';
 
 type Handler = (job: JobMessage) => Promise<void>;
 
 /**
  * Job handlers. Locally the SQS consumer calls these; on Google Cloud the same functions sit
- * behind POST /tasks/:type endpoints that Cloud Tasks calls.
- * TODO (Eshani/Alexis): diff (Gemini side-by-side compare), draft (FR-6), classify + embed (NIM, FR-5).
+ * behind POST /tasks/:type endpoints that Cloud Tasks calls. Every AI job uses Gemini.
  */
 const HANDLERS: Partial<Record<JobType, Handler>> = {
   scan: handleScan,
   extract: handleExtract,
   fetch_url: handleFetchUrl,
+  check_document: handleCheckDocument,
+  diff: handleDiff,
+  draft: handleDraft,
+  send_email: handleSendEmail,
+  search_sources: handleSearchSources,
 };
 
 const MAX_ATTEMPTS = 3;
@@ -31,7 +41,43 @@ export async function runJob(job: JobMessage, attempt: number): Promise<void> {
   } catch (err) {
     const final = attempt >= MAX_ATTEMPTS;
     await updateJob(job.uid, job.jobId, { status: final ? 'failed' : 'queued', error: errorMessage(err) });
-    if (job.type === 'extract') log.error('extraction_failed', { jobId: job.jobId, attempt, error: errorMessage(err) });
+    if (job.type === 'extract' || job.type === 'check_document' || job.type === 'draft' || job.type === 'send_email') {
+      log.error(`${job.type}_failed`, { jobId: job.jobId, attempt, error: errorMessage(err) });
+    }
+    if (final) await markGivenUp(job, errorMessage(err));
     throw err; // let the queue retry (SQS redelivery / Cloud Tasks retry)
+  }
+}
+
+/** A job that ran out of attempts must not leave its record looking "in progress" forever. */
+async function markGivenUp(job: JobMessage, error: string): Promise<void> {
+  try {
+    if (job.type === 'check_document') {
+      const versionRef = db().doc(job.target);
+      const check = { status: 'failed', reason: 'The check could not finish. Try again later.', jobId: job.jobId, versionId: versionRef.id, updatedAt: FieldValue.serverTimestamp() };
+      await versionRef.set({ check }, { merge: true });
+      const materialRef = versionRef.parent.parent!;
+      if ((await materialRef.get()).get('currentVersionId') === versionRef.id) await materialRef.set({ check }, { merge: true });
+    }
+    if (job.type === 'send_email') {
+      const outbox = db().doc(job.target);
+      await setDeliveryStatus(job.uid, (await outbox.get()).get('statusField'), 'failed');
+      await outbox.delete(); // it holds a one-time code: do not keep it
+    }
+    if (job.type === 'extract') {
+      // Show the reading as failed (not "reading…" forever); saving the page again reads it again.
+      const quota = /exceeded your current quota|quota exceeded/i.test(error);
+      await db()
+        .doc(job.target)
+        .set({ extraction: { status: 'failed', reason: quota ? 'ai_quota' : 'error', jobId: job.jobId } }, { merge: true });
+    }
+    if (job.type === 'search_sources') {
+      await db().doc(job.target).set({ search: { status: 'failed', error: 'The search could not finish.', jobId: job.jobId, at: FieldValue.serverTimestamp() } }, { merge: true });
+    }
+    if (job.type === 'draft') {
+      await db().doc(job.target).set({ status: 'failed', error: 'The draft could not be written. Try again later.' }, { merge: true });
+    }
+  } catch (err) {
+    log.error('mark_given_up_failed', { jobId: job.jobId, error: errorMessage(err), cause: error });
   }
 }

@@ -1,18 +1,20 @@
+import { PageLoading } from '../../core/page-loading';
 import { Component, OnInit, inject, signal } from '@angular/core';
-import { DatePipe } from '@angular/common';
+import { DeadlineText } from '../../core/deadline-text';
+import { DaysLeft } from '../../core/days-left';
 import { RouterLink } from '@angular/router';
 import { ApiService, type Scholarship } from '../../core/api.service';
 
 @Component({
   selector: 'app-dashboard',
-  imports: [RouterLink, DatePipe],
+  imports: [RouterLink, DeadlineText, DaysLeft, PageLoading],
   template: `
     <div class="page-head">
       <div>
         <h1>My scholarships</h1>
         @if (!loading() && items().length > 0) {
           <p class="hint">
-            {{ items().length }} of {{ limit }} · sorted by nearest deadline · <span class="badge unverified">Unverified</span> means no source yet
+            Sorted by nearest deadline ·<span class="badge unverified">Unverified</span> means no source yet
           </p>
         }
       </div>
@@ -20,6 +22,12 @@ import { ApiService, type Scholarship } from '../../core/api.service';
         <div class="actions">
           <a class="button" routerLink="/discover">Discover scholarships</a>
           <a class="button secondary" routerLink="/scholarships/new">Add your own</a>
+          <a class="button secondary" routerLink="/documents">Documents</a>
+        </div>
+        <div class="actions small">
+          <button type="button" class="link" (click)="download('calendar.ics')">Add deadlines to my calendar (.ics)</button>
+          <button type="button" class="link" (click)="download('checklist.csv')">Download checklist (.csv)</button>
+          <a routerLink="/print">Print or save as PDF</a>
         </div>
       }
     </div>
@@ -32,13 +40,14 @@ import { ApiService, type Scholarship } from '../../core/api.service';
     }
 
     @if (loading()) {
-      <p>Loading…</p>
+      <app-page-loading [cards]="3" />
     } @else if (error()) {
       <p class="error" role="alert">{{ error() }}</p>
     } @else if (items().length === 0) {
       <section class="card empty">
         <h2>Your dashboard is empty</h2>
         <p>Start by finding scholarships to track. You can follow up to {{ limit }}.</p>
+        <p>Transcripts, school certificates, and other application files are kept in <a routerLink="/documents">Documents</a>.</p>
         <div class="actions">
           <a class="button" routerLink="/discover">Discover scholarships</a>
           <a class="button secondary" routerLink="/scholarships/new">Add one that isn't listed</a>
@@ -51,9 +60,10 @@ import { ApiService, type Scholarship } from '../../core/api.service';
             <h2><a [routerLink]="['/scholarships', s.id]">{{ s.name }}</a></h2>
             <p class="muted">{{ s.provider }}</p>
             @if (s.deadline) {
+              <p class="days-row"><app-days-left [deadline]="s.deadline" /></p>
               <p>
-                Due <strong>{{ s.deadline.utc | date: 'mediumDate' }}</strong>
-                <span class="badge" [class]="s.deadline.verification">{{ label(s.deadline.verification) }}</span>
+                <span class="badge" [class]="s.deadline.verification">{{ label(s.deadline.verification, s.deadline.verifiedBy) }}</span>
+                Due <app-deadline [deadline]="s.deadline" [withTime]="false" />
               </p>
             } @else {
               <p class="muted">No deadline yet</p>
@@ -64,6 +74,9 @@ import { ApiService, type Scholarship } from '../../core/api.service';
               }
               <span>{{ s.counts.open }} open</span> · <span>{{ s.readinessPct }}% ready</span>
             </p>
+            <div class="progress-track" role="progressbar" [attr.aria-label]="s.name + ' readiness'" [attr.aria-valuenow]="s.readinessPct" aria-valuemin="0" aria-valuemax="100">
+              <div class="progress-bar" [style.width.%]="s.readinessPct"></div>
+            </div>
             @if (s.recheck?.status === 'unreachable') {
               <p class="warning" role="status">We couldn't re-check this page. Check the official site.</p>
             }
@@ -86,7 +99,8 @@ export class Dashboard implements OnInit {
     await this.load();
   }
 
-  label(v: string) {
+  label(v: string, verifiedBy?: string | null) {
+    if (v === 'verified' && verifiedBy) return 'Verified'; // checked by the ScholarScope team
     return v === 'verified' ? 'From source' : v === 'needs_review' ? 'Needs review' : 'Unverified';
   }
 
@@ -109,6 +123,14 @@ export class Dashboard implements OnInit {
       this.profileNote.set(me.readinessPercent < 100 ? me.missingForRecommendations.join('; ') : '');
     } catch {
       this.profileNote.set('');
+    }
+  }
+
+  async download(path: 'calendar.ics' | 'checklist.csv') {
+    try {
+      await this.api.download(path);
+    } catch {
+      this.error.set('Could not create that file. Try again.');
     }
   }
 

@@ -35,7 +35,10 @@ async function deleteUser(uid: string) {
   let page = await db().collection('auditLogs').where('subjectUid', '==', uid).limit(400).get();
   while (!page.empty) {
     const batch = db().batch();
-    page.docs.forEach((d) => batch.update(d.ref, { subjectUid: pseudonym, before: null, after: null }));
+    // The resource path can hold the account ID too (for example users/{uid} on an admin's deletion request).
+    page.docs.forEach((d) =>
+      batch.update(d.ref, { subjectUid: pseudonym, resource: String(d.get('resource') ?? '').split(uid).join('[deleted]'), before: null, after: null }),
+    );
     await batch.commit();
     page = await db().collection('auditLogs').where('subjectUid', '==', uid).limit(400).get();
   }

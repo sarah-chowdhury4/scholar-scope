@@ -5,7 +5,7 @@ import { existsSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { ZodError } from 'zod';
 import { log, errorMessage } from '@scholarscope/shared';
-import { requireAuth } from './auth';
+import { requireAdmin, requireAuth } from './auth';
 import { HttpError } from './http';
 import { meRouter } from './routes/me';
 import { passwordResetRouter } from './routes/passwordReset';
@@ -13,6 +13,12 @@ import { scholarshipsRouter } from './routes/scholarships';
 import { uploadsRouter } from './routes/uploads';
 import { jobsRouter, sourcesRouter, alertsRouter } from './routes/misc';
 import { catalogRouter } from './routes/catalog';
+import { documentsRouter } from './routes/documents';
+import { requirementsRouter } from './routes/requirements';
+import { changesRouter } from './routes/changes';
+import { draftsRouter } from './routes/drafts';
+import { exportsRouter } from './routes/exports';
+import { adminRouter } from './routes/admin';
 
 export function createApp() {
   const app = express();
@@ -40,15 +46,34 @@ export function createApp() {
   app.use('/api/auth', passwordResetRouter);
 
   const api = express.Router();
-  api.use(rateLimit({ windowMs: 60_000, limit: 120, standardHeaders: 'draft-8', legacyHeaders: false }));
+  // Before sign-in checks: a generous cap per address, against floods of unauthenticated requests.
+  api.use(rateLimit({ windowMs: 60_000, limit: 1200, standardHeaders: 'draft-8', legacyHeaders: false }));
   api.use(requireAuth);
+  // Per signed-in student, so classmates on one network don't share an allowance. Switching pages quickly
+  // makes 3-4 reads per page, so this leaves plenty of room while still stopping a runaway client.
+  api.use(
+    rateLimit({
+      windowMs: 60_000,
+      limit: 600,
+      standardHeaders: 'draft-8',
+      legacyHeaders: false,
+      keyGenerator: (req) => `uid:${req.uid}`,
+      message: { error: 'Too many requests. Wait a few seconds and try again.' },
+    }),
+  );
   api.use('/me', meRouter);
+  api.use('/scholarships/:id/requirements', requirementsRouter);
+  api.use('/scholarships/:id/changes', changesRouter);
   api.use('/scholarships', scholarshipsRouter);
   api.use('/uploads', uploadsRouter);
   api.use('/jobs', jobsRouter);
   api.use('/sources', sourcesRouter);
   api.use('/alerts', alertsRouter);
   api.use('/catalog', catalogRouter);
+  api.use('/documents', documentsRouter);
+  api.use('/drafts', draftsRouter);
+  api.use('/exports', exportsRouter);
+  api.use('/admin', requireAdmin, adminRouter);
   app.use('/api', api);
   app.use('/api', (_req, res) => res.status(404).json({ error: 'Not found' }));
 

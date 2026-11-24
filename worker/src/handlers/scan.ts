@@ -17,8 +17,10 @@ export async function handleScan(job: JobMessage): Promise<void> {
   const config = await getAppConfig();
   const store = await storage();
 
+  const itemRef = versionRef.parent.parent!;
   const fail = async (status: string, detail: string) => {
     await versionRef.update({ scan: { status, detail, engine: 'clamav', at: FieldValue.serverTimestamp() } });
+    await itemRef.set({ scanStatus: status, updatedAt: FieldValue.serverTimestamp() }, { merge: true });
     await updateJob(job.uid, job.jobId, { status: 'failed', error: `${status}: ${detail}` });
     log.warn(status === 'infected' ? 'upload_infected' : 'upload_rejected', { target: job.target, status });
   };
@@ -36,7 +38,6 @@ export async function handleScan(job: JobMessage): Promise<void> {
   if (!result.clean) return fail('infected', result.signature ?? 'malware found');
 
   const sha256 = createHash('sha256').update(data).digest('hex');
-  const itemRef = versionRef.parent.parent!;
   const storedKey = `${itemRef.path.replace(/^users\//, 'u/')}/${versionRef.id}/original.${type.ext}`;
   const put = await store.put(buckets.originals(), storedKey, data, type.mime);
 
@@ -50,9 +51,17 @@ export async function handleScan(job: JobMessage): Promise<void> {
     sizeBytes: data.length,
     stored: { bucket: buckets.originals(), key: storedKey, versionId: put.versionId ?? null },
   });
-  await itemRef.update({ currentVersionId: versionRef.id, lastSha256: sha256, updatedAt: FieldValue.serverTimestamp() });
+  await itemRef.set(
+    { currentVersionId: versionRef.id, lastSha256: sha256, scanStatus: 'clean', updatedAt: FieldValue.serverTimestamp() },
+    { merge: true },
+  );
 
-  const nextJobId = itemRef.parent.id === 'sources' && !isDuplicate ? await enqueueJob(job.uid, 'extract', versionRef.path) : undefined;
+  // Guidelines are extracted; a student's own file gets an AI document check.
+  const followUp = itemRef.parent.id === 'sources' ? 'extract' : 'check_document';
+  const nextJobId = isDuplicate ? undefined : await enqueueJob(job.uid, followUp, versionRef.path);
+  if (nextJobId && followUp === 'check_document') {
+    await itemRef.set({ check: { status: 'queued', versionId: versionRef.id, jobId: nextJobId, updatedAt: FieldValue.serverTimestamp() } }, { merge: true });
+  }
   await updateJob(job.uid, job.jobId, { status: 'done', progress: 100, nextJobId });
   log.info('upload_scanned', { target: job.target, mime: type.mime, duplicate: isDuplicate });
 }

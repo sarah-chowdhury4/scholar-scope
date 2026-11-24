@@ -1,0 +1,10 @@
+# Copy to terraform.tfvars (git-ignored) and fill in. No secrets go here: API keys are added to
+# Secret Manager by hand after `terraform apply` (see infra/README.md).
+project_id           = "my-scholarscope-project"
+region               = "us-central1"
+firestore_location   = "nam5"
+web_origin           = "https://my-scholarscope-project.web.app"
+firebase_web_api_key = "AIza-public-web-key-from-firebase-console"
+gemini_model         = "gemini-2.5-flash"
+mail_from            = "ScholarScope <alerts@example.org>"
+image_tag            = "v1"

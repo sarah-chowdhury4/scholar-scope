@@ -23,6 +23,11 @@ export class AuthService {
   /** undefined = still loading, null = signed out */
   readonly user = signal<User | null | undefined>(undefined);
   readonly signedIn = computed(() => !!this.user());
+  /**
+   * True when the sign-in token carries the `admin` role. Only used to show the Admin link and page: the API
+   * checks the same signed token on every admin request, so changing this in the browser opens nothing.
+   */
+  readonly isAdmin = signal(false);
   readonly ready: Promise<void>;
 
   constructor() {
@@ -30,7 +35,8 @@ export class AuthService {
       connectAuthEmulator(this.auth, 'http://localhost:9099', { disableWarnings: true });
     }
     this.ready = new Promise((resolve) => {
-      onAuthStateChanged(this.auth, (u) => {
+      onAuthStateChanged(this.auth, async (u) => {
+        this.isAdmin.set(u ? await this.readAdmin(u) : false);
         this.user.set(u);
         resolve();
       });
@@ -59,9 +65,20 @@ export class AuthService {
     return (await this.auth.currentUser?.getIdToken()) ?? null;
   }
 
-  /** Force a new token after the sign-in email changes. */
+  /** Force a new token after the sign-in email changes (and pick up a role an admin just gave). */
   async refreshToken(): Promise<void> {
-    await this.auth.currentUser?.getIdToken(true);
+    const u = this.auth.currentUser;
+    if (!u) return;
+    await u.getIdToken(true);
+    this.isAdmin.set(await this.readAdmin(u));
+  }
+
+  private async readAdmin(u: User): Promise<boolean> {
+    try {
+      return (await u.getIdTokenResult()).claims['admin'] === true;
+    } catch {
+      return false;
+    }
   }
 
   private resetIdle() {

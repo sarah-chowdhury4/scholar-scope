@@ -85,7 +85,7 @@ services:
       SERVICES: sqs,secretsmanager
       AWS_DEFAULT_REGION: us-east-1
     env_file:
-      - .env.secrets                 # GEMINI_API_KEY, NVIDIA_API_KEY, BREVO_API_KEY -> Secrets Manager
+      - .env.secrets                 # GEMINI_API_KEY, NVIDIA_API_KEY, JINA_API_KEY, BREVO_API_KEY, SMTP_PASSWORD -> Secrets Manager
     volumes:
       - ./local/localstack/init-ready.sh:/etc/localstack/init/ready.d/10-init.sh:ro
     ports:
@@ -115,6 +115,23 @@ services:
     ports:
       - "127.0.0.1:8025:8025"       # web inbox for alert emails
 
+  # ---------- Fictional scholarship website, for testing re-checks ----------
+  # http://sample-scholarship.localhost:8088 in the browser; the worker reaches the same address on the Docker
+  # network. Edit samples/scholarship-site/index.html to change the deadlines (served fresh on every request).
+  sample-site:
+    image: node:22-bookworm-slim
+    command: node /site/server.mjs
+    volumes:
+      - ./samples/scholarship-site:/site:ro
+    environment:
+      PORT: "8088"
+    ports:
+      - "127.0.0.1:8088:8088"
+    networks:
+      default:
+        aliases:
+          - sample-scholarship.localhost
+
   # ---------- ScholarScope API (Express) ----------
   api:
     build:
@@ -124,6 +141,7 @@ services:
     volumes:
       - ./shared:/repo/shared
       - ./api:/repo/api
+      - ./Dataset:/repo/Dataset:ro    # the team's scholarship dataset, read by npm run seed:catalog
       # keep the container's Linux node_modules; never use ones installed on Windows
       - /repo/shared/node_modules
       - /repo/api/node_modules
@@ -147,9 +165,7 @@ services:
       AWS_ACCESS_KEY_ID: test
       AWS_SECRET_ACCESS_KEY: test
       CORS_ORIGIN: http://localhost:4200
-      MAIL_BACKEND: smtp
-      SMTP_HOST: mailpit
-      SMTP_PORT: "1025"
+      # No mail settings: the API queues emails and the worker sends them (only the worker holds keys).
     ports:
       - "127.0.0.1:3000:3000"
     depends_on:
@@ -167,6 +183,7 @@ services:
     volumes:
       - ./shared:/repo/shared
       - ./worker:/repo/worker
+      - ./samples:/repo/samples:ro    # fictional test documents for npm run check:documents
       # keep the container's Linux node_modules; never use ones installed on Windows
       - /repo/shared/node_modules
       - /repo/worker/node_modules
@@ -192,9 +209,17 @@ services:
       OCR_BACKEND: tesseract
       GEMINI_BACKEND: aistudio                       # "vertex" on Google Cloud
       GEMINI_MODEL: ${GEMINI_MODEL:?set GEMINI_MODEL in .env}
+      NIM_ENABLED: ${NIM_ENABLED:-true}               # "false" = no NVIDIA key: NIM calls run on Gemini
       NIM_BASE_URL: https://integrate.api.nvidia.com/v1
+      NIM_CHAT_MODEL: ${NIM_CHAT_MODEL:-}             # blank = default in shared/src/platform/ai/nim.ts
+      NIM_EMBED_MODEL: ${NIM_EMBED_MODEL:-}
+      READER_BACKEND: ${READER_BACKEND:-jina}           # "direct" = fetch saved pages ourselves, never via Jina Reader
+      # The fictional test site (service sample-site) is on the Docker network, which the URL guard normally blocks.
+      FETCH_ALLOW_PRIVATE_HOSTS: sample-scholarship.localhost
       AI_REAL_STUDENT_DATA_ALLOWED: "false"          # synthetic documents only (NFR-1.5)
-      MAIL_BACKEND: smtp                             # "brevo" to send real emails
+      MAIL_BACKEND: ${MAIL_BACKEND:-smtp}           # smtp = Mailpit test inbox; gmail or brevo = real inboxes
+      MAIL_FROM: ${MAIL_FROM:-ScholarScope <alerts@scholarscope.local>}  # with brevo: a sender verified in Brevo
+      SMTP_USER: ${SMTP_USER:-}                     # with gmail: the Gmail address (its app password goes in .env.secrets)
       SMTP_HOST: mailpit
       SMTP_PORT: "1025"
       SCHEDULER: cron                                # Cloud Scheduler on Google Cloud

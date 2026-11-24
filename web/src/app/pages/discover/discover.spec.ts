@@ -6,7 +6,7 @@ import { ApiService, type CatalogQuery } from '../../core/api.service';
 const item = (id: string, extra: object = {}) => ({
   catalogId: id, organization: 'Org ' + id, name: 'Scholarship ' + id, deadline: '2027-01-15', minGpa: 3,
   promptOrMaterials: 'Essay; Transcript', sourceUrl: 'https://example.org', tags: ['essay', 'transcript'],
-  deadlinePassed: false, addedScholarshipId: null, ...extra,
+  deadlinePassed: false, addedScholarshipId: null, teamVerified: true, ...extra,
 });
 
 describe('Discover', () => {
@@ -49,7 +49,11 @@ describe('Discover', () => {
     expect(el.querySelector('input#q')).toBeTruthy();
     expect(el.querySelector('select#deadline')).toBeTruthy();
     expect(el.querySelector('input#gpa')).toBeTruthy();
-    expect(el.textContent).toContain('3 of 15 scholarships');
+    // The count is what is on the page, not the whole catalog.
+    expect(el.textContent).toContain('3 scholarships');
+    expect(el.textContent).not.toContain('of 15');
+    // A YYYY-MM-DD deadline shows as that same day in every time zone (it was a day early east of UTC).
+    expect(el.textContent).toContain('Jan 15, 2027');
     expect(el.textContent).toContain('Add to my scholarships');
     expect(el.textContent).toContain('Added · open');
     expect(el.textContent).toContain('Deadline passed');
@@ -66,11 +70,56 @@ describe('Discover', () => {
     expect((fixture.nativeElement as HTMLElement).querySelectorAll('a[href="/scholarships/catalog-sch-001"]').length).toBe(1);
   });
 
+  it('shows archived (closed) scholarships with the Archived button', async () => {
+    const fixture = await render();
+    const el = fixture.nativeElement as HTMLElement;
+    const button = el.querySelector('.archived-toggle') as HTMLButtonElement;
+    expect(button.getAttribute('aria-pressed')).toBe('false');
+    button.click();
+    await new Promise((r) => setTimeout(r));
+    fixture.detectChanges();
+    expect(queries.at(-1)).toMatchObject({ deadline: 'past' });
+    expect(button.getAttribute('aria-pressed')).toBe('true');
+    expect(el.textContent).toContain('archived scholarships');
+    button.click();
+    await new Promise((r) => setTimeout(r));
+    expect(queries.at(-1)).toMatchObject({ deadline: 'upcoming' });
+  });
+
   it('sends tag filters to the API', async () => {
     const fixture = await render();
     fixture.componentInstance.setTag('video', 'excludes');
     fixture.componentInstance.setTag('essay', 'requires');
     await new Promise((r) => setTimeout(r));
     expect(queries.at(-1)).toMatchObject({ requires: ['essay'], excludes: ['video'] });
+  });
+
+  it('keeps the filter panel closed until the student opens it', async () => {
+    const fixture = await render();
+    const el = fixture.nativeElement as HTMLElement;
+    const panel = el.querySelector('#filter-panel') as HTMLElement;
+    const toggle = el.querySelector('.filters-toggle') as HTMLButtonElement;
+    expect(panel.hidden).toBe(true);
+    expect(toggle.getAttribute('aria-expanded')).toBe('false');
+    toggle.click();
+    fixture.detectChanges();
+    expect(panel.hidden).toBe(false);
+    expect(toggle.getAttribute('aria-expanded')).toBe('true');
+    expect(el.querySelector('label[for="tag-recommendation"]')?.textContent).toBe('Recommendation letter');
+  });
+
+  it('shows filters in use as chips that remove them', async () => {
+    const fixture = await render();
+    fixture.componentInstance.setTag('essay', 'requires');
+    fixture.componentInstance.setTag('video', 'excludes');
+    await new Promise((r) => setTimeout(r));
+    fixture.detectChanges();
+    const el = fixture.nativeElement as HTMLElement;
+    const chips = [...el.querySelectorAll('.active-filters .chip')].map((c) => c.textContent?.replace('×', '').trim());
+    expect(chips).toEqual(['Asks for essay', 'No video']);
+    expect(el.querySelector('.filters-toggle')?.textContent).toContain('2');
+    (el.querySelector('[aria-label="Remove filter: Asks for essay"]') as HTMLButtonElement).click();
+    await new Promise((r) => setTimeout(r));
+    expect(queries.at(-1)).toMatchObject({ requires: [], excludes: ['video'] });
   });
 });

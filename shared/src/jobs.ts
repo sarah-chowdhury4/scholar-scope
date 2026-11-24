@@ -1,13 +1,13 @@
 import { FieldValue } from 'firebase-admin/firestore';
 import { randomUUID } from 'node:crypto';
 import { userDoc } from './firebase';
-import { queue, QUEUE_FOR_JOB } from './platform/queue/index';
+import { queue, queueForJob } from './platform/queue/index';
 import type { JobMessage, JobStatus, JobType } from './types';
 
 /** Create users/{uid}/jobs/{jobId} (for progress in the UI) and put the job on its queue. */
 export async function enqueueJob(uid: string, type: JobType, target: string): Promise<string> {
   const jobId = randomUUID();
-  const queueName = QUEUE_FOR_JOB[type];
+  const queueName = queueForJob(type);
   await userDoc(uid).collection('jobs').doc(jobId).set({
     type,
     queue: queueName,

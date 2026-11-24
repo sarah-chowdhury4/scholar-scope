@@ -2,3 +2,9 @@
 *.sh text eol=lf
 Dockerfile text eol=lf
 *.Dockerfile text eol=lf
+
+# Terraform files are checked by `terraform fmt -check` inside Linux containers: keep LF
+*.tf text eol=lf
+*.tfvars text eol=lf
+*.tfvars.example text eol=lf
+*.hcl text eol=lf

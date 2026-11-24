@@ -9,7 +9,9 @@
     "cron:recheck": "tsx src/runOnce.ts recheck",
     "cron:deadline-alerts": "tsx src/runOnce.ts deadline-alerts",
     "delete-user": "tsx src/jobs/deleteUser.ts",
-    "typecheck": "tsc -p tsconfig.json"
+    "typecheck": "tsc -p tsconfig.json",
+    "check:documents": "tsx scripts/check-documents.ts",
+    "mail:test": "tsx scripts/mail-test.ts"
   },
   "dependencies": {
     "@scholarscope/shared": "*",
