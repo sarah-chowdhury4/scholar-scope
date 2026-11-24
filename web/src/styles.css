@@ -240,9 +240,42 @@ details.draft summary { cursor: pointer; font-weight: 600; color: var(--accent);
   body { background: #fff; color: #000; }
   a { color: #000; }
 }
-.hero { padding: 32px 0 16px; }
+/* Landing hero: an illustration (public/hero-art.svg) behind the text, faded on the left so the words stay readable. */
+.hero {
+  position: relative;
+  overflow: hidden;
+  padding: 48px 40px 44px;
+  margin-bottom: 8px;
+  border-radius: var(--radius);
+  background:
+    linear-gradient(90deg, var(--bg) 0%, var(--bg) 45%, rgba(233, 238, 227, 0.7) 62%, rgba(233, 238, 227, 0) 82%),
+    url('/hero-art.svg') right center / cover no-repeat,
+    var(--surface-2);
+}
+.hero > * { position: relative; }
+
+@media (max-width: 1100px) {
+  /* The text reaches into the art here: keep the art as a faint wash behind it. */
+  .hero {
+    background:
+      linear-gradient(90deg, rgba(233, 238, 227, 0.96) 0%, rgba(233, 238, 227, 0.9) 60%, rgba(233, 238, 227, 0.55) 100%),
+      url('/hero-art.svg') right center / cover no-repeat,
+      var(--surface-2);
+  }
+}
+@media (max-width: 720px) {
+  /* On phones the text spans the width: the art stays as a faint wash behind it. */
+  .hero {
+    padding: 32px 20px;
+    background:
+      linear-gradient(180deg, rgba(233, 238, 227, 0.92), rgba(233, 238, 227, 0.8)),
+      url('/hero-art.svg') right center / cover no-repeat,
+      var(--surface-2);
+  }
+  .hero > h1 { font-size: 30px; }
+}
 .hero h1 { font-size: 38px; line-height: 1.15; max-width: 26ch; }
-.hero .lead { font-size: 1.1rem; max-width: 60ch; }
+.hero .lead { font-size: 1.1rem; max-width: 52ch; }
 .steps { list-style: none; padding: 0; display: grid; gap: 0.75rem; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); counter-reset: step; }
 .steps li { counter-increment: step; margin: 0; }
 .steps li strong::before { content: counter(step) '. '; color: var(--accent); }
