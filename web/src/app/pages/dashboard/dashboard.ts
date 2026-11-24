@@ -14,7 +14,7 @@ import { ApiService, type Scholarship } from '../../core/api.service';
         <h1>My scholarships</h1>
         @if (!loading() && items().length > 0) {
           <p class="hint">
-            {{ items().length }} of {{ limit }} · sorted by nearest deadline · <span class="badge unverified">Unverified</span> means no source yet
+            Sorted by nearest deadline ·<span class="badge unverified">Unverified</span> means no source yet
           </p>
         }
       </div>
