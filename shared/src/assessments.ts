@@ -7,6 +7,7 @@
  */
 import { documentsAskedFor, studentDocumentLabel, type AskedDocumentType } from './documents';
 import { checkDocumentForScholarship, type DocumentFacts, type DocumentFinding } from './documentChecks';
+import { EDUCATION_LEVEL_LABEL, gpaRequirementLevel, transcriptsForGpa, type GpaLevel } from './gpaLevel';
 
 export type AssessmentStatus = 'met' | 'not_met' | 'check' | 'missing';
 
@@ -36,7 +37,11 @@ export type AssessmentContext = {
   profileGpa: { value: number; scale: string } | null;
 };
 
-type RequirementLike = { kind?: string | null; label?: string | null; current?: { value?: Record<string, unknown> } | null };
+type RequirementLike = {
+  kind?: string | null;
+  label?: string | null;
+  current?: { value?: Record<string, unknown>; citation?: { quote?: unknown } | null } | null;
+};
 
 function minGpaOf(r: RequirementLike): number | null {
   const value = r.current?.value?.minGpa;
@@ -45,12 +50,26 @@ function minGpaOf(r: RequirementLike): number | null {
 
 const fmt = (n: number) => (Number.isInteger(n) ? n.toFixed(1) : String(Math.round(n * 100) / 100));
 
-function assessGpa(min: number, ctx: AssessmentContext): Assessment {
-  const transcripts = ctx.documents.filter((d) => d.type === 'transcript');
+function assessGpa(min: number, level: GpaLevel | null, ctx: AssessmentContext): Assessment {
+  const all = ctx.documents.filter((d) => d.type === 'transcript');
   const profileHint = ctx.profileGpa ? ` Your profile says ${fmt(ctx.profileGpa.value)} out of ${ctx.profileGpa.scale}, but that is not confirmed by a document.` : '';
-  if (!transcripts.length) {
-    return { status: 'missing', message: `Upload your transcript in Documents to check this.${profileHint}`, quote: null, page: null, documentTitle: null };
+  const which = level ? `${EDUCATION_LEVEL_LABEL[level]} transcript` : 'transcript';
+  if (!all.length) {
+    return { status: 'missing', message: `Upload your ${which} in Documents to check this.${profileHint}`, quote: null, page: null, documentTitle: null };
   }
+  // Only transcripts of the level the requirement names (high school, undergraduate, graduate) count.
+  const choice = transcriptsForGpa(level, all);
+  if (choice.kind === 'missing_level') {
+    const label = EDUCATION_LEVEL_LABEL[choice.level];
+    return {
+      status: 'missing',
+      message: `This asks for your ${label} GPA. Upload your ${label} transcript in Documents to check it; your other transcripts do not count here.${profileHint}`,
+      quote: null,
+      page: null,
+      documentTitle: null,
+    };
+  }
+  const transcripts = choice.transcripts;
   const read = transcripts.filter((d) => d.facts?.gpa?.found);
   if (!read.length) {
     const pending = transcripts.some((d) => d.checkStatus === 'queued' || d.checkStatus === 'running');
@@ -69,11 +88,14 @@ function assessGpa(min: number, ctx: AssessmentContext): Assessment {
     const best = fourPoint.reduce((a, b) => (b.facts!.gpa!.value.value > a.facts!.gpa!.value.value ? b : a));
     const gpa = best.facts!.gpa!;
     const met = gpa.value.value + 1e-9 >= min;
+    const note = choice.assumed ? ` ${choice.assumed}` : '';
+    // An unsure level is never shown as met: the student confirms which transcript it is first.
+    const unsureLevel = choice.assumed !== null && level !== null;
     return {
-      status: met ? 'met' : 'not_met',
+      status: unsureLevel ? 'check' : met ? 'met' : 'not_met',
       message: met
-        ? `You meet this: your ${best.title.toLowerCase()} shows a GPA of ${fmt(gpa.value.value)}.`
-        : `Your ${best.title.toLowerCase()} shows a GPA of ${fmt(gpa.value.value)}; the minimum is ${fmt(min)}.`,
+        ? `${unsureLevel ? 'Probably met' : 'You meet this'}: your ${best.title.toLowerCase()} shows a GPA of ${fmt(gpa.value.value)}.${note}`
+        : `Your ${best.title.toLowerCase()} shows a GPA of ${fmt(gpa.value.value)}; the minimum is ${fmt(min)}.${note}`,
       quote: gpa.quote || null,
       page: gpa.page,
       documentTitle: best.title,
@@ -122,7 +144,7 @@ function assessDocument(type: AskedDocumentType, ctx: AssessmentContext): Assess
 /** The automatic judgement for one requirement, or null when the student ticks it themselves. */
 export function assessRequirement(requirement: RequirementLike, ctx: AssessmentContext): Assessment | null {
   const min = minGpaOf(requirement);
-  if (min != null) return assessGpa(min, ctx);
+  if (min != null) return assessGpa(min, gpaRequirementLevel(requirement), ctx);
   const asked = documentsAskedFor([requirement]);
   if (asked.length === 1) return assessDocument(asked[0]!, ctx);
   return null;

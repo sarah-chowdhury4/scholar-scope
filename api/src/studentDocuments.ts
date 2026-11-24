@@ -1,6 +1,8 @@
 import {
   checkDocumentForScholarship,
   documentsAskedFor,
+  gpaRequirementLevel,
+  transcriptsForGpa,
   readDocumentFacts,
   sortFindings,
   studentDocumentHeading,
@@ -122,16 +124,24 @@ export async function listStudentDocuments(uid: string): Promise<StudentDocument
   return (await loadAll(uid)).map((item) => item.dto);
 }
 
+type RequirementForDocuments = Parameters<typeof gpaRequirementLevel>[0] & { kind?: string | null; label?: string | null };
+
 export function documentsForScholarship(
   docs: Loaded[],
-  requirements: { kind?: string | null; label?: string | null }[],
+  requirements: RequirementForDocuments[],
   scholarshipId: string,
   context: ScholarshipCheckContext,
 ) {
-  const withFindings = (item: Loaded): ScholarshipDocumentDto => ({
-    ...item.dto,
-    scholarshipFindings: item.facts ? sortFindings(checkDocumentForScholarship(item.facts, item.dto.type, context)) : [],
-  });
+  // The GPA minimum is compared only with the transcripts of the level the requirement names (or, when it does
+  // not say, the most recent level), so a high school transcript is not flagged against a college GPA rule.
+  const gpaRule = requirements.find((r) => typeof (r as { current?: { value?: { minGpa?: unknown } } }).current?.value?.minGpa === 'number');
+  const transcripts = docs.filter((d) => d.dto.type === 'transcript').map((d) => ({ id: d.dto.id, title: d.dto.title, facts: d.facts }));
+  const choice = gpaRule ? transcriptsForGpa(gpaRequirementLevel(gpaRule), transcripts) : null;
+  const gpaCompared = new Set(choice?.kind === 'use' ? choice.transcripts.map((t) => t.id) : []);
+  const withFindings = (item: Loaded): ScholarshipDocumentDto => {
+    const own = item.dto.type === 'transcript' && !gpaCompared.has(item.dto.id) ? { ...context, minGpa: null } : context;
+    return { ...item.dto, scholarshipFindings: item.facts ? sortFindings(checkDocumentForScholarship(item.facts, item.dto.type, own)) : [] };
+  };
   const needed = documentsAskedFor(requirements).map((type) => ({
     type,
     label: studentDocumentHeading(type),
@@ -146,7 +156,7 @@ export function documentsForScholarship(
 export async function scholarshipDocuments(
   uid: string,
   scholarshipId: string,
-  requirements: { kind?: string | null; label?: string | null }[],
+  requirements: RequirementForDocuments[],
   context: ScholarshipCheckContext,
 ) {
   return documentsForScholarship(await loadAll(uid), requirements, scholarshipId, context);

@@ -45,8 +45,8 @@ describe('minimum GPA', () => {
     expect(a.message).toContain('the minimum is 3.2');
   });
 
-  it('uses the best 4.0-scale transcript when there are several', () => {
-    const a = assessRequirement(gpaRule, ctx([transcript('High school transcript', { value: 3.0, scale: 4 }), transcript('Undergraduate transcript', { value: 3.48, scale: null })]))!;
+  it('uses the best 4.0-scale transcript when there are several of the same level', () => {
+    const a = assessRequirement(gpaRule, ctx([transcript('Undergraduate transcript (fall)', { value: 3.0, scale: 4 }), transcript('Undergraduate transcript', { value: 3.48, scale: null })]))!;
     expect(a).toMatchObject({ status: 'met', documentTitle: 'Undergraduate transcript' });
   });
 
@@ -64,6 +64,50 @@ describe('minimum GPA', () => {
     const doc = transcript('High school transcript', null);
     doc.facts = { ...doc.facts!, gpa: { value: { value: 3.9, scale: 4 }, quote: 'invented', page: null, found: false } };
     expect(assessRequirement(gpaRule, ctx([doc]))!.status).toBe('missing');
+  });
+});
+
+describe('GPA level (high school, undergraduate, graduate)', () => {
+  const hs = transcript('High school transcript', { value: 3.9, scale: 4 });
+  const college = transcript('Undergraduate transcript', { value: 3.1, scale: 4 });
+  const collegeRule = { kind: 'eligibility', label: 'Minimum cumulative college GPA of 3.5', current: { value: { minGpa: 3.5 } } };
+  const hsRule = {
+    kind: 'eligibility',
+    label: 'Minimum GPA 3.50',
+    current: { value: { minGpa: 3.5 }, citation: { quote: 'Applicants must have an unweighted high school GPA of 3.5 or higher.' } },
+  };
+
+  it('checks a college GPA rule against the college transcript, not a better high school one', () => {
+    const a = assessRequirement(collegeRule, ctx([hs, college]))!;
+    expect(a).toMatchObject({ status: 'not_met', documentTitle: 'Undergraduate transcript' });
+  });
+
+  it('reads the level from the source quote when the label does not say', () => {
+    expect(assessRequirement(hsRule, ctx([hs, college]))).toMatchObject({ status: 'met', documentTitle: 'High school transcript' });
+  });
+
+  it('asks for the right transcript when only the other level is saved', () => {
+    const a = assessRequirement(collegeRule, ctx([hs]))!;
+    expect(a.status).toBe('missing');
+    expect(a.message).toContain('Upload your undergraduate transcript');
+  });
+
+  it('tells the level from the school name when the title does not say', () => {
+    const doc = transcript('My transcript', { value: 3.7, scale: 4 });
+    doc.facts = { ...doc.facts!, issuer: { value: 'Lincoln High School', quote: 'Lincoln High School', page: 1, found: true } };
+    expect(assessRequirement(collegeRule, ctx([doc, college]))).toMatchObject({ documentTitle: 'Undergraduate transcript' });
+  });
+
+  it('does not mark it met when the transcript level is unknown, and says why', () => {
+    const a = assessRequirement(collegeRule, ctx([transcript('Transcript', { value: 3.8, scale: 4 })]))!;
+    expect(a.status).toBe('check');
+    expect(a.message).toContain('could not tell whether your transcript is undergraduate');
+  });
+
+  it('uses the most recent level when the rule does not say, and says so', () => {
+    const a = assessRequirement(gpaRule, ctx([hs, college]))!;
+    expect(a).toMatchObject({ status: 'not_met', documentTitle: 'Undergraduate transcript' });
+    expect(a.message).toContain('most recent one (undergraduate)');
   });
 });
 

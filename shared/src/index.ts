@@ -19,6 +19,7 @@ export * from './documents';
 export * from './outbox';
 export * from './documentChecks';
 export * from './assessments';
+export * from './gpaLevel';
 export * from './autoReadiness';
 export * from './requirements';
 export * from './diff';
