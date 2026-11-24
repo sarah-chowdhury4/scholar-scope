@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import type { Timestamp } from 'firebase-admin/firestore';
-import { userDoc, buildCsv, buildIcs, writeAudit, type CalendarDeadline } from '@scholarscope/shared';
+import { userDoc, buildCsv, buildIcs, writeAudit, isChecklistItem, type CalendarDeadline } from '@scholarscope/shared';
 
 /** Downloads (FR-7.3): deadlines as a calendar file, and the whole checklist as a spreadsheet. */
 export const exportsRouter = Router();
@@ -65,9 +65,10 @@ exportsRouter.get('/checklist.csv', async (req, res) => {
       due,
       VERIFICATION_TEXT[String(doc.get('deadline.verification'))] ?? '',
     ];
-    const reqs = await doc.ref.collection('requirements').where('removedAt', '==', null).get();
-    if (reqs.empty) rows.push([...base, '', '', '', '', '', '', doc.get('url') ?? '']);
-    for (const r of reqs.docs) {
+    // The deadline already has its own columns; it is not a checklist item.
+    const reqs = (await doc.ref.collection('requirements').where('removedAt', '==', null).get()).docs.filter((d) => isChecklistItem(d.data()));
+    if (reqs.length === 0) rows.push([...base, '', '', '', '', '', '', doc.get('url') ?? '']);
+    for (const r of reqs) {
       rows.push([
         ...base,
         r.get('label'),

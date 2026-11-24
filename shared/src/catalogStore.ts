@@ -3,7 +3,7 @@ import { deadlineFromParts } from './deadlines';
 import { deadlineRecord } from './deadlineRecord';
 import { db, userDoc } from './firebase';
 import { catalogCitation, isTeamVerified, requirementsFromCatalog, tagsFor, type CatalogEntry } from './catalog';
-import { recomputeCounts } from './requirements';
+import { countRequirements, recomputeCounts } from './requirements';
 
 const CACHE_MS = 60_000;
 let cache: { at: number; entries: CatalogEntry[] } | undefined;
@@ -189,8 +189,7 @@ export async function addFromCatalog(uid: string, catalogId: string, limit: numb
         ? { ...deadlineRecord(catalogDeadline, entry.deadline!), requirementId: null, verification, verifiedBy: verified ? 'ScholarScope team' : null }
         : null,
       status: 'researching',
-      counts: { open: requirements.length, changed: 0, unverified: verified ? 0 : requirements.length, needsReview: 0, ready: 0, total: requirements.length },
-      readinessPct: 0,
+      ...countRequirements(requirements.map((r) => ({ kind: r.kind, readiness: 'missing', verification }))),
       recheck: {
         enabled: Boolean(entry.sourceUrl),
         lastCheckedAt: null,

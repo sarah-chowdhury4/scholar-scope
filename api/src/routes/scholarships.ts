@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { FieldValue, Timestamp } from 'firebase-admin/firestore';
-import { db, userDoc, getAppConfig, writeAudit, minGpaFromRequirements, deadlineFromParts, deadlineRecord, isTimeZone, syncAutoReadiness } from '@scholarscope/shared';
+import { db, userDoc, getAppConfig, writeAudit, minGpaFromRequirements, deadlineFromParts, deadlineRecord, isTimeZone, syncAutoReadiness, countRequirements, isChecklistItem, sameCounts } from '@scholarscope/shared';
 import { HttpError } from '../http';
 import { createScholarshipSchema, updateScholarshipSchema } from '../validation';
 import { scholarshipDocuments } from '../studentDocuments';
@@ -117,9 +117,20 @@ scholarshipsRouter.get('/:id', async (req, res) => {
     minGpa: minGpaFromRequirements(requirements),
     requirementLabels: requirements.map((item) => item.label ?? ''),
   });
+  // Counts saved before the deadline stopped being a checklist item are corrected the first time the page opens.
+  const { counts, readinessPct } = countRequirements(requirements);
+  const data = snap.data()!;
+  if (!sameCounts(data['counts'], counts) || data['readinessPct'] !== readinessPct) {
+    await ref.update({ counts, readinessPct });
+    Object.assign(data, { counts, readinessPct });
+  }
+  const plain = (item: RequirementRecord) => ({ ...(toPlain(item) as object), assessment: assessments.get(item.id) ?? null });
+  const deadlineItem = requirements.find((item) => !isChecklistItem(item));
   res.json({
-    ...serialize(snap.id, snap.data()!),
-    requirements: requirements.map((item) => ({ ...(toPlain(item) as object), assessment: assessments.get(item.id) ?? null })),
+    ...serialize(snap.id, data),
+    // The application deadline is a date, not a task: it is sent apart so the page shows it with the due date.
+    requirements: requirements.filter(isChecklistItem).map(plain),
+    deadlineRequirement: deadlineItem ? plain(deadlineItem) : null,
     documents,
   });
 });

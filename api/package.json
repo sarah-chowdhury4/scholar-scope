@@ -10,6 +10,7 @@
     "seed:catalog": "tsx scripts/seed.ts --catalog-only",
     "typecheck": "tsc -p tsconfig.json",
     "migrate:deadlines": "tsx scripts/migrate-deadlines.ts",
+    "recount": "tsx scripts/recount.ts",
     "admin": "tsx scripts/admin.ts"
   },
   "dependencies": {

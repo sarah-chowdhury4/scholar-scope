@@ -13,6 +13,15 @@ describe('countRequirements', () => {
     expect(readinessPct).toBe(25);
   });
 
+  it('leaves the application deadline out: it is a date, not a task', () => {
+    const { counts, readinessPct } = countRequirements([
+      { kind: 'deadline', readiness: 'missing', verification: 'verified' },
+      { kind: 'essay', readiness: 'ready', verification: 'verified' },
+    ]);
+    expect(counts.total).toBe(1);
+    expect(counts.open).toBe(0);
+    expect(readinessPct).toBe(100);
+  });
   it('is zero percent with no requirements', () => {
     expect(countRequirements([]).readinessPct).toBe(0);
   });

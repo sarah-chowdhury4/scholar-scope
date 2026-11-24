@@ -93,14 +93,6 @@ import { ApiService, apiMessage, type Requirement, type RequirementVersion } fro
             <label [attr.for]="'gpa-' + r.id">Minimum GPA</label>
             <input [id]="'gpa-' + r.id" name="minGpa" type="number" step="0.01" min="0" [value]="minGpa() ?? ''" />
           }
-          @if (r.kind === 'deadline') {
-            <label [attr.for]="'date-' + r.id">Due date</label>
-            <input [id]="'date-' + r.id" name="date" type="date" [value]="deadlineDate()" required />
-            <label [attr.for]="'time-' + r.id">Time (optional)</label>
-            <input [id]="'time-' + r.id" name="time" type="time" [value]="deadlineTime()" />
-            <label [attr.for]="'tz-' + r.id">The scholarship's time zone (blank if not stated)</label>
-            <input [id]="'tz-' + r.id" name="timezone" [value]="deadlineZone()" placeholder="America/New_York" />
-          }
           <p class="hint">The source quote stays attached. Your correction is saved as a new version; the old one is kept.</p>
           <div class="actions">
             <button type="submit" [disabled]="busy()">Save correction</button>
@@ -216,30 +208,6 @@ export class RequirementCard {
     return typeof gpa === 'number' ? gpa : null;
   }
 
-  private storedDeadline() {
-    return this.requirement().current.value['deadline'] as
-      | { utc?: string; date?: string | null; time?: string | null; sourceTimezone?: string | null }
-      | undefined;
-  }
-
-  /** The deadline as written, in the scholarship's own zone (not converted to the student's). */
-  deadlineDate(): string {
-    const d = this.storedDeadline();
-    if (d?.date) return d.date;
-    if (!d?.utc) return '';
-    const moment = new Date(d.utc);
-    if (Number.isNaN(moment.getTime())) return '';
-    return new Intl.DateTimeFormat('en-CA', { timeZone: d.sourceTimezone || 'UTC', year: 'numeric', month: '2-digit', day: '2-digit' }).format(moment);
-  }
-
-  deadlineTime(): string {
-    return this.storedDeadline()?.time ?? '';
-  }
-
-  deadlineZone(): string {
-    return this.storedDeadline()?.sourceTimezone ?? '';
-  }
-
   async toggleReady(event: Event) {
     const box = event.target as HTMLInputElement;
     await this.run(() => this.api.setRequirementReadiness(this.scholarshipId(), this.requirement().id, box.checked ? 'ready' : 'missing'), () => {
@@ -265,13 +233,6 @@ export class RequirementCard {
     if (words !== null) body['wordLimit'] = String(words).trim() ? Number(words) : null;
     const gpa = form.get('minGpa');
     if (gpa !== null) body['minGpa'] = String(gpa).trim() ? Number(gpa) : null;
-    if (r.kind === 'deadline') {
-      body['deadline'] = {
-        date: String(form.get('date') ?? ''),
-        time: String(form.get('time') ?? '') || null,
-        timezone: String(form.get('timezone') ?? '').trim() || null,
-      };
-    }
     const ok = await this.run(() => this.api.reviewRequirement(this.scholarshipId(), r.id, body));
     if (ok) {
       this.editing.set(false);

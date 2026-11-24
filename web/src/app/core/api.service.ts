@@ -319,7 +319,9 @@ export class ApiService {
   scholarships = () => firstValueFrom(this.http.get<{ items: Scholarship[] }>('/api/scholarships'));
   scholarship = (id: string) =>
     firstValueFrom(
-      this.http.get<Scholarship & { requirements: Requirement[]; documents: ScholarshipDocuments }>(`/api/scholarships/${id}`),
+      this.http.get<Scholarship & { requirements: Requirement[]; deadlineRequirement?: Requirement | null; documents: ScholarshipDocuments }>(
+        `/api/scholarships/${id}`,
+      ),
     );
 
   documents = () => firstValueFrom(this.http.get<{ items: StudentDocument[] }>('/api/documents'));

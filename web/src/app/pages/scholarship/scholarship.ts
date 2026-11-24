@@ -14,6 +14,7 @@ import { DocumentCheckView } from '../documents/document-check';
 import { DeadlineText } from '../../core/deadline-text';
 import { DaysLeft } from '../../core/days-left';
 import { RequirementCard } from './requirement-card';
+import { DeadlineFix } from './deadline-fix';
 import { ChangeReview } from './change-review';
 import { EssayDraft } from './essay-draft';
 import { WORK_STEPS, WorkingIndicator } from '../../core/working';
@@ -21,7 +22,7 @@ import { celebrate, confetti } from '../../core/confetti';
 
 @Component({
   selector: 'app-scholarship',
-  imports: [RouterLink, DocumentCheckView, RequirementCard, ChangeReview, EssayDraft, DeadlineText, DaysLeft, WorkingIndicator, PageLoading],
+  imports: [RouterLink, DocumentCheckView, RequirementCard, DeadlineFix, ChangeReview, EssayDraft, DeadlineText, DaysLeft, WorkingIndicator, PageLoading],
   template: `
     <p><a routerLink="/">← All scholarships</a></p>
     @if (data(); as s) {
@@ -35,6 +36,9 @@ import { celebrate, confetti } from '../../core/confetti';
               Due <app-deadline [deadline]="s.deadline" />
             </p>
             <p><app-days-left [deadline]="s.deadline" /></p>
+          }
+          @if (s.deadlineRequirement; as dr) {
+            <app-deadline-fix [requirement]="dr" [scholarshipId]="s.id" (changed)="load()" (openSource)="openSource($event.sourceId, $event.sourceVersionId)" />
           }
         </div>
         <div class="actions sch-actions">
@@ -219,7 +223,7 @@ export class ScholarshipPage implements OnInit {
   /** Route parameter (component input binding). */
   readonly id = input.required<string>();
   private readonly api = inject(ApiService);
-  protected readonly data = signal<(Scholarship & { requirements: Requirement[]; documents: ScholarshipDocuments }) | null>(null);
+  protected readonly data = signal<(Scholarship & { requirements: Requirement[]; deadlineRequirement?: Requirement | null; documents: ScholarshipDocuments }) | null>(null);
   protected readonly requirements = signal<Requirement[]>([]);
   protected readonly busy = signal(false);
   protected readonly status = signal('');
