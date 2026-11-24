@@ -211,6 +211,8 @@ services:
       GEMINI_MODEL: ${GEMINI_MODEL:?set GEMINI_MODEL in .env}
       NIM_ENABLED: ${NIM_ENABLED:-true}               # "false" = no NVIDIA key: NIM calls run on Gemini
       NIM_BASE_URL: https://integrate.api.nvidia.com/v1
+      NIM_CHAT_MODEL: ${NIM_CHAT_MODEL:-}             # blank = default in shared/src/platform/ai/nim.ts
+      NIM_EMBED_MODEL: ${NIM_EMBED_MODEL:-}
       READER_BACKEND: ${READER_BACKEND:-jina}           # "direct" = fetch saved pages ourselves, never via Jina Reader
       # The fictional test site (service sample-site) is on the Docker network, which the URL guard normally blocks.
       FETCH_ALLOW_PRIVATE_HOSTS: sample-scholarship.localhost
