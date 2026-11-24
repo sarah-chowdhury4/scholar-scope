@@ -9,7 +9,8 @@
     "seed": "tsx scripts/seed.ts",
     "seed:catalog": "tsx scripts/seed.ts --catalog-only",
     "typecheck": "tsc -p tsconfig.json",
-    "migrate:deadlines": "tsx scripts/migrate-deadlines.ts"
+    "migrate:deadlines": "tsx scripts/migrate-deadlines.ts",
+    "admin": "tsx scripts/admin.ts"
   },
   "dependencies": {
     "@scholarscope/shared": "*",

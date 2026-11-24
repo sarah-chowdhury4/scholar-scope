@@ -7,6 +7,7 @@
     { "collectionGroup": "changes", "queryScope": "COLLECTION_GROUP", "fields": [ { "fieldPath": "status", "order": "ASCENDING" }, { "fieldPath": "detectedAt", "order": "DESCENDING" } ] },
     { "collectionGroup": "alerts", "queryScope": "COLLECTION", "fields": [ { "fieldPath": "inApp.readAt", "order": "ASCENDING" }, { "fieldPath": "createdAt", "order": "DESCENDING" } ] },
     { "collectionGroup": "auditLogs", "queryScope": "COLLECTION", "fields": [ { "fieldPath": "subjectUid", "order": "ASCENDING" }, { "fieldPath": "at", "order": "DESCENDING" } ] },
+    { "collectionGroup": "auditLogs", "queryScope": "COLLECTION", "fields": [ { "fieldPath": "actor.type", "order": "ASCENDING" }, { "fieldPath": "at", "order": "DESCENDING" } ] },
     { "collectionGroup": "sources", "queryScope": "COLLECTION", "fields": [ { "fieldPath": "kind", "order": "ASCENDING" }, { "fieldPath": "url", "order": "ASCENDING" } ] }
   ],
   "fieldOverrides": [

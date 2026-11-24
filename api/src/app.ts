@@ -5,7 +5,7 @@ import { existsSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { ZodError } from 'zod';
 import { log, errorMessage } from '@scholarscope/shared';
-import { requireAuth } from './auth';
+import { requireAdmin, requireAuth } from './auth';
 import { HttpError } from './http';
 import { meRouter } from './routes/me';
 import { passwordResetRouter } from './routes/passwordReset';
@@ -18,6 +18,7 @@ import { requirementsRouter } from './routes/requirements';
 import { changesRouter } from './routes/changes';
 import { draftsRouter } from './routes/drafts';
 import { exportsRouter } from './routes/exports';
+import { adminRouter } from './routes/admin';
 
 export function createApp() {
   const app = express();
@@ -72,6 +73,7 @@ export function createApp() {
   api.use('/documents', documentsRouter);
   api.use('/drafts', draftsRouter);
   api.use('/exports', exportsRouter);
+  api.use('/admin', requireAdmin, adminRouter);
   app.use('/api', api);
   app.use('/api', (_req, res) => res.status(404).json({ error: 'Not found' }));
 

@@ -17,7 +17,8 @@
     "typecheck": "npm run typecheck --workspaces --if-present",
     "test": "vitest run",
     "check": "npm run typecheck && npm test",
-    "infra:check": "node scripts/infra-check.mjs"
+    "infra:check": "node scripts/infra-check.mjs",
+    "admin": "docker compose exec api npm run admin --"
   },
   "devDependencies": {
     "@types/node": "^22.10.0",

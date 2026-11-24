@@ -12,7 +12,8 @@ let cache: { at: number; entries: CatalogEntry[] } | undefined;
 export async function loadCatalog(options: { fresh?: boolean } = {}): Promise<CatalogEntry[]> {
   if (!options.fresh && cache && Date.now() - cache.at < CACHE_MS) return cache.entries;
   const snap = await db().collection('scholarshipCatalog').get();
-  const entries = snap.docs.map((d) => {
+  // Entries an admin removed stay in Firestore (so the CSV import can't bring them back) but are not listed.
+  const entries = snap.docs.filter((d) => !d.get('removedAt')).map((d) => {
     const x = d.data();
     const promptOrMaterials = (x.promptOrMaterials as string | undefined) ?? '';
     return {
@@ -33,15 +34,18 @@ export async function loadCatalog(options: { fresh?: boolean } = {}): Promise<Ca
 }
 
 /**
- * Make the catalog exactly these entries: each is written by its Scholarship ID, and entries no longer in the
- * file are removed from Discover (scholarships students already added keep their own copy).
- * Returns the ids that were removed.
+ * Make the catalog match the dataset file: each entry is written by its Scholarship ID, and entries no longer in
+ * the file are removed from Discover (scholarships students already added keep their own copy).
+ * Entries an admin added, edited or removed in the admin dashboard are left exactly as they are: once an admin
+ * manages an entry, the dashboard owns it, so restarting the site never undoes their work.
  */
-export async function saveCatalog(entries: CatalogEntry[]): Promise<string[]> {
+export async function saveCatalog(entries: CatalogEntry[]): Promise<{ removed: string[]; adminManaged: string[] }> {
   if (entries.length === 0) throw new Error('The dataset has no scholarships; the catalog was left as it is.');
   const keep = new Set(entries.map((e) => e.catalogId));
   const existing = await db().collection('scholarshipCatalog').get();
-  const removed = existing.docs.filter((d) => !keep.has(d.id)).map((d) => d.ref);
+  const adminManaged = new Set(existing.docs.filter((d) => d.get('managedBy') === 'admin').map((d) => d.id));
+  const removed = existing.docs.filter((d) => !keep.has(d.id) && !adminManaged.has(d.id)).map((d) => d.ref);
+  entries = entries.filter((e) => !adminManaged.has(e.catalogId));
   for (let i = 0; i < removed.length; i += 400) {
     const batch = db().batch();
     for (const ref of removed.slice(i, i + 400)) batch.delete(ref);
@@ -56,7 +60,81 @@ export async function saveCatalog(entries: CatalogEntry[]): Promise<string[]> {
     await batch.commit();
   }
   cache = undefined;
-  return removed.map((r) => r.id);
+  return { removed: removed.map((r) => r.id), adminManaged: [...adminManaged].sort() };
+}
+
+// ---------- Admin dashboard ----------
+
+export type AdminCatalogEntry = CatalogEntry & {
+  teamVerified: boolean;
+  managedBy: 'admin' | 'dataset';
+  removedAt: string | null;
+  updatedAt: string | null;
+};
+
+const iso = (v: unknown) => (v instanceof Timestamp ? v.toDate().toISOString() : null);
+
+/** Every catalog entry, removed ones included, for the admin dashboard. */
+export async function loadCatalogForAdmin(): Promise<AdminCatalogEntry[]> {
+  const snap = await db().collection('scholarshipCatalog').get();
+  return snap.docs
+    .map((d) => {
+      const x = d.data();
+      const promptOrMaterials = (x.promptOrMaterials as string | undefined) ?? '';
+      const entry: CatalogEntry = {
+        catalogId: d.id,
+        organization: x.organization ?? '',
+        name: x.name ?? d.id,
+        deadline: x.deadline ?? null,
+        minGpa: typeof x.minGpa === 'number' ? x.minGpa : null,
+        promptOrMaterials,
+        sourceUrl: x.sourceUrl ?? null,
+        datasetVersion: x.datasetVersion ?? null,
+        datasetStatus: x.datasetStatus ?? null,
+        tags: Array.isArray(x.tags) ? x.tags : tagsFor(promptOrMaterials),
+      };
+      return {
+        ...entry,
+        teamVerified: isTeamVerified(entry),
+        managedBy: x.managedBy === 'admin' ? ('admin' as const) : ('dataset' as const),
+        removedAt: iso(x.removedAt),
+        updatedAt: iso(x.updatedAt ?? x.importedAt),
+      };
+    })
+    .sort((a, b) => a.catalogId.localeCompare(b.catalogId));
+}
+
+/** The next free Scholarship ID (SCH-001 … SCH-999), counting removed entries so an ID is never reused. */
+export async function nextCatalogId(): Promise<string> {
+  const snap = await db().collection('scholarshipCatalog').select().get();
+  const used = snap.docs.map((d) => Number(/^SCH-(\d{3})$/.exec(d.id)?.[1] ?? 0));
+  const next = Math.max(0, ...used) + 1;
+  if (next > 999) throw new Error('The catalog has reached SCH-999.');
+  return `SCH-${String(next).padStart(3, '0')}`;
+}
+
+/** Add or replace one entry from the admin dashboard. From then on the dataset import leaves it alone. */
+export async function saveCatalogEntryByAdmin(entry: CatalogEntry, adminUid: string): Promise<void> {
+  const { catalogId, ...rest } = entry;
+  await db()
+    .collection('scholarshipCatalog')
+    .doc(catalogId)
+    .set({ ...rest, managedBy: 'admin', removedAt: null, updatedAt: FieldValue.serverTimestamp(), updatedBy: adminUid });
+  cache = undefined;
+}
+
+/** Hide an entry from Discover (or show it again). Scholarships students already added keep their own copy. */
+export async function setCatalogEntryRemoved(catalogId: string, removed: boolean, adminUid: string): Promise<boolean> {
+  const ref = db().collection('scholarshipCatalog').doc(catalogId);
+  if (!(await ref.get()).exists) return false;
+  await ref.update({
+    managedBy: 'admin',
+    removedAt: removed ? FieldValue.serverTimestamp() : null,
+    updatedAt: FieldValue.serverTimestamp(),
+    updatedBy: adminUid,
+  });
+  cache = undefined;
+  return true;
 }
 
 export type AddFromCatalogResult =

@@ -13,6 +13,9 @@
         }
       </a>
       <a routerLink="/profile" routerLinkActive="active">Profile</a>
+      @if (auth.isAdmin()) {
+        <a routerLink="/admin" routerLinkActive="active">Admin</a>
+      }
     </nav>
     <button type="button" class="link" (click)="auth.signOut()">Sign out</button>
   } @else if (auth.user() === null) {

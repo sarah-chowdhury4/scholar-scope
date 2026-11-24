@@ -1,7 +1,7 @@
 /** Core types from the ScholarScope schema (Firestore). */
 import type { Timestamp } from 'firebase-admin/firestore';
 
-export type Actor = { type: 'student' | 'system' | 'ai'; id: string };
+export type Actor = { type: 'student' | 'admin' | 'system' | 'ai'; id: string };
 
 export type Citation = {
   sourceId: string;

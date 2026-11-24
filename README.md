@@ -298,7 +298,9 @@ All ports listen on `127.0.0.1` only.
 | Run the page re-check now | `docker compose exec worker npm run cron:recheck` |
 | Run deadline alerts now | `docker compose exec worker npm run cron:deadline-alerts` |
 | Failed jobs (dead-letter queue) | `docker compose exec localstack awslocal sqs get-queue-attributes --queue-url http://localhost:4566/000000000000/gemini-dlq --attribute-names ApproximateNumberOfMessages` |
-| Process "delete my data" requests | `docker compose run --rm deleter` |
+| Make someone an admin (they sign up first, then sign out and in again) | `npm run admin -- grant someone@example.com` |
+| Remove an admin / list admins | `npm run admin -- revoke someone@example.com` / `npm run admin -- list` |
+| Process "delete my data" requests (and accounts an admin deleted) | `docker compose run --rm deleter` |
 | Delete one student now | `docker compose run --rm deleter <uid>` |
 | Save accounts and data now (they are also saved on `docker compose stop`) | `docker compose exec firebase firebase emulators:export /data/export --project demo-scholarscope --force` (Git Bash: put `MSYS_NO_PATHCONV=1 ` in front) |
 | Convert deadlines saved before time zones were stored (once; add `-- --apply` to write) | `docker compose exec api npm run migrate:deadlines` |
@@ -397,6 +399,8 @@ scripts/    npm start / npm stop (site.mjs) and the Terraform checks (infra-chec
 - **Document text is data, not instructions:** the AI is told to ignore instructions inside documents, and every extracted item must quote the source; quotes not found in the stored text become "Unverified".
 - **AI document checks never read out ID numbers:** the prompt and the response schema have no field for passport or ID numbers, and every fact must quote the file before a rule uses it.
 - **Firestore rules deny all direct client access.**
+- **Admins are ordinary accounts with a role.** The `admin` role is a Firebase custom claim inside the signed sign-in token, set only by `npm run admin -- grant` (server access) or by another admin. Every `/api/admin` route checks it; hiding the Admin link in the web app is only a convenience. Admins manage the catalog, settings and accounts, but cannot open a student's documents, scholarships or profile, and deleting an account only queues it for the deleter job. Every admin change is written to the audit log. Removing a role signs that person out everywhere, so it takes effect at once.
+- **Catalog edits made in the admin dashboard win.** `npm start` reloads the catalog from `Dataset/`, but leaves alone any entry an admin added, edited or removed.
 - **Emulator settings can't reach a deployment:** the API and worker refuse to start if emulator variables are set outside `APP_ENV=local`.
 
 The local setup does **not** provide encryption at rest, IAM enforcement in LocalStack, or signed sign-in tokens (the Auth emulator issues unsigned ones). Those come from the managed services in production.
@@ -422,6 +426,7 @@ The local setup does **not** provide encryption at rest, IAM enforcement in Loca
 | Change alerts (in-app record + email, de-duplicated) | Done |
 | In-app alerts page, unread count in the menu, mark read / all read | Done |
 | Delete my data | Done |
+| Admin dashboard: catalog (add, edit, verify, remove, restore), settings and AI switch, accounts (roles, deletion), audit log | Done |
 | Side-by-side diff view with an AI (Gemini) summary, acknowledging changes | Done |
 | Student document library (transcripts, certificates, passport…) | Done |
 | AI document checks (Gemini): right kind of file, name vs profile, expiry vs deadline, GPA vs minimum, official / English rules | Done |
