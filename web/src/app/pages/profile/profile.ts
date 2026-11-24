@@ -6,6 +6,7 @@ import { ApiService, apiMessage, type Me, type ProfileOptions } from '../../core
 import { AuthService } from '../../core/auth.service';
 import { ToastService } from '../../core/toast.service';
 import { TimeZoneService } from '../../core/time-zone.service';
+import { timeZoneGroups } from '../../core/time-zones';
 import { MIN_PASSWORD_LENGTH, passwordHint, passwordLevel } from '../../core/password-strength';
 import { CountryPicker } from './country-picker';
 
@@ -339,12 +340,15 @@ import { CountryPicker } from './country-picker';
             </p>
             <form [formGroup]="settings" (ngSubmit)="saveSettings()">
               <label for="timezone">Time zone</label>
-              <input id="timezone" formControlName="timezone" list="timezones" autocomplete="off" required />
-              <datalist id="timezones">
-                @for (zone of timeZones; track zone) {
-                  <option [value]="zone"></option>
+              <select id="timezone" formControlName="timezone" required>
+                @for (group of zoneGroups(); track group.region) {
+                  <optgroup [label]="group.region">
+                    @for (zone of group.zones; track zone.value) {
+                      <option [value]="zone.value">{{ zone.label }}</option>
+                    }
+                  </optgroup>
                 }
-              </datalist>
+              </select>
               <label class="check">
                 <input type="checkbox" formControlName="emailAlerts" />
                 <span>Email me deadline alerts</span>
@@ -428,7 +432,8 @@ export class ProfilePage implements OnInit, OnDestroy {
   private readonly toast = inject(ToastService);
   private readonly tz = inject(TimeZoneService);
 
-  protected readonly timeZones = Intl.supportedValuesOf('timeZone');
+  /** Every time zone, grouped by region; the saved one is added if the browser's list lacks it. */
+  protected readonly zoneGroups = signal(timeZoneGroups());
   protected readonly profile = signal<Me | null>(null);
   protected readonly options = signal<ProfileOptions | null>(null);
   protected readonly loading = signal(true);
@@ -782,7 +787,7 @@ export class ProfilePage implements OnInit, OnDestroy {
 
   protected async saveSettings() {
     const timezone = this.settings.controls.timezone.value.trim();
-    if (!timezone) return this.fail('settings', 'Enter a time zone.');
+    if (!timezone) return this.fail('settings', 'Choose a time zone.');
     await this.run('settings', async () => {
       const me = await this.api.updateProfile({
         timezone,
@@ -854,9 +859,9 @@ export class ProfilePage implements OnInit, OnDestroy {
       this.languages.set(me.studyLanguages ?? '');
     }
     if (section === 'all' || section === 'settings') {
-      this.settings.controls.timezone.setValue(
-        me.timezoneChosen ? me.timezone : Intl.DateTimeFormat().resolvedOptions().timeZone,
-      );
+      const zone = me.timezoneChosen ? me.timezone : Intl.DateTimeFormat().resolvedOptions().timeZone;
+      this.zoneGroups.set(timeZoneGroups([zone]));
+      this.settings.controls.timezone.setValue(zone);
       this.settings.controls.emailAlerts.setValue(me.notificationPrefs.email);
     }
   }
