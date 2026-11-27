@@ -23,13 +23,18 @@ import { CountryPicker } from './country-picker';
       <section class="card profile-hero">
         <div class="avatar" aria-hidden="true">{{ initial(me) }}</div>
         <div class="hero-main">
-          <h1>{{ me.displayName || 'Your profile' }}</h1>
+          <h1>{{ me.displayName || (isAdmin() ? 'Your account' : 'Your profile') }}</h1>
           <p class="muted">{{ me.email }}</p>
-          <p class="hint">
-            Deadline emails go to your primary address. Citizenship, where you live and your studies tell domestic and
-            international awards apart.
-          </p>
+          @if (isAdmin()) {
+            <p class="hint">Admin account. Sign-in and security settings only; it keeps no student profile.</p>
+          } @else {
+            <p class="hint">
+              Deadline emails go to your primary address. Citizenship, where you live and your studies tell domestic and
+              international awards apart.
+            </p>
+          }
         </div>
+        @if (!isAdmin()) {
         <div class="complete">
           <div class="complete-top"><span>Profile complete</span><strong>{{ me.readinessPercent }}%</strong></div>
           <div class="progress-track" role="progressbar" aria-label="Profile complete" [attr.aria-valuenow]="me.readinessPercent" aria-valuemin="0" aria-valuemax="100">
@@ -43,8 +48,9 @@ import { CountryPicker } from './country-picker';
             }
           </p>
         </div>
+        }
       </section>
-      @if (!me.timezoneChosen) {
+      @if (!me.timezoneChosen && !isAdmin()) {
         <p class="notice">Deadlines you add still use this device's time zone until you save one under Deadlines and alerts.</p>
       }
       @if (me.deletion?.requestedAt) {
@@ -55,10 +61,10 @@ import { CountryPicker } from './country-picker';
         <div class="col">
           <section class="card">
             <h2>Name</h2>
-            <p class="muted">Shown on your profile and used to check your documents.</p>
+            <p class="muted">{{ isAdmin() ? 'The name on this account. The audit log lists admins by email address.' : 'Shown on your profile and used to check your documents.' }}</p>
             <form [formGroup]="nameForm" (ngSubmit)="saveName()">
               <label for="displayName">Full name</label>
-              <input id="displayName" formControlName="displayName" autocomplete="name" maxlength="80" placeholder="As it appears on your documents" />
+              <input id="displayName" formControlName="displayName" autocomplete="name" maxlength="80" [placeholder]="isAdmin() ? 'Your full name' : 'As it appears on your documents'" />
               @if (errors()['name']) { <p class="error" role="alert">{{ errors()['name'] }}</p> }
               <button type="submit" [disabled]="busy() !== null">Save name</button>
             </form>
@@ -179,6 +185,7 @@ import { CountryPicker } from './country-picker';
           </section>
         </div>
 
+        @if (!isAdmin()) {
         <div class="col">
           <section class="card">
             <div class="row-between">
@@ -275,8 +282,10 @@ import { CountryPicker } from './country-picker';
             </form>
           </section>
         </div>
+        }
       </div>
 
+      @if (!isAdmin()) {
       <div class="two-col">
         <section class="card">
           <h2>Education</h2>
@@ -373,6 +382,7 @@ import { CountryPicker } from './country-picker';
           </section>
         </div>
       </div>
+      }
 
       @if (resetOpen()) {
         <div class="modal" (click)="closeReset()">
@@ -427,6 +437,8 @@ import { CountryPicker } from './country-picker';
 export class ProfilePage implements OnInit, OnDestroy {
   private readonly api = inject(ApiService);
   private readonly auth = inject(AuthService);
+  /** Admin accounts are staff accounts: name, email and password only, no student profile or self-deletion. */
+  protected readonly isAdmin = this.auth.isAdmin;
   private readonly router = inject(Router);
   private readonly fb = inject(FormBuilder);
   private readonly toast = inject(ToastService);

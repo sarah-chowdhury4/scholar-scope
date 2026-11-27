@@ -2,8 +2,11 @@ import { Component, OnInit, inject, input, output, signal } from '@angular/core'
 import { ApiService, apiMessage, type Draft, type Requirement } from '../../core/api.service';
 import { WORK_STEPS, WorkingIndicator } from '../../core/working';
 
+/** Below this share of the word limit, the draft explains that it is short because the notes are. */
+const SHORT_DRAFT_SHARE = 0.6;
+
 /**
- * Essay draft helper for one requirement. The student writes their own notes first; Gemini drafts
+ * Essay draft helper for one requirement. The student writes their own notes first; the AI drafts
  * from those notes and their profile only, and every sentence shows which note it used.
  */
 @Component({
@@ -54,6 +57,13 @@ import { WORK_STEPS, WorkingIndicator } from '../../core/working';
                 </p>
               }
             </div>
+          }
+          @if (tooShort(d)) {
+            <p class="notice short-draft">
+              This draft is {{ d.wordCount }} of {{ d.prompt.wordLimit }} words because it only uses what your notes say, and
+              never makes anything up. To make it longer, press Discard (your notes stay), add more notes, such as what happened,
+              a setback, what you learned and what comes next, and write it again.
+            </p>
           }
           @if (d.suggestion) {
             <p class="hint">Idea: {{ d.suggestion }}</p>
@@ -132,6 +142,11 @@ export class EssayDraft implements OnInit {
   basis(d: Draft, ids: string[]) {
     if (!ids.length) return 'Not based on your notes or profile. Check it or remove it.';
     return 'Based on: ' + ids.map((id) => d.facts.find((fact) => fact.id === id)?.text ?? id).join(' | ');
+  }
+
+  /** Well under the word limit: the notes only support this much, and the draft never pads with made-up content. */
+  tooShort(d: Draft) {
+    return !d.edited && d.prompt.wordLimit != null && d.wordCount < d.prompt.wordLimit * SHORT_DRAFT_SHARE;
   }
 
   overLimit(d: Draft) {

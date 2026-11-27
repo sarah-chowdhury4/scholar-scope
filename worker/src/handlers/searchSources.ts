@@ -5,6 +5,8 @@ import {
   getAppConfig,
   geminiSearch,
   isQuotaError,
+  isBusyError,
+  aiProvider,
   updateJob,
   enqueueJob,
   log,
@@ -56,6 +58,13 @@ export async function handleSearchSources(job: JobMessage): Promise<void> {
     await updateJob(job.uid, job.jobId, { status: 'paused_ai_off' });
     return;
   }
+  // The search runs on Google Search through Gemini; with AI_PROVIDER=nim Gemini is never called.
+  if (aiProvider() === 'nim') {
+    await setSearch({ status: 'paused', reason: 'Searching the web for official pages is not available right now. Save the official page or upload the guidelines instead.' });
+    await updateJob(job.uid, job.jobId, { status: 'done', progress: 100 });
+    log.info('search_skipped', { reason: 'ai_provider_nim', target: job.target });
+    return;
+  }
   await updateJob(job.uid, job.jobId, { status: 'running', progress: 10 });
 
   const name = String(sch.get('name') ?? '').slice(0, 200);
@@ -75,6 +84,12 @@ export async function handleSearchSources(job: JobMessage): Promise<void> {
   try {
     answer = await geminiSearch(SEARCH_SYSTEM, prompt);
   } catch (err) {
+    if (aiProvider() === 'auto' && isBusyError(err)) {
+      // NIM has no web search to fall back on: leave the requirements as they are rather than retry into a busy Gemini.
+      await setSearch({ status: 'paused', reason: 'Searching the web for official pages is not available right now. Save the official page or upload the guidelines instead.' });
+      await updateJob(job.uid, job.jobId, { status: 'done', progress: 100 });
+      return;
+    }
     if (!isQuotaError(err)) throw err;
     await setSearch({ status: 'paused', reason: 'The daily AI limit was reached.' });
     await updateJob(job.uid, job.jobId, { status: 'failed', error: 'ai_quota' });

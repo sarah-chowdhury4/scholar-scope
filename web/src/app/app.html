@@ -3,18 +3,22 @@
   <span class="tagline">No source, no claim.</span>
   @if (auth.signedIn()) {
     <nav aria-label="Main">
-      <a routerLink="/" routerLinkActive="active" [routerLinkActiveOptions]="{ exact: true }">My scholarships</a>
-      <a routerLink="/discover" routerLinkActive="active">Discover</a>
-      <a routerLink="/documents" routerLinkActive="active">Documents</a>
-      <a routerLink="/alerts" routerLinkActive="active">
-        Alerts
-        @if (alerts.unread() > 0) {
-          <span class="count" [attr.aria-label]="alerts.unread() + ' unread'">{{ alerts.unread() }}</span>
-        }
-      </a>
-      <a routerLink="/profile" routerLinkActive="active">Profile</a>
       @if (auth.isAdmin()) {
+        <!-- Admin accounts are staff accounts: the admin workspace, Discover as students see it, and their own account. -->
         <a routerLink="/admin" routerLinkActive="active">Admin</a>
+        <a routerLink="/discover" routerLinkActive="active">Discover</a>
+        <a routerLink="/profile" routerLinkActive="active">Account</a>
+      } @else {
+        <a routerLink="/" routerLinkActive="active" [routerLinkActiveOptions]="{ exact: true }">My scholarships</a>
+        <a routerLink="/discover" routerLinkActive="active">Discover</a>
+        <a routerLink="/documents" routerLinkActive="active">Documents</a>
+        <a routerLink="/alerts" routerLinkActive="active">
+          Alerts
+          @if (alerts.unread() > 0) {
+            <span class="count" [attr.aria-label]="alerts.unread() + ' unread'">{{ alerts.unread() }}</span>
+          }
+        </a>
+        <a routerLink="/profile" routerLinkActive="active">Profile</a>
       }
     </nav>
     <button type="button" class="link" (click)="auth.signOut()">Sign out</button>

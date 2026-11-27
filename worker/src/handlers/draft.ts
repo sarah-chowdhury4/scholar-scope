@@ -4,7 +4,6 @@ import {
   userDoc,
   getAppConfig,
   generateJson,
-  geminiModel,
   readProfileRecord,
   notesToFacts,
   profileToFacts,
@@ -74,7 +73,7 @@ export async function handleDraft(job: JobMessage): Promise<void> {
   const prompt = draft.get('prompt') as { label: string; quote: string | null; wordLimit: number | null };
   const limit = prompt.wordLimit ?? 500;
 
-  const { data, inputTokens, outputTokens } = await generateJson<{ paragraphs: DraftSentence[][]; missing?: string }>({
+  const { data, inputTokens, outputTokens, model: aiModelUsed } = await generateJson<{ paragraphs: DraftSentence[][]; missing?: string }>({
     system: DRAFT_SYSTEM,
     task:
       `Write a draft of about ${Math.round(limit * 0.9)} words and never more than ${limit} words for the essay prompt below. ` +
@@ -82,6 +81,8 @@ export async function handleDraft(job: JobMessage): Promise<void> {
     documentText:
       `ESSAY PROMPT: ${prompt.quote ?? prompt.label}\n\nFACTS ABOUT THE STUDENT:\n` + facts.map((fact) => `${fact.id}: ${fact.text}`).join('\n'),
     schema: DRAFT_SCHEMA,
+    // On NIM, reasoning first takes minutes for a whole essay; the fact ids and the sentence check keep it honest.
+    reasoning: false,
   });
   await recordTokens(job.uid, inputTokens, outputTokens);
 
@@ -100,7 +101,7 @@ export async function handleDraft(job: JobMessage): Promise<void> {
     overLimit: prompt.wordLimit != null && words > prompt.wordLimit,
     unsupportedCount: unsupported,
     suggestion: typeof data.missing === 'string' ? data.missing.slice(0, 300) : null,
-    model: geminiModel(),
+    model: aiModelUsed,
     promptVersion: DRAFT_PROMPT_VERSION,
     error: null,
     readyAt: FieldValue.serverTimestamp(),

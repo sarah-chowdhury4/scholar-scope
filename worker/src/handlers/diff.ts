@@ -1,5 +1,5 @@
 import { FieldValue } from 'firebase-admin/firestore';
-import { db, getAppConfig, generateJson, geminiModel, updateJob, log, type JobMessage } from '@scholarscope/shared';
+import { db, getAppConfig, generateJson, updateJob, log, type JobMessage } from '@scholarscope/shared';
 import { recordTokens } from '../usage';
 
 export const DIFF_PROMPT_VERSION = 'df-1';
@@ -44,7 +44,7 @@ export async function handleDiff(job: JobMessage): Promise<void> {
   }
   await updateJob(job.uid, job.jobId, { status: 'running', progress: 30 });
 
-  const { data, inputTokens, outputTokens } = await generateJson<{ summary: string; whatToDo: string; importance: 'minor' | 'important' }>({
+  const { data, inputTokens, outputTokens, model: aiModelUsed } = await generateJson<{ summary: string; whatToDo: string; importance: 'minor' | 'important' }>({
     system: DIFF_SYSTEM,
     task: `Requirement: "${String(change.get('label') ?? '')}". Compare BEFORE and AFTER inside the document block.`,
     documentText: `BEFORE:\n${before || '(not in the earlier version)'}\n\nAFTER:\n${after || '(no longer in the guidelines)'}`,
@@ -57,7 +57,7 @@ export async function handleDiff(job: JobMessage): Promise<void> {
       summary: String(data.summary ?? '').slice(0, 400),
       whatToDo: String(data.whatToDo ?? '').slice(0, 400),
       importance: data.importance === 'important' ? 'important' : 'minor',
-      model: geminiModel(),
+      model: aiModelUsed,
       promptVersion: DIFF_PROMPT_VERSION,
       at: FieldValue.serverTimestamp(),
     },

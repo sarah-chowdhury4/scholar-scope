@@ -22,6 +22,14 @@ describe('countRequirements', () => {
     expect(counts.open).toBe(0);
     expect(readinessPct).toBe(100);
   });
+
+  it('still counts a changed deadline as a change to review', () => {
+    const { counts } = countRequirements([
+      { kind: 'deadline', readiness: 'changed', verification: 'verified', changeFlag: { active: true } },
+      { kind: 'essay', readiness: 'missing', verification: 'verified' },
+    ]);
+    expect(counts).toMatchObject({ total: 1, open: 1, changed: 1 });
+  });
   it('is zero percent with no requirements', () => {
     expect(countRequirements([]).readinessPct).toBe(0);
   });

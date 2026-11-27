@@ -4,6 +4,7 @@ import { FormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
 import { HttpErrorResponse } from '@angular/common/http';
 import { ApiService, type CatalogItem, type CatalogQuery, type CatalogTag } from '../../core/api.service';
+import { AuthService } from '../../core/auth.service';
 
 const TAG_LABELS: Record<CatalogTag, string> = {
   essay: 'Essay',
@@ -42,9 +43,15 @@ const TAG_LABELS: Record<CatalogTag, string> = {
     <div class="page-head">
       <div>
         <h1>Discover scholarships</h1>
-        <p class="hint">Add any of these to <a routerLink="/">My scholarships</a>. Scholarships marked <span class="badge verified">Verified</span> were collected and checked by the ScholarScope team against their official pages.</p>
+        @if (isAdmin()) {
+          <p class="hint">This is Discover as students see it. Add, edit or remove entries in <a routerLink="/admin/catalog">Admin → Catalog</a>. Scholarships marked <span class="badge verified">Verified</span> were collected and checked by the ScholarScope team against their official pages.</p>
+        } @else {
+          <p class="hint">Add any of these to <a routerLink="/">My scholarships</a>. Scholarships marked <span class="badge verified">Verified</span> were collected and checked by the ScholarScope team against their official pages.</p>
+        }
       </div>
-      <a class="button secondary" routerLink="/scholarships/new">Not listed? Add your own</a>
+      @if (!isAdmin()) {
+        <a class="button secondary" routerLink="/scholarships/new">Not listed? Add your own</a>
+      }
     </div>
 
     <section class="card filters" aria-label="Search and filters">
@@ -177,7 +184,8 @@ const TAG_LABELS: Record<CatalogTag, string> = {
               }
             </p>
           }
-          @if (s.addedScholarshipId) {
+          @if (isAdmin()) {
+          } @else if (s.addedScholarshipId) {
             <a class="button secondary" [routerLink]="['/scholarships', s.addedScholarshipId]">Added · open</a>
           } @else {
             <button type="button" (click)="add(s)" [disabled]="adding() === s.catalogId || s.deadlinePassed">
@@ -191,6 +199,8 @@ const TAG_LABELS: Record<CatalogTag, string> = {
 })
 export class Discover implements OnInit, OnDestroy {
   private readonly api = inject(ApiService);
+  /** Admin accounts see Discover read-only: they manage entries in Admin → Catalog and keep no scholarships of their own. */
+  protected readonly isAdmin = inject(AuthService).isAdmin;
   protected readonly labels = TAG_LABELS;
   protected readonly tags = Object.keys(TAG_LABELS) as CatalogTag[];
 

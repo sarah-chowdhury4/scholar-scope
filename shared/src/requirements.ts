@@ -20,10 +20,11 @@ export function countRequirements(
   for (const r of items) {
     if (r.readiness === 'ready') counts.ready++;
     else counts.open++;
-    if (r.readiness === 'changed' || r.changeFlag?.active === true) counts.changed++;
     if (r.verification === 'unverified') counts.unverified++;
     if (r.verification === 'needs_review') counts.needsReview++;
   }
+  // A changed deadline is not a task, but the student still has a change to review: it counts as "changed".
+  counts.changed = requirements.filter((r) => r.readiness === 'changed' || r.changeFlag?.active === true).length;
   return { counts, readinessPct: counts.total ? Math.round((counts.ready / counts.total) * 100) : 0 };
 }
 
