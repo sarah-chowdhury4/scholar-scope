@@ -1,465 +1,416 @@
+<div align="center">
+
 # ScholarScope
 
-**No source, no claim.** ScholarScope helps a student juggling several scholarship applications keep track of every requirement, see exactly where it came from, and notice when it changes.
+**No source, no claim.**
 
-- Upload a scholarship's guidelines (PDF, Word, image or text) or save its web page.
-- Requirements, deadlines, word limits and eligibility rules are extracted, and **each one links to the exact page and sentence in the source**. Anything that can't be found in the source is shown as **Unverified**.
-- Requirements are versioned, never overwritten. When a saved page changes, the affected requirement is flagged until the student acknowledges it.
-- Deadline alerts go out 14, 7, 3 and 1 days before each deadline, and on the day itself (admins can change these days in **Admin → Settings**). If the worker was off on a reminder day, that reminder goes out when it next runs (up to 3 days late, with the real number of days left); the worker also checks for due reminders each time it starts.
+A scholarship tracker that ties every requirement to the exact sentence it came from, so students never miss a rule, a document or a changed deadline.
 
-**Demo video:** [watch ScholarScope in action on YouTube](https://youtu.be/PK8dkiaQhP4).
+_Mentor Me Collective (MMC) BUILD, Fall 2026 · Google Cloud Launchpad Showcase · Team ScholarScope_
+
+[![CI](https://github.com/sarah-chowdhury4/scholar-scope/actions/workflows/ci.yml/badge.svg)](https://github.com/sarah-chowdhury4/scholar-scope/actions/workflows/ci.yml)
+[![Angular](https://img.shields.io/badge/Angular-22-DD0031?logo=angular&logoColor=white)](https://angular.dev/)
+[![Node.js](https://img.shields.io/badge/Node.js-22-5FA04E?logo=nodedotjs&logoColor=white)](https://nodejs.org/)
+[![Firebase](https://img.shields.io/badge/Firebase-Auth%20%2F%20Firestore-FFCA28?logo=firebase&logoColor=black)](https://firebase.google.com/)
+[![Gemini](https://img.shields.io/badge/Google-Gemini-4285F4?logo=googlegemini&logoColor=white)](https://ai.google.dev/)
+[![NVIDIA NIM](https://img.shields.io/badge/NVIDIA-Nemotron%203.5-76B900?logo=nvidia&logoColor=white)](https://build.nvidia.com/)
+[![Terraform](https://img.shields.io/badge/Terraform-Google%20Cloud-844FBA?logo=terraform&logoColor=white)](infra/README.md)
+[![Tests](https://img.shields.io/badge/Tests-267%20passed-brightgreen?logo=vitest&logoColor=white)](#14-testing-and-quality-assurance)
+[![UN SDG 4](https://img.shields.io/badge/UN%20SDG-4%20Quality%20Education-C5192D)](https://sdgs.un.org/goals/goal4)
+
+</div>
+
+---
+
+## Submission Links
+
+| **Deliverable** | **Link** |
+|---|---|
+| Presentation deck | [ScholarScope-Presentation.pdf](docs/deliverables/ScholarScope-Presentation.pdf) |
+| Written summary | [ScholarScope-Written-Summary.pdf](docs/deliverables/ScholarScope-Written-Summary.pdf) |
+| Recorded walkthrough | [Watch on YouTube](https://youtu.be/PK8dkiaQhP4) |
+| Local setup guide | [docs/SETUP.md](docs/SETUP.md) |
+| Team dataset | [Dataset/](Dataset/) · [Data documentation](dataset_documentation.md) |
+| Architecture diagram | [architecture-diagram.jfif](architecture-diagram.jfif) |
+| Samples for testing | [samples/](samples/README.md) |
 
 [![ScholarScope demo video](https://img.youtube.com/vi/PK8dkiaQhP4/hqdefault.jpg)](https://youtu.be/PK8dkiaQhP4)
 
-Everything runs on your own computer with Docker. **You don't need a cloud account or a payment method.**
+---
+
+## Table of Contents
+
+1. [Target Audience](#1-target-audience)
+2. [Problem Statement](#2-problem-statement)
+3. [UN Sustainable Development Goal](#3-un-sustainable-development-goal)
+4. [Solution Overview](#4-solution-overview)
+5. [Key Features](#5-key-features)
+6. [User Journey](#6-user-journey)
+7. [System Architecture](#7-system-architecture)
+8. [Google Cloud Integration](#8-google-cloud-integration)
+9. [NVIDIA Integration](#9-nvidia-integration)
+10. [Verification Rules](#10-verification-rules)
+11. [Technology Stack](#11-technology-stack)
+12. [Setup and Run Instructions](#12-setup-and-run-instructions)
+13. [Data Sources and Sample Data](#13-data-sources-and-sample-data)
+14. [Testing and Quality Assurance](#14-testing-and-quality-assurance)
+15. [Demo](#15-demo)
+16. [Privacy, Security, and Responsible Use](#16-privacy-security-and-responsible-use)
+17. [Limitations and Future Scope](#17-limitations-and-future-scope)
+18. [Team Credits and Individual Contributions](#18-team-credits-and-individual-contributions)
+19. [Documentation Hub](#19-documentation-hub)
+20. [License](#20-license)
 
 ---
 
-## Contents
+## 1. Target Audience
 
-1. [Before you start](#before-you-start)
-2. [Get started (about 30–45 minutes the first time)](#get-started)
-3. [Local URLs](#local-urls)
-4. [Everyday commands](#everyday-commands)
-5. [Troubleshooting](#troubleshooting)
-6. [How it's built](#how-its-built)
-7. [Security model](#security-model)
-8. [Project status](#project-status)
-9. [Contributing](#contributing)
+ScholarScope is built for students applying for several scholarships at once, who need to know exactly what each one asks for:
+
+- **Low-income and first-generation students**, often applying without help at home and with an overloaded school counselor.
+- **High school seniors and college applicants** juggling different deadlines, essay prompts and document rules.
+- **Students applying abroad**, where deadlines are in another time zone and rules include citizenship or language requirements.
+- **Scholarship programs and advisers** who want students to read the official rules, not a summary of them.
+
+Our persona, **Jay Clark**, is an 18-year-old first-generation student with a 3.40 GPA who wants to study computer science without taking on debt, and tracks applications on sticky notes.
 
 ---
 
-## Before you start
+## 2. Problem Statement
 
-You need Docker (with Compose v2), Node.js **22.22.3 or newer** (Angular 22 refuses older 22.x) and Git. Docker needs **at least 6 GB RAM**; ClamAV alone uses about 1.5 GB.
+Scholarship criteria, essay prompts and deadlines change, and one missed change can disqualify an application. Students face:
 
-| | Windows 10/11 | macOS (Intel or Apple Silicon) | Linux (Ubuntu, Debian, Fedora…) |
-|---|---|---|---|
-| Docker | Docker Desktop with the **WSL 2** engine | Docker Desktop (OrbStack or Colima also work) | Docker Engine + the `docker compose` plugin |
-| Docker memory | Settings → Resources (or WSL default: half your RAM) | Settings → Resources → Memory ≥ 6 GB | uses system RAM directly |
-| Node.js 22 | Installer from nodejs.org | `nvm install 22` ([nvm](https://github.com/nvm-sh/nvm)) or `brew install node@22` | `nvm install 22` ([nvm](https://github.com/nvm-sh/nvm)) |
-| Git | git-scm.com | `xcode-select --install` or `brew install git` | `sudo apt install git` / `sudo dnf install git` |
-| Terminal | **PowerShell** (not Command Prompt) | Terminal (zsh) | any shell (bash) |
+- Requirements spread across a main page, eligibility pages, FAQs and PDFs.
+- Deadlines that move, or are stated in another time zone.
+- Documents (transcripts, certificates, passports) that must match each scholarship's rules: the right kind of file, the right name, a minimum GPA, not expired.
+- AI summaries and third-party lists that state requirements without showing where they came from, so a student can't tell whether they are right.
 
-**Linux only:** let your user run Docker without `sudo`: `sudo usermod -aG docker $USER`, then log out and back in.
+---
 
-Check the installs (same on every system):
+## 3. UN Sustainable Development Goal
 
-```bash
-docker info              # prints a "Server" section with no errors
-docker compose version   # v2.x or newer
-node -v                  # v22.22.3 or newer
-git --version
+**SDG 4: Quality Education.**
+
+By simplifying the administrative work of applying and keeping every requirement accurate and traceable, ScholarScope lowers a barrier to financial aid for underserved students, so a missed rule or deadline doesn't cost them an award they qualify for.
+
+---
+
+## 4. Solution Overview
+
+ScholarScope reads a scholarship's official guidelines (an uploaded file or its web page) and turns them into a checklist. **Every item must quote the sentence it came from**, and the quote is checked against the stored source. The student reviews each item, keeps track of documents and deadlines, and is alerted when the guidelines change.
+
+**Design principles**
+
+- **No source, no claim:** a requirement is only shown as From source when its quote is found, character for character, in the stored guidelines. Anything else is Unverified.
+- **The student decides:** every item can be confirmed, corrected or rejected, and corrections are saved as new versions, never overwritten.
+- **Untrusted inputs:** uploads, web pages and AI output are all treated as untrusted. Uploads are virus-scanned, and document text is passed to the AI as data, never as instructions.
+- **Honest drafts:** essay drafts use only the student's own notes, and any sentence not based on them is marked.
+
+---
+
+## 5. Key Features
+
+- **Discover catalog.** Search and filter the team's 15 checked scholarships by deadline, GPA, provider or what the application asks for, or add one that isn't listed.
+- **Guidelines with citations.** Upload a PDF, Word file, image or text file, or save the scholarship's web page. ScholarScope also reads linked rule pages (eligibility, FAQ). Each requirement links to the exact sentence in the source.
+- **Review and versions.** Confirm, correct or reject each item, tick items off, and see every version in History.
+- **Change detection.** A daily re-check of saved pages shows the old and new wording side by side, with an AI summary, and sends an alert.
+- **Deadline alerts.** Email and in-app reminders 14, 7, 3 and 1 days before and on the day (adjustable by admins), shown in the student's own time zone.
+- **Document library and AI checks.** Transcripts, certificates and passports are virus-scanned, then checked against each scholarship: right kind of file, name versus profile, expiry versus deadline, GPA at the right school level, official or English rules.
+- **Essay drafts.** Drafts written only from the student's notes, with unsupported sentences marked and a note when a draft is short because the notes are short.
+- **Readiness and exports.** A readiness bar per scholarship, a calendar file (.ics), a CSV checklist and a print view.
+- **Admin workspace.** Catalog management, settings (AI switch, reminder days, limits), accounts and an audit log, for staff accounts only.
+- **Delete my data.** Students can request permanent erasure of their account and files.
+
+---
+
+## 6. User Journey
+
+```text
+1. Discover
+   Find a scholarship in the catalog, or add your own.
+        |
+        v
+2. Add the guidelines
+   Upload a file or paste the scholarship's web page.
+   The file is virus-scanned and stored; scans are read with OCR.
+        |
+        v
+3. Extract and check
+   The AI lists deadlines, essays, eligibility rules and documents,
+   each with a quote. Quotes are checked against the stored text:
+   From source / Needs review / Unverified.
+        |
+        v
+4. Review and prepare
+   - Confirm, correct or reject each item
+   - Check documents from your library against the rules
+   - Draft essays from your own notes
+   - Track readiness and export the calendar or checklist
+        |
+        v
+5. Stay up to date
+   Daily page re-checks flag changes side by side, and reminders
+   go out before each deadline.
 ```
 
-Windows only: `wsl -l -v` should list `docker-desktop` with VERSION 2.
+---
 
-Code blocks below are labelled **PowerShell** (Windows) or **bash** (macOS/Linux). Unlabelled `docker …` commands are the same everywhere. Run each command as **one line**, even if your screen wraps it.
+## 7. System Architecture
+
+```mermaid
+flowchart LR
+  S["Student (Angular web app)"] -->|"signed-in requests"| API["API (Express)"]
+  S -->|"upload to a signed URL"| QB[("Quarantine bucket")]
+  API --> DB[("Firestore")]
+  API -->|"jobs"| QU[["Job queues"]]
+  QU --> W["Worker"]
+  W -->|"virus scan"| AV["ClamAV"]
+  W --> OB[("Originals bucket, versioned")]
+  W -->|"text only"| AI["Gemini or NVIDIA NIM"]
+  W --> DB
+  W -->|"alerts"| MAIL["Email: Brevo or Gmail"]
+  W -->|"daily re-check"| WEB["Scholarship web pages"]
+  ADM["Admin (Admin workspace)"] -->|"admin role"| API
+```
+
+The web app talks only to the API, which checks the sign-in token on every request. Slow work (virus scans, OCR, AI extraction, document checks, essay drafts, page re-checks, emails) runs as queued jobs in a separate worker. Only the worker holds API keys and sends email.
+
+### Data flow: reading a scholarship's guidelines
+
+```mermaid
+sequenceDiagram
+    actor Student
+    participant Web as Web app
+    participant API
+    participant Worker
+    participant AI as Gemini or NVIDIA NIM
+    participant DB as Firestore
+
+    Student->>Web: Upload guidelines or paste the page address
+    Web->>API: Start the upload or save the page
+    API->>Worker: Queue a scan or fetch job
+    Worker->>Worker: Virus scan, store the original, extract text (OCR for scans)
+    Worker->>AI: Text as data, plus the extraction task
+    AI-->>Worker: Items, each with a quote and a confidence
+    Worker->>Worker: Find each quote in the stored text
+    Worker->>DB: Save items as From source, Needs review or Unverified
+    Web-->>Student: Checklist with a link to each source sentence
+```
 
 ---
 
-## Get started
+## 8. Google Cloud Integration
 
-All commands run from the repository root unless a step says otherwise.
+- **Firebase (Google).** Firebase Authentication for sign-in and Firestore for all app data. Locally they run as the Firebase emulators.
+- **Gemini.** With `AI_PROVIDER=gemini` or `auto`, Gemini reads requirements, checks documents, summarises changes and drafts essays, through the Gemini API (Google AI Studio). It also searches the web with Google Search to find a scholarship's official rule pages when the saved page is thin.
+- **Google Cloud infrastructure as code.** The production setup is written in Terraform in [`infra/`](infra/README.md): Firestore, Cloud Storage buckets, Cloud Tasks queues, Secret Manager, Cloud Run (API, worker with a ClamAV sidecar, deleter job), Cloud Scheduler and Artifact Registry. In the cloud, Gemini runs on **Vertex AI** with the worker's own identity, so no Gemini key is needed.
+- **Checked without a cloud account.** `npm run infra:check` runs terraform fmt and validate, tfsec, checkov and infracost in Docker, locally and in CI.
 
-### 1. Clone
+Each Google Cloud service has a local stand-in behind a small adapter in `shared/src/platform/`, chosen by environment variables:
 
-```bash
-git clone https://github.com/sarah-chowdhury4/scholar-scope.git
-cd scholar-scope
-```
+| Production service (Google Cloud) | Local stand-in |
+|---|---|
+| Firestore, Identity Platform | Firebase emulators |
+| Cloud Storage | MinIO (Chainguard build) |
+| Cloud Tasks, Secret Manager | LocalStack SQS and Secrets Manager |
+| Malware scanning | ClamAV |
+| Cloud Vision OCR | Tesseract inside the worker |
+| Vertex AI Gemini | Gemini API (Google AI Studio free tier) |
+| Cloud Scheduler | `node-cron` inside the worker |
 
-(Same command in PowerShell.)
+The Terraform has not been applied: the Google Cloud adapters for storage and queues are still stubs, so a hosted deployment is future work.
 
-### 2. Get the free keys (no card needed)
+---
 
-| Key | Where | Goes in |
+## 9. NVIDIA Integration
+
+ScholarScope uses **NVIDIA NIM's hosted API** with the **Nemotron 3.5** models:
+
+- **Accuracy jobs:** `nvidia/nemotron-3.5-super-vl-120b-a12b` reads requirements, checks documents, summarises changes and drafts essays when `AI_PROVIDER=nim` (NVIDIA only) or `auto` (Gemini first, NIM when Gemini is busy or out of quota).
+- **Same safeguards for every provider:** the same prompts, JSON schema and quote check apply whichever AI answers, and each result records the model that produced it.
+- **The demo video was recorded with `AI_PROVIDER=nim`.**
+
+The model can be changed in `.env` (`NIM_JSON_MODEL`) without a code change; the defaults are in `shared/src/platform/ai/nim.ts`.
+
+---
+
+## 10. Verification Rules
+
+**Requirement status**
+
+| Status | When |
+|---|---|
+| **From source** | The quote is found in the stored source, and the AI's confidence is at least **85%** |
+| **Needs review** | The quote is found, but confidence is below 85% |
+| **Unverified** | The quote can't be found in the source, or the student typed the value by hand |
+
+Catalog scholarships are **From source** when the team checked them against the official page (a source URL and a status that isn't Unverified).
+
+**Document checks**
+
+| Check | Result |
+|---|---|
+| Kind of file | Warns when a file doesn't look like the document it was saved as (for example a timetable saved as a transcript) |
+| Name | Compares the name on the document with the student's profile |
+| Expiry | Compares a passport's expiry date with the scholarship deadline |
+| GPA | Compares the GPA on the transcript of the matching school level with the scholarship's minimum, and warns about different grading scales |
+| Official / English | Flags unofficial copies and documents not in English when a scholarship requires them |
+
+Every fact a rule uses must quote the document first. The AI never reads out passport or ID numbers.
+
+---
+
+## 11. Technology Stack
+
+| Domain | Technology | Purpose |
 |---|---|---|
-| LocalStack auth token | app.localstack.cloud → *Auth Token* (free account) | `.env` → `LOCALSTACK_AUTH_TOKEN` |
-| Gemini API key | aistudio.google.com → *Get API key* | `.env.secrets` → `GEMINI_API_KEY` |
-| Gemini model id | AI Studio → model list (exact id of the current Flash model) | `.env` → `GEMINI_MODEL` |
-| Gmail app password (optional: real emails) | Google Account → Security → *App passwords* (needs 2-Step Verification). Without it, every email goes to Mailpit. Brevo also works; see *Send real emails* | `.env.secrets` → `SMTP_PASSWORD`, `.env` → `SMTP_USER` |
-| Jina Reader key (optional) | jina.ai → *Get API key*. Without one, saved pages are still read at 20 requests a minute | `.env.secrets` → `JINA_API_KEY` |
-| NVIDIA NIM key (optional; required for `AI_PROVIDER=nim` or `auto`) | build.nvidia.com → *Get API Key*. No key? Set `NIM_ENABLED=false` in `.env` and NIM calls run on Gemini | `.env.secrets` → `NVIDIA_API_KEY` |
+| Frontend | Angular 22 (signals, standalone components) | Student and admin web app |
+| API | Node.js 22, Express 5 | Sign-in check, validation, routes |
+| Background jobs | Node.js worker with queues | Scans, OCR, AI jobs, re-checks, alerts, email |
+| Auth and database | Firebase Authentication, Firestore | Accounts, custom admin role, app data |
+| File storage | Cloud Storage (MinIO locally) | Quarantine, versioned originals, exports |
+| Queues and secrets | Cloud Tasks, Secret Manager (LocalStack locally) | Job queues, API keys |
+| Virus scanning | ClamAV | Every upload, before anything reads it |
+| OCR | Tesseract | Scanned PDFs and images |
+| AI | Gemini, NVIDIA NIM (Nemotron 3.5) | Extraction, document checks, change summaries, drafts |
+| Web pages | Jina Reader, direct fetch | Reading saved scholarship pages |
+| Email | Brevo or Gmail (Mailpit locally) | Codes, deadline and change alerts |
+| Infrastructure | Terraform, Docker Compose | Google Cloud setup, local stack |
+| Testing and CI | Vitest, Angular tests, GitHub Actions, gitleaks | Tests and checks on every pull request |
 
-> **Synthetic documents only.** Free-tier AI inputs may be kept or used by the provider. Never upload real student records to a local setup.
+---
 
-Keep keys in a password manager, never in chat, screenshots or recordings.
+## 12. Setup and Run Instructions
 
-### 3. Create your settings files
+### Prerequisites
 
-**PowerShell**
+- Docker with Compose v2 and at least 6 GB of memory
+- Node.js 22.22.3 or newer
+- Git
+- Free keys: a LocalStack auth token, and a Gemini API key and/or an NVIDIA API key
 
-```powershell
-Copy-Item .env.example .env
-Copy-Item local\localstack\secrets.env.example .env.secrets
-```
+### Run locally
 
-**bash**
-
-```bash
-cp .env.example .env
-cp local/localstack/secrets.env.example .env.secrets
-chmod 600 .env .env.secrets
-```
-
-Fill the four MinIO secrets with random **hex** values. Hex matters: a value starting with `-` breaks the MinIO setup. These commands fill only those four lines:
-
-**PowerShell**
-
-```powershell
-$keys = 'MINIO_ROOT_PASSWORD','MINIO_API_SECRET_KEY','MINIO_WORKER_SECRET_KEY','MINIO_DELETER_SECRET_KEY'
-$c = Get-Content .env
-foreach ($k in $keys) {
-  $v = node -e "console.log(require('crypto').randomBytes(24).toString('hex'))"
-  $c = $c -replace "^$k=.*$", "$k=$v"
-}
-Set-Content .env $c -Encoding ascii
-```
-
-**bash** (works with both macOS and GNU `sed`)
+The first setup takes about 30–45 minutes and is described step by step for Windows, macOS and Linux in **[docs/SETUP.md](docs/SETUP.md)**. After that:
 
 ```bash
-for k in MINIO_ROOT_PASSWORD MINIO_API_SECRET_KEY MINIO_WORKER_SECRET_KEY MINIO_DELETER_SECRET_KEY; do
-  v=$(node -e "console.log(require('crypto').randomBytes(24).toString('hex'))")
-  sed -i.bak "s/^$k=.*/$k=$v/" .env
-done
-rm .env.bak
+npm start   # starts everything and waits until the site answers
+npm stop    # saves accounts and data, then stops
 ```
 
-Then open `.env` and set `LOCALSTACK_AUTH_TOKEN` and `GEMINI_MODEL`; open `.env.secrets` and set `GEMINI_API_KEY`. If you have an NVIDIA key, set `NVIDIA_API_KEY` too; if not, set `NIM_ENABLED=false` in `.env` so the NIM jobs run on Gemini. Use any text editor: `notepad .env` (Windows), `open -e .env` (macOS) or `nano .env` (Linux).
+Open <http://localhost:4200>.
 
-**Choose the AI.** `AI_PROVIDER` in `.env` picks which AI reads requirements, checks documents, summarises changes and drafts essays:
+### Choose the AI
+
+`AI_PROVIDER` in `.env`:
 
 | Value | What it does |
 |---|---|
 | `gemini` (default) | Gemini only. Needs `GEMINI_API_KEY`. |
-| `nim` | NVIDIA NIM only. Needs `NVIDIA_API_KEY`; Gemini is not called. The search for a scholarship's official pages uses Google Search through Gemini, so it is skipped. |
-| `auto` | Gemini first; when it is busy or out of its free quota, NIM answers instead. Needs both keys. |
+| `nim` | NVIDIA NIM only. Needs `NVIDIA_API_KEY`. The Google Search for official pages is skipped. |
+| `auto` | Gemini first; NIM answers when Gemini is busy or out of quota. Needs both keys. |
 
-Each AI result records the model that produced it. After changing the value, run `docker compose up -d worker`.
-
-Both files are git-ignored. If this is a fresh copy rather than a clone, run `git init -b main` first, then confirm with `git status` that neither file is listed.
-
-### 4. Check the image versions
-
-`.env.example` already pins the images the team has tested:
-
-- **MinIO:** MinIO's own images are gone (deleted from Docker Hub, private on quay.io), so this project uses **Chainguard's free MinIO build** (`cgr.dev/chainguard/minio`, `-dev` variant). It includes `mc`, so the same digest goes in both `MINIO_IMAGE` and `MC_IMAGE`.
-- **LocalStack:** `localstack/localstack`, which needs your auth token from step 2.
-
-Check that everything is filled in. This prints nothing when the config is valid:
-
-```bash
-docker compose config -q
-```
-
-To move to newer images later, pull them, then copy the printed `name@sha256:…` into `.env.example` for everyone:
-
-```bash
-docker pull cgr.dev/chainguard/minio:latest-dev
-docker image inspect cgr.dev/chainguard/minio:latest-dev --format "{{index .RepoDigests 0}}"
-docker pull localstack/localstack:latest
-docker image inspect localstack/localstack:latest --format "{{index .RepoDigests 0}}"
-```
-
-### 5. Start the infrastructure
-
-```bash
-docker compose up -d --build firebase minio minio-init localstack clamav mailpit
-docker compose ps
-```
-
-The first start takes several minutes: the Firebase image downloads the emulators, and ClamAV downloads virus signatures.
-
-**Done when:** `docker compose ps` shows `firebase`, `minio`, `localstack`, `clamav` and `mailpit` as **healthy** (`minio-init` runs once and exits), and
-
-```bash
-docker compose logs --tail 20 minio-init localstack
-```
-
-contains `MinIO ready: …` and `LocalStack ready: 3 queues + DLQs, secrets loaded.`
-
-### 6. Check each service
-
-| Check | How | Expected |
-|---|---|---|
-| Firebase | open http://localhost:4000 | Emulator UI with Firestore and Authentication |
-| MinIO | open http://localhost:9001, log in with `MINIO_ROOT_USER` / `MINIO_ROOT_PASSWORD` from `.env` | buckets `uploads`, `originals`, `exports` |
-| Queues | `docker compose exec localstack awslocal sqs list-queues` | six queues (`gemini`, `nim`, `default`, each with a `-dlq`) |
-| Secrets (names only) | `docker compose exec localstack awslocal secretsmanager list-secrets --query "SecretList[].Name"` | `scholarscope/gemini-api-key` (+ `nvidia-api-key` if set) |
-| Mailpit | open http://localhost:8025 | empty inbox |
-
-The `awslocal is deprecated` banner is harmless.
-
-### 7. Run the storage permission tests
-
-```bash
-docker compose run --rm --entrypoint /bin/sh minio-init /init/test-permissions.sh
-```
-
-**Done when:** every line says `PASS` and the last line is `All storage permission tests passed.`
-
-### 8. Start the API and worker
-
-```bash
-docker compose up -d --build api worker
-docker compose logs --tail 20 api worker
-```
-
-**Done when:** the logs show `api_started`, `worker_started` and three `queue_consumer_started` lines, and http://localhost:3000/api/health returns `{"status":"ok"}`.
-
-### 9. Load the scholarship catalog
-
-The **Discover** page lists the scholarships in the catalog. The team dataset (15 scholarships) is in `Dataset/ScholarScope Updated Dataset.csv`; load it with:
-
-```bash
-docker compose exec api npm run seed:catalog
-```
-
-`npm start` runs it for you on every start. Run it again after the dataset changes: rows are matched by `Scholarship ID`, so it updates them instead of adding copies, and scholarships no longer in the file are removed from Discover (students who already added one keep their copy). To load another export instead, put it in `api/seed/` (columns as in `api/seed/dataset.example.csv`, or the dataset sheet's headers; dates as `YYYY-MM-DD`) and run `… seed:catalog -- seed/<file>.csv`.
-
-**Done when:** it prints `Catalog: 15 scholarships saved.`
-
-### 10. Start the web app
-
-In a second terminal window, from the repository root:
-
-```bash
-cd web
-npm ci
-npm start
-```
-
-(Same commands in PowerShell.)
-
-Open http://localhost:4200. You should see the sign-in page. Choose **Create an account** (any email, 12+ character password). A new account starts with an **empty dashboard** with two buttons: **Discover scholarships** and **Add one that isn't listed**.
-
-### 11. Try the full flow
-
-1. Open **Discover** (top menu). Search (e.g. `leadership`), filter by deadline, your GPA, provider or what the application asks for (essay, video, recommendation…), then **Add to my scholarships**. The button changes to **Added · open**.
-2. Back on **My scholarships**, choose **Add your own** and add a scholarship that isn't listed, with a deadline **7 days from today**. It shows an **Unverified** badge, because you typed it and there's no source yet.
-3. Trigger the deadline alert now: `docker compose exec worker npm run cron:deadline-alerts`. The email appears at http://localhost:8025.
-4. Save this as `example-guidelines.txt` and upload it on the scholarship's page:
-
-   ```text
-   Example Award 2027 — Application Guidelines
-   Applications close on December 1, 2026 at 11:59 PM Eastern Time.
-   Essay: In 500 words or fewer, describe a challenge you have overcome.
-   Applicants must have a minimum GPA of 3.0.
-   Submit one recommendation letter from a teacher.
-   ```
-
-5. Each requirement now shows its quoted sentence and a **From source** / **Needs review** badge. **Open source** opens the stored file.
-6. On a requirement, try **Looks right**, **Fix** (saved as a new version) and **Not a requirement**; tick the box when it's done. **History** lists every version.
-7. Paste a page address under **Or paste the scholarship's web page**. Run `docker compose exec worker npm run cron:recheck` after the page changes: the scholarship shows **What changed** with the old and new wording side by side, and **Alerts** in the top menu gets a new item.
-8. In **Documents**, upload a synthetic transcript or passport. After the virus scan, the AI check lists what it found (wrong kind of file, name differs from your profile, passport expiry). The scholarship page adds checks against its deadline and minimum GPA.
-9. On an essay requirement, open **Draft this essay with AI**, write a few lines of notes, and **Write a draft**. Sentences not based on your notes are marked; edit, then **Approve this draft**.
-10. On the dashboard, download the calendar (.ics) or checklist (.csv), or open **Print or save as PDF**.
-
-### Optional: a demo student with scholarships already added
-
-```bash
-docker compose exec api npm run seed -- seed/dataset.csv demo@student.test "a-long-demo-password"
-```
-
-This loads the catalog and adds catalog scholarships (up to 15) to a demo account. Entries the team checked against the official page (a source URL and a dataset status that isn't `Unverified`) show as **From source**; any others show as **Unverified** until real guidelines are uploaded.
+Keys go only in `.env.secrets`. Never commit API keys, real student documents or personal data.
 
 ---
 
-### Optional: send real emails (free)
+## 13. Data Sources and Sample Data
 
-Locally every email (confirmation codes, password resets, deadline and change alerts) goes to the Mailpit test inbox at http://localhost:8025. To deliver them to real inboxes, use a Gmail account (simplest) or Brevo.
+- **Scholarship catalog:** the team's dataset of **15 scholarships** (domestic awards and international study grants), each with a deadline, minimum GPA, required materials and a verified source URL. See [Dataset/](Dataset/) and [dataset_documentation.md](dataset_documentation.md).
+- **Sample documents:** 9 fictional transcripts and look-alike files for testing document checks, each watermarked SAMPLE. See [samples/README.md](samples/README.md).
+- **Sample scholarship site:** a fictional scholarship website for testing page reading and change alerts. See [samples/scholarship-site/README.md](samples/scholarship-site/README.md).
 
-**Gmail** (about 500 emails a day; use a Gmail account made for the project, not your personal one):
-
-1. On that Google account, turn on **2-Step Verification** (Google Account → Security).
-2. Open **Google Account → Security → App passwords** (or search "App passwords" in the account settings), create one named `ScholarScope`, and copy the 16-character password.
-3. Put it in `.env.secrets` as `SMTP_PASSWORD=...` (spaces don't matter).
-4. In `.env`, set `MAIL_BACKEND=gmail` and `SMTP_USER=the-gmail-address@gmail.com`. Optionally `MAIL_FROM=ScholarScope <the-gmail-address@gmail.com>` for the display name.
-5. Run `docker compose up -d --build localstack worker`.
-
-**Brevo** (about 300 a day; the sign-up asks for company details): create a free account at brevo.com, verify a sender under **Senders**, create a key under **SMTP & API → API keys**, put it in `.env.secrets` as `BREVO_API_KEY`, and set `MAIL_BACKEND=brevo` and `MAIL_FROM=ScholarScope <the verified address>` in `.env`. Then run the same command as step 5.
-
-**Check it:** `docker compose exec worker npm run mail:test -- you@example.com` checks the settings (for Brevo: the key, and that `MAIL_FROM` is a verified sender), sends one test email, and says exactly what is missing if anything is.
-
-**Done when:** adding an email on your profile says *Code sent* and the code arrives (check spam the first time). If it says *We could not send the email*, `docker compose logs --tail 20 worker` says why (for Gmail, usually a normal password used instead of an app password). Real addresses then get real emails, and the daily limit is shared by everyone using the account or key.
-
-## Local URLs
-
-| What | URL |
-|---|---|
-| Web app | http://localhost:4200 |
-| API health | http://localhost:3000/api/health |
-| Firebase Emulator UI (data, users) | http://localhost:4000 |
-| MinIO console (files) | http://localhost:9001 |
-| Mailpit (alert emails) | http://localhost:8025 |
-
-All ports listen on `127.0.0.1` only.
+All test data is fictional. Free AI tiers may keep what they are sent, so real student records are never used.
 
 ---
 
-## Everyday commands
+## 14. Testing and Quality Assurance
 
-| Task | Command |
-|---|---|
-| Start everything (starts Docker Desktop if needed, waits until the site answers) | `npm start` |
-| Stop everything (saves accounts and data first; stop before shutting down the computer or quitting Docker) | `npm stop` |
-| Start / stop without the helper | `docker compose --profile web up -d` / `docker compose --profile web stop` |
-| Recent logs | `docker compose logs --tail 30 worker` (add `-f` to follow) |
-| Restart after changing code in `shared/` | `docker compose restart api worker` |
-| Rebuild after changing a `package.json` | `docker compose up -d --build --renew-anon-volumes api worker` |
-| Run the page re-check now | `docker compose exec worker npm run cron:recheck` |
-| Run deadline alerts now | `docker compose exec worker npm run cron:deadline-alerts` |
-| Failed jobs (dead-letter queue) | `docker compose exec localstack awslocal sqs get-queue-attributes --queue-url http://localhost:4566/000000000000/gemini-dlq --attribute-names ApproximateNumberOfMessages` |
-| Make someone an admin (they sign up first, then sign out and in again) | `npm run admin -- grant someone@example.com` |
-| Remove an admin / list admins | `npm run admin -- revoke someone@example.com` / `npm run admin -- list` |
-| Process "delete my data" requests (and accounts an admin deleted) | `docker compose run --rm deleter` |
-| Delete one student now | `docker compose run --rm deleter <uid>` |
-| Save accounts and data now (they are also saved on `docker compose stop`) | `docker compose exec firebase firebase emulators:export /data/export --project demo-scholarscope --force` (Git Bash: put `MSYS_NO_PATHCONV=1 ` in front) |
-| Convert deadlines saved before time zones were stored (once; add `-- --apply` to write) | `docker compose exec api npm run migrate:deadlines` |
-| Reset all local data | `docker compose down -v` |
-
-## Tests
+All **219 unit tests** (shared code, API, worker) and **48 Angular tests** pass.
 
 ```bash
-npm ci && npm run check                     # typecheck + unit tests (shared, api, worker)
-cd web && npx ng test --watch=false && cd ..   # Angular tests
-docker compose run --rm --entrypoint /bin/sh minio-init /init/test-permissions.sh
-npm run infra:check                         # Terraform: fmt, validate, tfsec, checkov, infracost (Docker only, no cloud account)
+npm run check                               # typecheck + unit tests
+cd web && npx ng test --watch=false         # Angular tests
+npm run infra:check                         # Terraform: fmt, validate, tfsec, checkov
+docker compose run --rm --entrypoint /bin/sh minio-init /init/test-permissions.sh   # storage permissions
 ```
 
-In Windows PowerShell 5, use `;` instead of `&&`.
+CI runs on every pull request: typecheck and unit tests, the Angular build and tests, Docker Compose and shell-script checks, Terraform checks and a gitleaks secret scan. The web app was also audited against WCAG 2.1 AA and the major issues were fixed.
 
 ---
 
-## Troubleshooting
+## 15. Demo
 
-| Symptom | Fix |
-|---|---|
-| `'clamav' is not recognized…` (Windows) or `clamav: command not found` (macOS/Linux) | A long command was split over two lines. Run it as one line. |
-| `required variable … is missing a value` | That value in `.env` is empty (step 3). |
-| `pull access denied for minio/mc` or `401 Unauthorized` from quay.io | Old MinIO image names. Use the Chainguard digest from `.env.example` (step 4). |
-| `No such image: localstack/…` | The pull didn't finish. Run `docker pull localstack/localstack:latest` again. |
-| `minio-init`: `flag provided but not defined` | A MinIO secret starts with `-`. Refill the four with hex (step 3), then `docker compose rm -sf minio minio-init`, `docker volume rm scholarscope_minio-data`, `docker compose up -d minio minio-init`. |
-| `localstack` exits or shows a licence error | `LOCALSTACK_AUTH_TOKEN` is missing or wrong. |
-| Worker: `queue_receive_failed … ECONNREFUSED 127.0.0.1:4566` | You have an old copy of `shared/src/platform/queue/sqs.ts`. Pull the latest code, then `docker compose restart worker`. |
-| `npm warn EBADENGINE` and Angular won't start | Node.js is older than 22.22.3. Install the latest Node 22 LTS (Windows: nodejs.org installer; macOS/Linux: `nvm install 22 && nvm alias default 22`), open a new terminal, run `npm ci` again. |
-| Linux: `permission denied while trying to connect to the Docker daemon socket` | Add yourself to the `docker` group (see *Before you start*), then log out and back in. |
-| Linux: `docker: 'compose' is not a docker command` | Install the Compose v2 plugin (`sudo apt install docker-compose-plugin` on Docker's apt repo). The old `docker-compose` v1 tool isn't supported. |
-| Apple Silicon: `no matching manifest for linux/arm64` for one image | Create `docker-compose.override.yml` with `services: { <service>: { platform: linux/amd64 } }` (Docker Desktop runs it under emulation), or pin a newer multi-arch digest. |
-| Containers slow or killed on a Mac | Docker Desktop → Settings → Resources → Memory ≥ 6 GB. |
-| Web app shows only the header | Pull the latest code (the sign-in guard fix), then reload. Otherwise press F12 → Console and check the red errors. |
-| `/bin/sh^M: bad interpreter` | A `.sh` file got Windows line endings. `.gitattributes` prevents this for new clones; to fix now, open it in VS Code → *CRLF* → *LF* → save (macOS/Linux: `sed -i.bak 's/\r$//' file.sh`). |
-| ClamAV unhealthy for several minutes | First signature download. Wait, or give Docker more RAM. |
-| Upload fails with a signature or CORS error | `S3_PUBLIC_ENDPOINT` must be `http://localhost:9000` and the web app must run on `http://localhost:4200`. |
-| Upload stuck on "Reading the requirements…" | `docker compose logs --tail 30 worker`. Usually a wrong Gemini key or model id (or NVIDIA key with `AI_PROVIDER=nim`). Fix it, then `docker compose restart localstack worker`. |
-| Job status `paused_ai_off` | `config/app.aiEnabled` is `false` in the Emulator UI (Firestore); set it to `true`. |
-| AI calls return 429 | AI Studio free-tier limit. Wait for the daily reset, lower `GEMINI_RATE_PER_SEC`, or set `AI_PROVIDER=auto` (or `nim`) so NVIDIA NIM answers instead. |
-| Accounts gone after a restart | Data is saved only on a clean `docker compose stop`. Quitting Docker Desktop or shutting down with containers running skips the save; run the "Save accounts and data now" command first. |
-| Port already in use | Change the left-hand port in `docker-compose.yml`, e.g. `"127.0.0.1:3001:3000"`. |
+**Recorded walkthrough:** [Watch on YouTube](https://youtu.be/PK8dkiaQhP4)
 
-Before pasting logs into an issue or chat, check them for passwords and keys.
+The walkthrough follows Jay Clark through Discover, a scholarship's checklist with source quotes, a transcript check, an essay draft, a deadline change on a scholarship's page and the reminder email, recorded on the local stack with NVIDIA NIM.
 
 ---
 
-## How it's built
+## 16. Privacy, Security, and Responsible Use
 
-| Part | Folder | Runs as |
-|---|---|---|
-| Web app (Angular 22) | `web/` | `npm start` on your machine |
-| API (Node.js 22, Express) | `api/` | `api` container |
-| Worker: virus scan, OCR, extraction, page re-checks, alerts | `worker/` | `worker` container |
-| Shared code: data access, adapters, citation and deadline logic | `shared/` | used by API and worker |
-| Local infrastructure | `local/`, `docker-compose.yml` | containers below |
-| Google Cloud infrastructure (Terraform) | `infra/` | checked locally with `npm run infra:check`, see [infra/README.md](infra/README.md) |
-
-| Production service (Google Cloud) | Local stand-in |
-|---|---|
-| Firestore, Identity Platform | Firebase emulators (`firebase`) |
-| Cloud Storage | MinIO, Chainguard build (`minio`) |
-| Cloud Tasks, Secret Manager | LocalStack SQS + Secrets Manager (`localstack`) |
-| Malware scanning | ClamAV (`clamav`) |
-| Email (Brevo) | Mailpit (`mailpit`) |
-| Cloud Vision OCR | Tesseract inside the worker |
-| Vertex AI Gemini | Gemini API, Google AI Studio free tier |
-| NVIDIA NIM | Hosted NIM API (or Gemini with `NIM_ENABLED=false`); also answers the main AI jobs with `AI_PROVIDER=nim` or `auto` |
-| Cloud Scheduler | `node-cron` inside the worker |
-
-All storage, queue, secret, AI and mail calls go through small adapters in `shared/src/platform/`, chosen by environment variables (`STORAGE_BACKEND`, `QUEUE_BACKEND`, `SECRETS_BACKEND`, `GEMINI_BACKEND`, `AI_PROVIDER`, `MAIL_BACKEND`). Moving to Google Cloud means writing the Google implementations next to the local ones (stubs are there) and changing configuration, not rewriting the job handlers.
-
-```
-api/        Express API: routes, sign-in check, validation, seed script
-worker/     job handlers (scan, extract, fetch_url), cron jobs, delete-user job
-shared/     Firestore access, adapters, citation + deadline logic
-web/        Angular app
-local/      emulator config, MinIO policies + tests, LocalStack init, dev Dockerfiles
-infra/      Terraform for Google Cloud, checked locally (fmt, validate, tfsec, checkov, infracost)
-scripts/    npm start / npm stop (site.mjs) and the Terraform checks (infra-check.mjs)
-.github/    CI workflow
-```
-
----
-
-## Security model
-
-- **Only the worker sends email.** The API queues each email (with its one-time code) for the worker and never holds a mail key; the worker deletes the queued copy as soon as it is sent.
-- **API keys stay on the server.** `.env.secrets` is read only by LocalStack, which stores the keys in its Secrets Manager; only the worker fetches them. The API and the browser never see them.
-- **Least privilege for files.** Each service has its own MinIO user (`local/minio/policies/`): the API can only drop files into quarantine, the worker can add originals but never delete them, and only the deleter job can erase a student's files. Originals are versioned.
+- **Only the worker sends email and holds API keys.** The API and the browser never see them.
+- **Least privilege for files.** The API can only drop files into quarantine, the worker can add originals but never delete them, and only the deleter job can erase a student's files. Originals are versioned.
 - **Every API route checks the sign-in token**, and all data paths come from the token's user id, so one student can't reach another's data. Sessions end after 30 minutes of inactivity.
 - **Uploads are untrusted:** size limit, real file-type check from the file's bytes, then a ClamAV scan before anything reads them.
-- **Saved web pages are fetched safely:** robots.txt is honoured, and private or internal addresses are blocked. Public scholarship pages are then read with Jina Reader (asked not to cache or log them), with a direct fetch as the fallback; set `READER_BACKEND=direct` to keep page addresses away from Jina. Student uploads are never sent to Jina.
-- **Document text is data, not instructions:** the AI is told to ignore instructions inside documents, and every extracted item must quote the source; quotes not found in the stored text become "Unverified".
-- **AI document checks never read out ID numbers:** the prompt and the response schema have no field for passport or ID numbers, and every fact must quote the file before a rule uses it.
+- **Web pages are fetched safely:** robots.txt is honoured and private addresses are blocked. Student uploads are never sent to Jina Reader.
+- **Document text is data, not instructions:** the AI is told to ignore instructions inside documents, and every item must quote the source.
+- **No ID numbers:** document checks have no field for passport or ID numbers.
+- **Admins are staff accounts.** The admin role is checked on every admin route; admins never see a student's documents, scholarships or profile, and every admin change is written to the audit log.
 - **Firestore rules deny all direct client access.**
-- **Admins are ordinary accounts with a role.** The `admin` role is a Firebase custom claim inside the signed sign-in token, set only by `npm run admin -- grant` (server access) or by another admin. Every `/api/admin` route checks it; hiding the Admin link in the web app is only a convenience. Admin accounts are staff accounts: they see Admin, Discover (as students see it) and their own account settings, and the student pages (dashboard, scholarships, documents, alerts) send them to Admin instead. Admins manage the catalog, settings and accounts, but cannot open a student's documents, scholarships or profile, and deleting an account only queues it for the deleter job. Every admin change is written to the audit log. Removing a role signs that person out everywhere, so it takes effect at once.
-- **Catalog edits made in the admin dashboard win.** `npm start` reloads the catalog from `Dataset/`, but leaves alone any entry an admin added, edited or removed.
-- **Emulator settings can't reach a deployment:** the API and worker refuse to start if emulator variables are set outside `APP_ENV=local`.
+- **Delete my data** erases a student's account and files through a separate deleter job.
+- **Not a guarantee.** ScholarScope shows where each requirement came from; students should still read the official guidelines before applying.
 
-The local setup does **not** provide encryption at rest, IAM enforcement in LocalStack, or signed sign-in tokens (the Auth emulator issues unsigned ones). Those come from the managed services in production.
+The local setup does not provide encryption at rest or signed sign-in tokens; those come from the managed Google Cloud services in production.
 
 ---
 
-## Project status
+## 17. Limitations and Future Scope
 
-| Area | Status |
+**Current limitations**
+
+- Runs locally only; the Google Cloud adapters for storage and queues are stubs, and the Terraform has not been applied.
+- Extraction accuracy has not been measured against a hand-checked set.
+- Pairing old and new versions of a requirement after a page change is basic (by requirement name).
+- Two-step sign-in (TOTP) screens are not built yet.
+- The free AI tiers limit how many documents can be read each day.
+
+**Next steps**
+
+- Implement the Google Cloud adapters and deploy with the existing Terraform.
+- Measure extraction accuracy on a larger set of real scholarship pages.
+- Add two-step sign-in for students.
+- Pilot with school counselors and scholarship advisers.
+
+---
+
+## 18. Team Credits and Individual Contributions
+
+**Team ScholarScope** · Mentor Me Collective BUILD, Fall 2026 · SDG 4
+
+| Member | GitHub | Track | Individual contributions |
+|---|---|---|---|
+| **Sarah Chowdhury** | [@sarah-chowdhury4](https://github.com/sarah-chowdhury4) | Cloud Foundations | Developed the web app, API and worker; set up the local Docker stack, the Terraform for Google Cloud and CI; integrated Gemini and NVIDIA NIM; applied the team's design and dataset across the app; recorded the demo walkthrough. |
+| **Alexis Raynor** | [@lexrayn](https://github.com/lexrayn) | Data Analytics | Researched and built the 15-scholarship dataset that became the whole Discover catalog, each entry checked against its official source; wrote the data documentation and data dictionary, including the "No source, no claim" lineage rule the product is built on; drew the system architecture and data lineage diagram; wrote the project's written summary; reviewed how requirements are verified and shown. |
+| **Eshani Anilkumar** | [@Eshani197](https://github.com/Eshani197) | AI Cloud Leader | Designed and built the student profile page, whose colours, fonts and components became the design for the whole web app; wrote the front-end setup and profile integration guides that defined the student flow from sign-up to dashboard to profile; shaped the student workflow and alerts; created the presentation deck; reviewed the student experience throughout. |
+
+The whole team planned the product together (product brief, user path, project and cloud plans), met regularly, answered questions quickly and reviewed features as they were built.
+
+---
+
+## 19. Documentation Hub
+
+| Document | Description |
 |---|---|
-| Sign-up / sign-in, consent, idle timeout | Done (TOTP MFA screens to do) |
-| Scholarship records (up to 15), dashboard sorted by deadline, empty state for new students | Done |
-| Discover page: catalog search, filters (deadline, GPA, provider, what's required), add to my list | Done |
-| Add a scholarship that isn't in the catalog (name, provider, page, award, deadline) | Done |
-| Landing page before sign-in | Done |
-| Upload → scan → store original → extract with citations | Done |
-| Paste a scholarship page URL as a source (joins the daily re-check), list of sources | Done |
-| Confirm / correct / reject an extracted item, tick items done, version history | Done |
-| OCR for images and scanned PDFs | Done (Tesseract locally) |
-| Requirement versions + change flag on re-extraction | Done (basic pairing by requirement name) |
-| Daily page re-check (robots.txt, change detection) | Done |
-| Deadline alerts (email, de-duplicated; stored for in-app) | Done |
-| Change alerts (in-app record + email, de-duplicated) | Done |
-| In-app alerts page, unread count in the menu, mark read / all read | Done |
-| Delete my data | Done |
-| Admin dashboard: catalog (add, edit, verify, remove, restore), settings and AI switch, accounts (roles, deletion), audit log | Done |
-| Side-by-side diff view with an AI summary, acknowledging changes | Done |
-| Student document library (transcripts, certificates, passport…) | Done |
-| AI document checks: right kind of file, name vs profile, expiry vs deadline, GPA vs minimum (matched to the school level), official / English rules | Done |
-| Essay drafts from the student's own notes, each sentence tied to a note, a note when a draft is short, edit + approval, daily limit | Done |
-| Choice of AI for these jobs: Gemini, NVIDIA NIM, or Gemini with NIM as the fallback (`AI_PROVIDER`) | Done |
-| Admin accounts kept apart from student pages | Done |
-| Calendar (ICS with reminders), CSV checklist, print / save-as-PDF view | Done |
-| Google Cloud adapters (GCS, Cloud Tasks, Secret Manager) | Stubs in `shared/src/platform/` |
-| Google Cloud infrastructure as code (Terraform) | Done, checked locally and in CI (`infra/`) |
+| [docs/SETUP.md](docs/SETUP.md) | Local setup for Windows, macOS and Linux, everyday commands, tests, troubleshooting, contributing |
+| [infra/README.md](infra/README.md) | Google Cloud infrastructure (Terraform), checks and deployment notes |
+| [dataset_documentation.md](dataset_documentation.md) | Dataset structure, data dictionary and lineage rules |
+| [architecture-diagram.jfif](architecture-diagram.jfif) | System architecture and data lineage diagram |
+| [samples/README.md](samples/README.md) | Fictional test documents and expected results |
+| [samples/scholarship-site/README.md](samples/scholarship-site/README.md) | Fictional scholarship website for testing changes |
 
 ---
 
-## Contributing
-
-- Work on a branch and open a pull request into `main`. CI (`.github/workflows/ci.yml`) must pass: typecheck and unit tests, Angular build and tests, a `docker-compose.yml` check, shell-script checks, Terraform checks (`npm run infra:check`) and a gitleaks secret scan.
-- **Never commit** `.env`, `.env.secrets`, real student documents or keys. If a key is ever committed or shown, revoke it and create a new one.
-- Keep shell scripts and Dockerfiles with LF line endings (`.gitattributes` handles this).
-- UI: the site follows the team's profile page design (`Profile setup/`). Colors, fonts and shared components live in `web/src/styles.css`; change a color in its `:root` block, not in a page.
-- New image versions: test locally, then update the digests in `.env.example` in the same pull request.
-
-## License
+## 20. License
 
 No license has been chosen yet. Until one is added, all rights are reserved by the authors.
