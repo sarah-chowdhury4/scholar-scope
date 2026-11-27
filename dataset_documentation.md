@@ -22,8 +22,9 @@ The platform operates under a strict data lineage rule: **"No source, no claim."
 
 *Lead: Alexis (Cloud Data Analytics Lead)*
 
-### 3.1 Dataset Structure (`api/seed/dataset.csv`)
-
+### 3.1 Dataset Structure (`Dataset/ScholarScope Updated Dataset.csv`)
+*`npm start` loads it automatically.
+* To load it by hand, run `docker compose exec api npm run seed:catalog` with no file name.
 The seed dataset contains **15 structured scholarship records** split into two primary categories:
 
 * **Domestic \& Major Grants (`SCH-001` to `SCH-005`, `SCH-011` to `SCH-015`):** Standard academic awards featuring GPA cutoffs, essay prompts, transcripts, and letters of recommendation.
@@ -40,29 +41,23 @@ The seed dataset contains **15 structured scholarship records** split into two p
 |`min\_gpa`|Min GPA|`NUMERIC` (Decimal)|**Numeric Rule:** Stored as raw float/decimal (e.g., `3.00`) for filtering.|Algorithmic profile GPA matching.|
 |`essay\_prompt`|Required Essay Prompt / Materials|`STRING` (Long Text)|Extracted prompt text and required document checklist.|Input payload for draft matching.|
 |`verified\_source\_url`|Verified Source URL|`STRING` (URL)|Direct deep link pointing to official rules/guidelines page.|**Zero-Hallucination Guardrail**.|
-|`version\_flag`|Data Status / Version Flag|`STRING` (Text)|Allowed flags: `v1.0 - Active`, `v2.1 - Deadline Changed`, `Unverified`.|Enables immutable version history tracking.|
-
+* The app never changes the dataset's `Data Status / Version Flag` column.
+* Instead, every requirement keeps its own version history: a correction or a changed web page saves a new version, and **History** lists them all.
 \---
 
-## 4\. Confidence Scoring \& Lineage Guardrails
-
-* **95% Confidence Threshold (`FR-2.4`):**
-
-  * **Automated Acceptance ($\\ge 95%$):** Extracted fields automatically populate on the student dashboard.
-  * **"Needs Review" Warning ($< 95%$):** Ambiguous phrasing or low-OCR confidence triggers a yellow **Needs Review** badge, locking the item until manually confirmed.
-* **Zero-Hallucination Guardrail (`FR-4.2`, `NFR-2.1`):** If `verified\_source\_url` is missing or invalid, `version\_flag` defaults to `Unverified`, preventing unverified claims from reaching students.
-* **Immutable Snapshotting (`FR-3.2`, `NFR-2.2`):** Re-fetching or re-uploading documents never overwrites existing records; updates increment the `version\_flag` (e.g., `v1.0` $\\rightarrow$ `v2.0`) and log a delta diff.
-
+## 4. Confidence Threshold, Student Review & Unverified Status
+* **Confidence threshold:** The app uses **85%**, (`confidenceThreshold: 0.85` in `shared/src/config.ts`).
+  * Items at or above 85% show **From source**.
+  * Items below 85% show **Needs review**.
+* **No locking:** Nothing is locked. The item shows a **Needs review** badge, and the student checks it with **Looks right**, **Fix**, or **Not a requirement**.
+* **When something is Unverified:**
+  * A catalog entry is Unverified when it has no source URL or its status says Unverified.
+  * A requirement read from a document is Unverified when its quote cannot be found in the source.
+  * A deadline the student typed in is Unverified too.
 \---
 
 ## 5\. Local Setup \& Testing Workflow
 
 ### 5.1 Seeding the Dataset
-
-1. Place the 15-scholarship dataset into `api/seed/dataset.csv`.
-2. Run the catalog seed command inside the API container:
-
-```bash
-   docker compose exec api npm run seed:catalog -- seed/dataset.csv
-   ```
+* The app loads `Dataset/ScholarScope Updated Dataset.csv` automatically on `npm start`, or manually with `docker compose exec api npm run seed:catalog` (no file name).
 
