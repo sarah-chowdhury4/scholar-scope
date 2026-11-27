@@ -5,7 +5,7 @@
 - Upload a scholarship's guidelines (PDF, Word, image or text) or save its web page.
 - Requirements, deadlines, word limits and eligibility rules are extracted, and **each one links to the exact page and sentence in the source**. Anything that can't be found in the source is shown as **Unverified**.
 - Requirements are versioned, never overwritten. When a saved page changes, the affected requirement is flagged until the student acknowledges it.
-- Deadline alerts go out 14, 7, 3 and 1 days before each deadline, and on the day itself. If the worker was off on a reminder day, that reminder goes out when it next runs (up to 3 days late, with the real number of days left); the worker also checks for due reminders each time it starts.
+- Deadline alerts go out 14, 7, 3 and 1 days before each deadline, and on the day itself (admins can change these days in **Admin → Settings**). If the worker was off on a reminder day, that reminder goes out when it next runs (up to 3 days late, with the real number of days left); the worker also checks for due reminders each time it starts.
 
 Everything runs on your own computer with Docker. **You don't need a cloud account or a payment method.**
 
@@ -61,7 +61,7 @@ All commands run from the repository root unless a step says otherwise.
 ### 1. Clone
 
 ```bash
-git clone https://github.com/<org>/scholar-scope.git
+git clone https://github.com/sarah-chowdhury4/scholar-scope.git
 cd scholar-scope
 ```
 
@@ -76,7 +76,7 @@ cd scholar-scope
 | Gemini model id | AI Studio → model list (exact id of the current Flash model) | `.env` → `GEMINI_MODEL` |
 | Gmail app password (optional: real emails) | Google Account → Security → *App passwords* (needs 2-Step Verification). Without it, every email goes to Mailpit. Brevo also works; see *Send real emails* | `.env.secrets` → `SMTP_PASSWORD`, `.env` → `SMTP_USER` |
 | Jina Reader key (optional) | jina.ai → *Get API key*. Without one, saved pages are still read at 20 requests a minute | `.env.secrets` → `JINA_API_KEY` |
-| NVIDIA NIM key (optional) | build.nvidia.com → *Get API Key*. No key? Set `NIM_ENABLED=false` in `.env` and NIM calls run on Gemini | `.env.secrets` → `NVIDIA_API_KEY` |
+| NVIDIA NIM key (optional; required for `AI_PROVIDER=nim` or `auto`) | build.nvidia.com → *Get API Key*. No key? Set `NIM_ENABLED=false` in `.env` and NIM calls run on Gemini | `.env.secrets` → `NVIDIA_API_KEY` |
 
 > **Synthetic documents only.** Free-tier AI inputs may be kept or used by the provider. Never upload real student records to a local setup.
 
@@ -124,6 +124,16 @@ rm .env.bak
 ```
 
 Then open `.env` and set `LOCALSTACK_AUTH_TOKEN` and `GEMINI_MODEL`; open `.env.secrets` and set `GEMINI_API_KEY`. If you have an NVIDIA key, set `NVIDIA_API_KEY` too; if not, set `NIM_ENABLED=false` in `.env` so the NIM jobs run on Gemini. Use any text editor: `notepad .env` (Windows), `open -e .env` (macOS) or `nano .env` (Linux).
+
+**Choose the AI.** `AI_PROVIDER` in `.env` picks which AI reads requirements, checks documents, summarises changes and drafts essays:
+
+| Value | What it does |
+|---|---|
+| `gemini` (default) | Gemini only. Needs `GEMINI_API_KEY`. |
+| `nim` | NVIDIA NIM only. Needs `NVIDIA_API_KEY`; Gemini is not called. The search for a scholarship's official pages uses Google Search through Gemini, so it is skipped. |
+| `auto` | Gemini first; when it is busy or out of its free quota, NIM answers instead. Needs both keys. |
+
+Each AI result records the model that produced it. After changing the value, run `docker compose up -d worker`.
 
 Both files are git-ignored. If this is a fresh copy rather than a clone, run `git init -b main` first, then confirm with `git status` that neither file is listed.
 
@@ -249,7 +259,7 @@ Open http://localhost:4200. You should see the sign-in page. Choose **Create an 
 docker compose exec api npm run seed -- seed/dataset.csv demo@student.test "a-long-demo-password"
 ```
 
-This loads the catalog and adds catalog scholarships (up to 15) to a demo account. Catalog values have no citation, so they show as **Unverified** until real guidelines are uploaded.
+This loads the catalog and adds catalog scholarships (up to 15) to a demo account. Entries the team checked against the official page (a source URL and a dataset status that isn't `Unverified`) show as **From source**; any others show as **Unverified** until real guidelines are uploaded.
 
 ---
 
@@ -339,9 +349,9 @@ In Windows PowerShell 5, use `;` instead of `&&`.
 | `/bin/sh^M: bad interpreter` | A `.sh` file got Windows line endings. `.gitattributes` prevents this for new clones; to fix now, open it in VS Code → *CRLF* → *LF* → save (macOS/Linux: `sed -i.bak 's/\r$//' file.sh`). |
 | ClamAV unhealthy for several minutes | First signature download. Wait, or give Docker more RAM. |
 | Upload fails with a signature or CORS error | `S3_PUBLIC_ENDPOINT` must be `http://localhost:9000` and the web app must run on `http://localhost:4200`. |
-| Upload stuck on "Reading the requirements…" | `docker compose logs --tail 30 worker`. Usually a wrong Gemini key or model id. Fix it, then `docker compose restart localstack worker`. |
+| Upload stuck on "Reading the requirements…" | `docker compose logs --tail 30 worker`. Usually a wrong Gemini key or model id (or NVIDIA key with `AI_PROVIDER=nim`). Fix it, then `docker compose restart localstack worker`. |
 | Job status `paused_ai_off` | `config/app.aiEnabled` is `false` in the Emulator UI (Firestore); set it to `true`. |
-| AI calls return 429 | AI Studio free-tier limit. Wait for the daily reset or lower `GEMINI_RATE_PER_SEC`. |
+| AI calls return 429 | AI Studio free-tier limit. Wait for the daily reset, lower `GEMINI_RATE_PER_SEC`, or set `AI_PROVIDER=auto` (or `nim`) so NVIDIA NIM answers instead. |
 | Accounts gone after a restart | Data is saved only on a clean `docker compose stop`. Quitting Docker Desktop or shutting down with containers running skips the save; run the "Save accounts and data now" command first. |
 | Port already in use | Change the left-hand port in `docker-compose.yml`, e.g. `"127.0.0.1:3001:3000"`. |
 
@@ -369,11 +379,10 @@ Before pasting logs into an issue or chat, check them for passwords and keys.
 | Email (Brevo) | Mailpit (`mailpit`) |
 | Cloud Vision OCR | Tesseract inside the worker |
 | Vertex AI Gemini | Gemini API, Google AI Studio free tier |
-| NVIDIA NIM | Hosted NIM API (or Gemini with `NIM_ENABLED=false`) |
-| NVIDIA NIM | Hosted NIM API |
+| NVIDIA NIM | Hosted NIM API (or Gemini with `NIM_ENABLED=false`); also answers the main AI jobs with `AI_PROVIDER=nim` or `auto` |
 | Cloud Scheduler | `node-cron` inside the worker |
 
-All storage, queue, secret, AI and mail calls go through small adapters in `shared/src/platform/`, chosen by environment variables (`STORAGE_BACKEND`, `QUEUE_BACKEND`, `SECRETS_BACKEND`, `GEMINI_BACKEND`, `MAIL_BACKEND`). Moving to Google Cloud means writing the Google implementations next to the local ones (stubs are there) and changing configuration, not rewriting the job handlers.
+All storage, queue, secret, AI and mail calls go through small adapters in `shared/src/platform/`, chosen by environment variables (`STORAGE_BACKEND`, `QUEUE_BACKEND`, `SECRETS_BACKEND`, `GEMINI_BACKEND`, `AI_PROVIDER`, `MAIL_BACKEND`). Moving to Google Cloud means writing the Google implementations next to the local ones (stubs are there) and changing configuration, not rewriting the job handlers.
 
 ```
 api/        Express API: routes, sign-in check, validation, seed script
@@ -399,7 +408,7 @@ scripts/    npm start / npm stop (site.mjs) and the Terraform checks (infra-chec
 - **Document text is data, not instructions:** the AI is told to ignore instructions inside documents, and every extracted item must quote the source; quotes not found in the stored text become "Unverified".
 - **AI document checks never read out ID numbers:** the prompt and the response schema have no field for passport or ID numbers, and every fact must quote the file before a rule uses it.
 - **Firestore rules deny all direct client access.**
-- **Admins are ordinary accounts with a role.** The `admin` role is a Firebase custom claim inside the signed sign-in token, set only by `npm run admin -- grant` (server access) or by another admin. Every `/api/admin` route checks it; hiding the Admin link in the web app is only a convenience. Admins manage the catalog, settings and accounts, but cannot open a student's documents, scholarships or profile, and deleting an account only queues it for the deleter job. Every admin change is written to the audit log. Removing a role signs that person out everywhere, so it takes effect at once.
+- **Admins are ordinary accounts with a role.** The `admin` role is a Firebase custom claim inside the signed sign-in token, set only by `npm run admin -- grant` (server access) or by another admin. Every `/api/admin` route checks it; hiding the Admin link in the web app is only a convenience. Admin accounts are staff accounts: they see Admin, Discover (as students see it) and their own account settings, and the student pages (dashboard, scholarships, documents, alerts) send them to Admin instead. Admins manage the catalog, settings and accounts, but cannot open a student's documents, scholarships or profile, and deleting an account only queues it for the deleter job. Every admin change is written to the audit log. Removing a role signs that person out everywhere, so it takes effect at once.
 - **Catalog edits made in the admin dashboard win.** `npm start` reloads the catalog from `Dataset/`, but leaves alone any entry an admin added, edited or removed.
 - **Emulator settings can't reach a deployment:** the API and worker refuse to start if emulator variables are set outside `APP_ENV=local`.
 
@@ -427,10 +436,12 @@ The local setup does **not** provide encryption at rest, IAM enforcement in Loca
 | In-app alerts page, unread count in the menu, mark read / all read | Done |
 | Delete my data | Done |
 | Admin dashboard: catalog (add, edit, verify, remove, restore), settings and AI switch, accounts (roles, deletion), audit log | Done |
-| Side-by-side diff view with an AI (Gemini) summary, acknowledging changes | Done |
+| Side-by-side diff view with an AI summary, acknowledging changes | Done |
 | Student document library (transcripts, certificates, passport…) | Done |
-| AI document checks (Gemini): right kind of file, name vs profile, expiry vs deadline, GPA vs minimum, official / English rules | Done |
-| Essay drafts with Gemini from the student's own notes, each sentence tied to a note, edit + approval, daily limit | Done |
+| AI document checks: right kind of file, name vs profile, expiry vs deadline, GPA vs minimum (matched to the school level), official / English rules | Done |
+| Essay drafts from the student's own notes, each sentence tied to a note, a note when a draft is short, edit + approval, daily limit | Done |
+| Choice of AI for these jobs: Gemini, NVIDIA NIM, or Gemini with NIM as the fallback (`AI_PROVIDER`) | Done |
+| Admin accounts kept apart from student pages | Done |
 | Calendar (ICS with reminders), CSV checklist, print / save-as-PDF view | Done |
 | Google Cloud adapters (GCS, Cloud Tasks, Secret Manager) | Stubs in `shared/src/platform/` |
 | Google Cloud infrastructure as code (Terraform) | Done, checked locally and in CI (`infra/`) |
