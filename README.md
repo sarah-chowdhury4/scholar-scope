@@ -7,6 +7,10 @@
 - Requirements are versioned, never overwritten. When a saved page changes, the affected requirement is flagged until the student acknowledges it.
 - Deadline alerts go out 14, 7, 3 and 1 days before each deadline, and on the day itself (admins can change these days in **Admin → Settings**). If the worker was off on a reminder day, that reminder goes out when it next runs (up to 3 days late, with the real number of days left); the worker also checks for due reminders each time it starts.
 
+**Demo video:** [watch ScholarScope in action on YouTube](https://youtu.be/PK8dkiaQhP4).
+
+[![ScholarScope demo video](https://img.youtube.com/vi/PK8dkiaQhP4/hqdefault.jpg)](https://youtu.be/PK8dkiaQhP4)
+
 Everything runs on your own computer with Docker. **You don't need a cloud account or a payment method.**
 
 ---
