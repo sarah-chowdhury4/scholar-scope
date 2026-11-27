@@ -1,5 +1,5 @@
 import { Routes } from '@angular/router';
-import { adminGuard, authGuard, guestGuard } from './core/auth.guard';
+import { adminGuard, authGuard, guestGuard, studentGuard } from './core/auth.guard';
 
 export const routes: Routes = [
   {
@@ -16,7 +16,7 @@ export const routes: Routes = [
   },
   {
     path: '',
-    canActivate: [authGuard],
+    canActivate: [studentGuard],
     loadComponent: () => import('./pages/dashboard/dashboard').then((m) => m.Dashboard),
     title: 'Dashboard · ScholarScope',
   },
@@ -28,19 +28,19 @@ export const routes: Routes = [
   },
   {
     path: 'documents',
-    canActivate: [authGuard],
+    canActivate: [studentGuard],
     loadComponent: () => import('./pages/documents/documents').then((m) => m.DocumentsPage),
     title: 'Documents · ScholarScope',
   },
   {
     path: 'print',
-    canActivate: [authGuard],
+    canActivate: [studentGuard],
     loadComponent: () => import('./pages/print/print').then((m) => m.PrintPage),
     title: 'Checklist · ScholarScope',
   },
   {
     path: 'alerts',
-    canActivate: [authGuard],
+    canActivate: [studentGuard],
     loadComponent: () => import('./pages/alerts/alerts').then((m) => m.AlertsPage),
     title: 'Alerts · ScholarScope',
   },
@@ -52,13 +52,13 @@ export const routes: Routes = [
   },
   {
     path: 'scholarships/new',
-    canActivate: [authGuard],
+    canActivate: [studentGuard],
     loadComponent: () => import('./pages/add-scholarship/add-scholarship').then((m) => m.AddScholarship),
     title: 'Add a scholarship · ScholarScope',
   },
   {
     path: 'scholarships/:id',
-    canActivate: [authGuard],
+    canActivate: [studentGuard],
     loadComponent: () => import('./pages/scholarship/scholarship').then((m) => m.ScholarshipPage),
     title: 'Scholarship · ScholarScope',
   },

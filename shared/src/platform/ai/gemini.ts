@@ -57,10 +57,11 @@ export async function withBusyRetry<T>(call: () => Promise<T>, waits = [3_000, 1
 }
 
 /**
- * Ask Gemini for JSON matching `schema`. Document text is passed as data inside a delimited block,
- * and the system instruction tells the model to ignore any instructions inside it (NFR-1.6).
+ * Ask Gemini for JSON matching `schema` (callers use generateJson in ./provider, which picks the AI). Document text
+ * is passed as data inside a delimited block, and the system instruction tells the model to ignore any instructions
+ * inside it (NFR-1.6).
  */
-export async function generateJson<T>(options: {
+export async function geminiJson<T>(options: {
   system: string;
   documentText: string;
   task: string;

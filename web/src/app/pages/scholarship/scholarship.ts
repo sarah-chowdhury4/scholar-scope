@@ -1,6 +1,6 @@
 import { PageLoading } from '../../core/page-loading';
 import { Component, ElementRef, OnInit, computed, inject, input, signal, viewChild } from '@angular/core';
-import { RouterLink } from '@angular/router';
+import { Router, RouterLink } from '@angular/router';
 import {
   ApiService,
   apiMessage,
@@ -222,7 +222,10 @@ import { celebrate, confetti } from '../../core/confetti';
 export class ScholarshipPage implements OnInit {
   /** Route parameter (component input binding). */
   readonly id = input.required<string>();
+  /** `?read=1` from "Add your own": read the official page it was added with straight away. */
+  readonly read = input<string>();
   private readonly api = inject(ApiService);
+  private readonly router = inject(Router);
   protected readonly data = signal<(Scholarship & { requirements: Requirement[]; deadlineRequirement?: Requirement | null; documents: ScholarshipDocuments }) | null>(null);
   protected readonly requirements = signal<Requirement[]>([]);
   protected readonly busy = signal(false);
@@ -260,6 +263,12 @@ export class ScholarshipPage implements OnInit {
 
   async ngOnInit() {
     await this.load();
+    const url = this.data()?.url;
+    if (this.read() === '1') {
+      // Drop the flag so a reload does not read the page again.
+      await this.router.navigate([], { queryParams: {}, replaceUrl: true });
+      if (url) await this.readPage(url);
+    }
   }
 
   label(v: string, verifiedBy?: string | null) {
@@ -347,6 +356,11 @@ export class ScholarshipPage implements OnInit {
       this.status.set('Enter the full address, starting with https://');
       return;
     }
+    await this.readPage(url);
+  }
+
+  /** Save a web page as a source and read its requirements, showing each step (also used right after "Add your own"). */
+  private async readPage(url: string) {
     this.busy.set(true);
     this.closeGuidelines();
     this.phase.set('fetchPage');

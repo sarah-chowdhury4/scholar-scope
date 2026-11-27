@@ -38,7 +38,7 @@ describe('ProfilePage email confirmation', () => {
       imports: [ProfilePage],
       providers: [
         provideRouter([]),
-        { provide: AuthService, useValue: { refreshToken: async () => undefined, signIn: async () => undefined } },
+        { provide: AuthService, useValue: { refreshToken: async () => undefined, signIn: async () => undefined, isAdmin: () => false } },
         {
           provide: ApiService,
           useValue: {

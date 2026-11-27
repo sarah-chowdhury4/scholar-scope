@@ -33,6 +33,22 @@ export type NewRequirementVersion = {
  */
 export type UpsertOutcome = { outcome: 'created' | 'unchanged' | 'changed'; requirementId: string; changeId: string | null };
 
+/**
+ * Whether two quotes say the same thing word for word. An AI copies a list item sometimes with its bullet ("* ") and
+ * sometimes without, and may change spacing or the final full stop; none of that is a change in the guidelines.
+ */
+export function sameWording(a: string | null | undefined, b: string | null | undefined): boolean {
+  const norm = (q: string | null | undefined) =>
+    (q ?? '')
+      .replace(/^\s*(?:[*\-•●]|\d+[.)])\s+/gm, '')
+      .replace(/\s+/g, ' ')
+      .replace(/[\s.;:,]+$/, '')
+      .trim()
+      .toLowerCase();
+  const x = norm(a);
+  return x !== '' && x === norm(b);
+}
+
 export async function upsertRequirement(scholarshipRef: DocumentReference, item: NewRequirementVersion): Promise<UpsertOutcome> {
   const matchKey = matchKeyFor(item.kind, item.label);
   const existing = await scholarshipRef.collection('requirements').where('matchKey', '==', matchKey).limit(1).get();
@@ -44,6 +60,8 @@ export async function upsertRequirement(scholarshipRef: DocumentReference, item:
     const newHash = item.citation?.quoteHash ?? null;
 
     if (current && prevHash && prevHash === newHash) return { outcome: 'unchanged', requirementId: reqRef.id, changeId: null };
+    const prevQuote = current?.get('current.citation.quote') as string | undefined;
+    if (current && sameWording(prevQuote, item.citation?.quote)) return { outcome: 'unchanged', requirementId: reqRef.id, changeId: null };
     // The same rule worded differently on a page we found (an FAQ, a search result) is not a change: the
     // existing source keeps the rule, so two pages never flag each other back and forth.
     const prevCitation = current?.get('current.citation') as { sourceId?: string } | null | undefined;

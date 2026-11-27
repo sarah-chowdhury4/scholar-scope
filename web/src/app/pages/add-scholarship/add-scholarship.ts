@@ -110,7 +110,8 @@ export class AddScholarship {
         awardAmount: v.amount ? { amount: Number(v.amount), currency: v.currency } : null,
         deadline: v.deadline ? { date: v.deadline, time: v.time || null, timezone: zone || null } : null,
       });
-      await this.router.navigate(['/scholarships', created.id]);
+      // With an official page, the scholarship page reads it straight away and shows the progress.
+      await this.router.navigate(['/scholarships', created.id], v.url ? { queryParams: { read: '1' } } : {});
     } catch (err) {
       this.error.set(err instanceof HttpErrorResponse && err.error?.error ? err.error.error : 'Could not add the scholarship.');
     } finally {

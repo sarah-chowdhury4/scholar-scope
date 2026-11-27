@@ -1,6 +1,6 @@
 import { REQUIREMENT_KINDS } from '@scholarscope/shared';
 
-export const EXTRACT_PROMPT_VERSION = 'x-1';
+export const EXTRACT_PROMPT_VERSION = 'x-2';
 
 export const EXTRACT_SYSTEM = [
   'You extract scholarship application requirements from a document for a student.',
@@ -14,7 +14,22 @@ export const EXTRACT_SYSTEM = [
 export const EXTRACT_TASK =
   'List every requirement: deadlines (with time and time zone if stated), essays and prompts, word or ' +
   'character limits, transcripts, recommendation letters, eligibility rules (GPA, enrollment, citizenship, ' +
-  'financial need), forms, videos and financial documents. Give a confidence between 0 and 1.';
+  "financial need), forms, videos and financial documents. Put an essay's word limit in that essay's wordLimit " +
+  'field instead of listing it as a separate item. Give a confidence between 0 and 1.';
+
+/**
+ * Added for a linked or found page when the checklist already has items from the scholarship's own page: the same
+ * rule restated on an FAQ must not become a second checklist item. Restating it under the same label is not an option
+ * either, since a new quote for an existing item reads as a change in the guidelines.
+ */
+export function skipKnown(labels: string[]): string {
+  const list = labels.slice(0, 60).map((label) => `- ${label.slice(0, 120)}`).join('\n');
+  return (
+    " These requirements are already on the checklist from the scholarship's other pages:\n" +
+    list +
+    '\nDo not list any of them again, even in other words. Only list requirements this page adds.'
+  );
+}
 
 /** Added to the task for pages we found ourselves, which may describe several programmes. */
 export function forScholarship(name: string, provider: string): string {

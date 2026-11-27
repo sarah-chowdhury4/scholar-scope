@@ -34,7 +34,32 @@ const draft: Draft = {
   approvedAt: null,
 };
 
+async function render(d: Draft) {
+  TestBed.resetTestingModule();
+  await TestBed.configureTestingModule({
+    imports: [EssayDraft],
+    providers: [{ provide: ApiService, useValue: { drafts: async () => ({ items: [d] }) } }],
+  }).compileComponents();
+  const fixture = TestBed.createComponent(EssayDraft);
+  fixture.componentRef.setInput('requirement', requirement);
+  fixture.componentRef.setInput('scholarshipId', 's1');
+  fixture.detectChanges();
+  await fixture.whenStable();
+  fixture.detectChanges();
+  return fixture.nativeElement as HTMLElement;
+}
+
 describe('EssayDraft', () => {
+  it('explains that a draft well under the limit is short because the notes are', async () => {
+    const el = await render({ ...draft, prompt: { ...draft.prompt, wordLimit: 650 }, wordCount: 160 });
+    expect(el.querySelector('.short-draft')?.textContent).toContain('160 of 650 words because it only uses what your notes say');
+  });
+
+  it('says nothing about length when the draft is near the limit or edited', async () => {
+    expect((await render({ ...draft, prompt: { ...draft.prompt, wordLimit: 650 }, wordCount: 590 })).querySelector('.short-draft')).toBeNull();
+    expect((await render({ ...draft, prompt: { ...draft.prompt, wordLimit: 650 }, wordCount: 160, edited: true })).querySelector('.short-draft')).toBeNull();
+  });
+
   it('marks sentences not based on the notes and blocks approval over the word limit', async () => {
     await TestBed.configureTestingModule({
       imports: [EssayDraft],

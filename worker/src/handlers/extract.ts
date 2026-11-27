@@ -6,7 +6,6 @@ import {
   buckets,
   getAppConfig,
   generateJson,
-  geminiModel,
   findQuote,
   quoteHash,
   deadlineFromSource,
@@ -22,7 +21,7 @@ import {
   type Verification,
 } from '@scholarscope/shared';
 import { extractText } from '../text/extractText';
-import { EXTRACT_PROMPT_VERSION, EXTRACT_SCHEMA, EXTRACT_SYSTEM, EXTRACT_TASK, forScholarship, type ExtractedItem } from '../prompts/extract';
+import { EXTRACT_PROMPT_VERSION, EXTRACT_SCHEMA, EXTRACT_SYSTEM, EXTRACT_TASK, forScholarship, skipKnown, type ExtractedItem } from '../prompts/extract';
 import { recomputeCounts, upsertRequirement } from '../requirements';
 import { consumePages, recordTokens } from '../usage';
 import { createChangeAlert } from '../alerts';
@@ -80,8 +79,10 @@ export async function handleExtract(job: JobMessage): Promise<void> {
     // A page we found (linked or by search) may cover other programmes too: keep to this scholarship.
     const sch = await userDoc(job.uid).collection('scholarships').doc(scholarshipIds[0]).get();
     task += forScholarship(String(sch.get('name') ?? ''), String(sch.get('provider') ?? ''));
+    const known = await sch.ref.collection('requirements').where('removedAt', '==', null).get();
+    if (!known.empty) task += skipKnown(known.docs.map((d) => String(d.get('label') ?? '')).filter(Boolean));
   }
-  const { data: result, inputTokens, outputTokens } = await generateJson<{ items: ExtractedItem[] }>({
+  const { data: result, inputTokens, outputTokens, model: aiModelUsed } = await generateJson<{ items: ExtractedItem[] }>({
     system: EXTRACT_SYSTEM,
     task,
     documentText,
@@ -135,8 +136,8 @@ export async function handleExtract(job: JobMessage): Promise<void> {
         verification,
         origin: source.get('kind') === 'url' ? 'refetch' : 'extraction',
         sourceOrigin: origin,
-        extraction: { model: geminiModel(), promptVersion: EXTRACT_PROMPT_VERSION, confidence: item.confidence, jobId: job.jobId, ocrDerived: text.ocrUsed },
-        createdBy: { type: 'ai', id: geminiModel() },
+        extraction: { model: aiModelUsed, promptVersion: EXTRACT_PROMPT_VERSION, confidence: item.confidence, jobId: job.jobId, ocrDerived: text.ocrUsed },
+        createdBy: { type: 'ai', id: aiModelUsed },
       });
       stats[outcome]++;
       if (changeId) {

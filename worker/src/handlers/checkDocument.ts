@@ -7,7 +7,7 @@ import {
   generateJson,
   isQuotaError,
   syncAutoReadiness,
-  geminiModel,
+  aiModel,
   findQuote,
   readProfileRecord,
   checkDocument,
@@ -83,7 +83,7 @@ export async function handleCheckDocument(job: JobMessage): Promise<void> {
   if (readable < 20) {
     facts = emptyFacts(true);
   } else {
-    let result: { data: RawDocumentFacts; inputTokens?: number; outputTokens?: number };
+    let result: { data: RawDocumentFacts; inputTokens?: number; outputTokens?: number; model: string };
     try {
       result = await generateJson<RawDocumentFacts>({
         system: CHECK_DOCUMENT_SYSTEM,
@@ -113,7 +113,7 @@ export async function handleCheckDocument(job: JobMessage): Promise<void> {
     facts,
     findings,
     severity: worstSeverity(findings),
-    model: geminiModel(),
+    model: aiModel(),
     promptVersion: DOCUMENT_CHECK_PROMPT_VERSION,
     ocrUsed: text.ocrUsed,
     checkedAt: FieldValue.serverTimestamp(),
