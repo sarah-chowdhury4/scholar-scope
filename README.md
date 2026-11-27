@@ -17,6 +17,7 @@ _Mentor Me Collective (MMC) BUILD, Fall 2026 · Google Cloud Launchpad Showcase 
 [![Terraform](https://img.shields.io/badge/Terraform-Google%20Cloud-844FBA?logo=terraform&logoColor=white)](infra/README.md)
 [![Tests](https://img.shields.io/badge/Tests-267%20passed-brightgreen?logo=vitest&logoColor=white)](#14-testing-and-quality-assurance)
 [![UN SDG 4](https://img.shields.io/badge/UN%20SDG-4%20Quality%20Education-C5192D)](https://sdgs.un.org/goals/goal4)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue)](LICENSE)
 
 </div>
 
@@ -56,7 +57,7 @@ _Mentor Me Collective (MMC) BUILD, Fall 2026 · Google Cloud Launchpad Showcase 
 14. [Testing and Quality Assurance](#14-testing-and-quality-assurance)
 15. [Demo](#15-demo)
 16. [Privacy, Security, and Responsible Use](#16-privacy-security-and-responsible-use)
-17. [Limitations and Future Scope](#17-limitations-and-future-scope)
+17. [Limitations and Future Ideas](#17-limitations-and-future-ideas)
 18. [Team Credits and Individual Contributions](#18-team-credits-and-individual-contributions)
 19. [Documentation Hub](#19-documentation-hub)
 20. [License](#20-license)
@@ -365,7 +366,7 @@ The local setup does not provide encryption at rest or signed sign-in tokens; th
 
 ---
 
-## 17. Limitations and Future Scope
+## 17. Limitations and Future Ideas
 
 **Current limitations**
 
@@ -375,7 +376,7 @@ The local setup does not provide encryption at rest or signed sign-in tokens; th
 - Two-step sign-in (TOTP) screens are not built yet.
 - The free AI tiers limit how many documents can be read each day.
 
-**Next steps**
+**Future ideas** (for the next cohort)
 
 - Implement the Google Cloud adapters and deploy with the existing Terraform.
 - Measure extraction accuracy on a larger set of real scholarship pages.
@@ -413,4 +414,6 @@ The whole team planned the product together (product brief, user path, project a
 
 ## 20. License
 
-No license has been chosen yet. Until one is added, all rights are reserved by the authors.
+This project is open source under the [MIT License](LICENSE), so future Scholars and anyone else can use, change and build on it.
+
+Copyright (c) 2026 Team ScholarScope (Sarah Chowdhury, Eshani Anilkumar, Alexis Raynor).
