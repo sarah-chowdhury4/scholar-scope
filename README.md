@@ -26,7 +26,7 @@ _Mentor Me Collective (MMC) BUILD, Fall 2026 · Google Cloud Launchpad Showcase 
 
 | **Deliverable** | **Link** |
 |---|---|
-| Presentation deck | [ScholarScope-Presentation.pdf](docs/deliverables/ScholarScope-Presentation.pdf) |
+| Presentation deck | [ScholarScope-Presentation.pptx](docs/deliverables/ScholarScope-Presentation.pptx) |
 | Written summary | [ScholarScope-Written-Summary.pdf](docs/deliverables/ScholarScope-Written-Summary.pdf) |
 | Recorded walkthrough | [Watch on YouTube](https://youtu.be/PK8dkiaQhP4) |
 | Local setup guide | [docs/SETUP.md](docs/SETUP.md) |
